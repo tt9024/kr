@@ -29,8 +29,6 @@ BookDepot books[utils::TotalSecurity];
 bool interrupted;
 unsigned int oid;
 
-
-
 bool makeOrder(const std::string &cmd, OrderQType::Writer* owriter) {
     // very messy string operations
     stringstream ss(cmd);

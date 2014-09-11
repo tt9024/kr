@@ -1,0 +1,8 @@
+this directory should put all the passive utilities to be used in the system
+1. Queues
+2. Sockets
+3. Thread
+4. Logger
+5. Fix Utilities
+6. Asset Domain Knowledges (e.g. FX, etc)
+7. Calendar/Time

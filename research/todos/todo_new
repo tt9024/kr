@@ -1,0 +1,837 @@
+1. do a few tests:
+   a. auto-regression tests, AR/ARMA model
+   b. correlation tests
+   c. on the pca'ed series
+   d. leading/lagging tests
+   e. co-integration tests
+
+Basic system: 
+single ccy time series monitoring 
+1. detect a system-wide significant change ( the key is how to detect this ??? )
+2. once this is there, based on historical data's analysis, we construct a correlation table
+   find ccy pair that have negative correlations
+
+Extension: 
+two ccy time series monitoring
+1. detect if they are too close or too wide? 
+2. also apply 1 to find ccy pairs
+
+pca time series monitoring
+
+per-lp lead/lag time series monitoring:
+1. construct such system for each lp. 
+2. try to find some lead/follow for some ccy, may help global ccy time series prediction
+
+The core is to find break out. 
+
+1/25
+OK, things are getting better.  I finally got a chance to get on.  So now get started. 
+
+Thinking about the algo, I need to going back to fundamental, conceptually, where is the alpha? 
+I claim that by decomposing 1 time series to the two contributing 2 time series, I improve the
+predictability.  I wonder if this is true. I need to answer this question by this week. 
+
+a) just draw the time series, observe the curve and get a perceptual feeling
+b) understand the following theory:
+
+   1. law of large numbers -- cheating for getting averge number.
+   2. law of central limit theory -- extention of law of large numbers
+   3. random walk  (it seems the longer it runs, the farther it will be from the center -- distance increases with sqrt(n))
+      Oh, that's a scale problem, because 
+   4. statistical multiplex  -- I have a wrong perception here:  if I have two variables, X and Y, 
+      the variance of VAR(X+Y) = VAR(X) + VAR(Y) + COV(X,Y).  I have this wrong perception for at least 10 years now!
+      Glad that I corrected it!!!
+   5. the observation in boston museum.  aggregate benullei results, exponential distribution (not normal, why?)
+      (a thought on 4/25) this is a combinatorial problem. Say path has length of n, each step has two possibilities,
+      left (1) or right(0).  So the final position, can be expressed by a n-bit binary number.  obviously there are
+      2^n possibilities, and center has C(n/2, n), possibilities.  It's a symetrical shape. Note that sum(i=0, n) C(i,n) = 2^n, 
+      this is a random walk, the distribution approaches to normal distribution.
+
+   Some of the results seems contridicting each other.  All of them consider 
+   adding of lots of random variable.
+
+c) after b) being done, that shows the preliminary feasibility of the algo.  Then read the measuring the 
+   measuring the predictability - this I need to read carefully and understand what is fundamentally the
+   predictability. 
+   conceptually, the constant is the most predictable, and coin flipping the least. It's the shape of 
+   pdf curve, or the entropy. Are there any other ways? 
+
+   READ! == 
+
+   1. what's difference between ar model and polynomial model? 
+
+2/6
+Trying to understand why the covariance differs so much as to whether I convert it to return.  
+I feel this is an important concept. 
+
+******  understanding the corr/cov/whiten
+1. whiten is correct:  (x-u)/std
+2. corr(x,y) = cov(x,y) / std(x)*std(y)
+3. after whiten, cov(x,y) = corr(x,y) 
+
+***** understanding the return stuff
+1. return is more like the order of the timestamp.  I found that the more I differentiate a time series, 
+   the more unrelated I get.  For example, if I do a return on return, it's more unrelated. 
+2. I tried to use 0/1 to represent the return, either up or down, but they are not very correlated as well. 
+
+To write it a little bit, say x(t) = \alpha * x(t-1) + \delta, where \delta is a random variable. Then,
+r(t) = x(t)/x(t-1) = (\alpha * x(t-1) + \delta) / x(t-1) = \alpha + \delta * x(t-1)^(-1) 
+
+So it becomes that if x(t) and y(t) is correlated, but probably not 1/x(t) and 1/y(t). 
+   OK, that's a different animal.  
+
+But why the ccy_cum_rate correlates better than ccy_rate?   We get ccy_rate first, that's
+computed by CPs.  
+
+Where is the correlation come from?  I think the correlation comes from
+the intrinsic investment/finance requirement, applied on difference currencies.  
+Why it changes from time to time?  
+
+Can I explore some more robust correlation?  
+ 
+2/6/2013
+tried the correlation between EUR and CHF.  Several findings:
+1. regression'ed residual is more gaussian like, direct difference is not. 
+2. however, I have several issues:
+   a) do I have look ahead problem?
+   b) even using in sample, the predictive power is limited if the pdf curve not good enough. 
+
+3. a new idea:  can I get the top and bottom as two time series, i.e. X(t) = max(ccy(t, i)), Y(t) = min(ccy(t, i))
+   i = 0, 1, 2, ... , number of currency
+
+   This sort of worked, but doesn't trade a lot: for 8 hours, only traded twice. 
+ 
+4. another idea: use remaining ccys to regress a given ccy, find the distribute of diff. 
+
+2/11
+tried the max/min correlation.  The regression needs to be adjusted as the regime shifts.
+The most worrying observation is that the correlation relationship changes.
+
+Say use the first 2 hours of data, we see CAD and NZD perfectly negatively correlated, but aftwards they became positively correlated.
+
+pushing to 4 hours --
+does the correlation relationship persist more on the 4 hour basis?
+if not, I need to make a decision as to whether I can deal with that by using a running counter?
+and I should move to another idea of regress using multiple ccys, that kind of have the same effect with PCA'ed prediction
+
+The correlation relationship doesn't persist more than 4 hour basis.  From that training data, the 
+>>> cov1  -- first 4 hours
+array([[ 1.        ,  0.17009598,  0.07461894,  0.58621156, -0.31106522,
+        -0.55590125, -0.05968613, -0.43432372],
+       [ 0.17009598,  1.        ,  0.08934054,  0.37128554, -0.43723773,
+         0.16480229, -0.796081  , -0.64248354],
+       [ 0.07461894,  0.08934054,  1.        , -0.3332858 , -0.06016396,
+        -0.54047286, -0.29059155,  0.21502639],
+       [ 0.58621156,  0.37128554, -0.3332858 ,  1.        , -0.70250734,
+         0.12050135, -0.31705171, -0.70520843],
+       [-0.31106522, -0.43723773, -0.06016396, -0.70250734,  1.        ,
+        -0.09525154,  0.45315047,  0.33677726],
+       [-0.55590125,  0.16480229, -0.54047286,  0.12050135, -0.09525154,
+         1.        , -0.23639446, -0.35717065],
+       [-0.05968613, -0.796081  , -0.29059155, -0.31705171,  0.45315047,
+        -0.23639446,  1.        ,  0.5217653 ],
+       [-0.43432372, -0.64248354,  0.21502639, -0.70520843,  0.33677726,
+        -0.35717065,  0.5217653 ,  1.        ]])
+>>> cov2  -- second 4 hours
+array([[ 1.        ,  0.55428385, -0.16586596,  0.59764493, -0.23239822,
+        -0.41824373, -0.12399733, -0.03649165],
+       [ 0.55428385,  1.        , -0.47581951,  0.59934092,  0.22872079,
+        -0.12851953,  0.25039342, -0.40459814],
+       [-0.16586596, -0.47581951,  1.        , -0.70458268, -0.59060837,
+        -0.70918488, -0.75138293,  0.83545371],
+       [ 0.59764493,  0.59934092, -0.70458268,  1.        ,  0.16481611,
+         0.25931796,  0.29242043, -0.59977783],
+       [-0.23239822,  0.22872079, -0.59060837,  0.16481611,  1.        ,
+         0.47009204,  0.55684985, -0.65201635],
+       [-0.41824373, -0.12851953, -0.70918488,  0.25931796,  0.47009204,
+         1.        ,  0.65395186, -0.73935253],
+       [-0.12399733,  0.25039342, -0.75138293,  0.29242043,  0.55684985,
+         0.65395186,  1.        , -0.79842759],
+       [-0.03649165, -0.40459814,  0.83545371, -0.59977783, -0.65201635,
+        -0.73935253, -0.79842759,  1.        ]])
+>>> cov3  -- overall 8 hours
+array([[ 1.        ,  0.24242373, -0.19863069,  0.54516085, -0.05517258,
+        -0.54930444, -0.01525662, -0.18792028],
+       [ 0.24242373,  1.        ,  0.15529919,  0.451892  , -0.39092008,
+         0.13627131, -0.62612766, -0.65245039],
+       [-0.19863069,  0.15529919,  1.        , -0.11881271, -0.59077003,
+        -0.07291706, -0.67620601, -0.22812837],
+       [ 0.54516085,  0.451892  , -0.11881271,  1.        , -0.52823874,
+         0.16377747, -0.27517639, -0.64557342],
+       [-0.05517258, -0.39092008, -0.59077003, -0.52823874,  1.        ,
+        -0.20053925,  0.62566714,  0.43868328],
+       [-0.54930444,  0.13627131, -0.07291706,  0.16377747, -0.20053925,
+         1.        , -0.11360392, -0.52045746],
+       [-0.01525662, -0.62612766, -0.67620601, -0.27517639,  0.62566714,
+        -0.11360392,  1.        ,  0.46667816],
+       [-0.18792028, -0.65245039, -0.22812837, -0.64557342,  0.43868328,
+        -0.52045746,  0.46667816,  1.        ]])
+
+For example, USD and JPY was not correlated (0.2) in first 4 hours but was (0.8) in the second, not overall (0.2)
+
+2/12
+I now exactly understand the co-integration and how to test it.
+"Spurious Regression and Simple Cointegration - Gloria Gonzalez-Rivera"
+
+I also understand the partial auto-correlation and how to calculate it.
+https://onlinecourses.science.psu.edu/stat510/?q=node/62
+
+should be useful to compute the AR models.
+
+The goal should still be to explore the correlations.  The worries I have is how
+this relationship persist?  Like in previous example, in certain time period,
+i.e. 2 hours, the regression model can be very different, or even not correlated
+anymore.  If I increase time period, then in certain small time period, they could
+be un-correlated for quite a while...
+
+I need to get the difference by multiply a coefficient to one of the time series.
+-- suppose that X and Y co-integrate
+
+Y(t) = a + bX(t) + Z
+
+where Z is of order I(0). then I need to get difference by multiply b to X(t) and
+find difference with Y(t). I got to change the python code and test again.
+
+"Seems that mean-reversion is much harder, as the timing is hard to get, and
+the relationship changes from time to time. "
+
+Jia You!
+
+2/13
+did co-integration test, got negative results. 
+co-integraion acceptance test:
+1. I tested the individual ccy_cum_rate time series to be non-stationary I(1).
+   This was found by checking the PACF and ACF
+
+2. When checking the residuals, they definitely is not purely random, but
+   have some short term trends here and there.  The ACF shows high correlation
+   at first 5 lags, and PACF shows 1 lag. So that's still not quite stationary. 
+
+3. Then I remembered an example of co-integration - a drunk man with a leashed
+   dog.  The key is that the dog is LEASHED!!!  There comes the stationary, because
+   the difference won't get out-of-bound.  However the bound doesn't seem to 
+   be there or too big compared with average residual. 
+
+   The way I test for the stationary here is to find the ACF and PACF.  A
+   stationary series have typically 1 significant PACF with less than 0.9
+   ACF.  When you diff a stationary series, you will still get 1 or 2 significant
+   PACF and 1 or 2 ACF greater than 0.2
+
+   A non-stationary series have typically 1 significant PACF with more than 0.9
+   ACF.  When diff it, ACFs gone, PACF gone, indicating a random process. 
+
+
+TODO - generate a leashed dog series and see what kind of residual is this type
+of data  
+Done - the diff seems to be stationary -- try changing length of the bound and
+changing the step it makes each time.  We see that if each step is small and the
+bound is big, the diff becomes I(1) and become non-stationary.  So - it all depends
+on the magnitude of the noise. 
+
+co-integration is tricky -- but what would be wrong if the residual is not I(0)? 
+1. the diff can be unbound - but theoretically it can't be too far in reality, the
+   real issue is that whether it can come back.  In a long run it will come back
+   for a random walk, but do a mean reversion on random walk is quite risky. 
+
+so the co-integration doesn't really work -- so the result is:
+****  max-min co-int residual not stationary, even if oversample
+****  plotting maximum correlated ccy price series, residual not stationary, even if oversampled
+
+Two ways, basically I am running a risk of running mean-reversion on a random walk... 
+
+NOW - go on to the multiple regression prediction!!!
+
+Ideally, I should try to trade and see the pnl.  What else ideas do I have? 
+
+1. mean reversion
+   a) max-min
+   b) single pair
+   c) multiple regression for mean reversion (co-int)
+2. trend following 
+   a) break out detection
+   b) lead/followers for ccy and lp based
+   c) ccy trend following + uncorrelated
+   d) svn
+
+by next week,  I need to get those things done - good thing that I have 
+detailed notes.  
+
+Tonight's finding:
+1. my python code for plotRegressionDiff(d1, d2): the order of d1 and d2 is significant. 
+   Using home data:
+
+>>> diff, thres = corr.plotRegressionDiff(corr.overSample(ccy_cum_rate[5,:], 20, True), corr.overSample(ccy_cum_rate[6,:], 20, True))
+24 84 -0.000198069352403 0.000189006222182
+>>> corr.findPACF(diff)
+array([ 0.        ,  0.91479307, -0.18619072,  0.00568932, -0.03602138,
+        0.00480522,  0.05472529, -0.03992281, -0.05065539, -0.07387583,
+        0.00161325])
+
+But when reverse the order: 
+
+>>> diff, thres = corr.plotRegressionDiff(corr.overSample(ccy_cum_rate[6,:], 20, True), corr.overSample(ccy_cum_rate[5,:], 20, True))
+11 95 -0.000589516154939 0.000440278097856
+>>> corr.findPACF(diff)
+array([ 0.        ,  0.99125865, -0.06044295,  0.09025998, -0.03377885,
+        0.03200084,  0.03415707, -0.0199782 , -0.05674688,  0.07849233,
+        0.03923381])
+
+Not sure why, but basically a good news: 
+
+It looks like that using ccy_rate to do a cov and use cluster.affinity_propagation(cov) could
+spot some good co-int pairs, when sampled at 10 to 20 seconds interval.  Need to purse this
+more, it could be turned into an algo.
+
+I have an experiement and confirmed that it is indeed order significant for regression differences.  
+
+For example, I have d1 = [0,0,1,1,2,2,] and d2 = [0,2,1,4,3,6]
+when use d2 to regress d1, I get pretty small residual, when use d1 to regression d2, I got larger residual. 
+So this is a tip to test regression on both side.  This may be related to the OLS algo that I need to implement
+later.  It seems that I need to use a more variable series to regress a less variable series.  
+
+Other than that, I found that ccy_rate is very gaussian and is definitely I(0).  The correlation between some
+of the ccy_rates are pretty significant, especially after oversampling.  What can I do with these correlated
+returns?  
+   a) find leaders/followers
+   b) mean reversion -- but what's the use of this mean reversion? Say their diff is big, but next time their diff
+      become smaller, but they could still be up/down rates -- the only situation can be used is that, if one of 
+      them is at extreme and the diff is big? 
+      
+      
+2/25
+  Several observations during these days:
+  1. time scale of 1 second doesn't give reliable co-int results
+  2. increase time scale does de-trend, it's like reducing the length of the rope
+  3. I am not sure how to use the shape of pdf.  Ideally, I want a small pacf and a 
+     very centered distribution, (maybe a QQ plot). that helps to set a good threshold
+     for mean-reversion. 
+
+  Today - try:
+  multiple mean-reversion as a voting algorithm to collectively decide the trend of a ccy. 
+  I have multiple co-int relationship, which all gives some information.  I would like to 
+  use a voting to pick a most probable one.  
+
+  Time scale helps with the execution, I need to detail the algo. Good! 
+  
+  Problem: I still don't understand how good is the co-int fitting - i.e. helpful to the trading. 
+  That also depends on the trading strategy. 
+
+  Maybe it's not the lower the PACF the better?  I believe a collective voting is a good 
+  path to filter out noise and detect pricing mistakes.   
+
+  Another interesting observation: it's the 10-second ccy_cum_rate pair-wise 
+  residual pdf shape.  It is defined as percent of value range having 90%
+  of samples -- the smaller the better. N(0,1) has about 0.52.
+
+>>> pdf_shape2
+array([[ 1.  ,  0.58,  0.76,  0.78,  0.75,  0.64,  0.69,  0.72],
+       [ 0.42,  1.  ,  0.74,  0.39,  0.7 ,  0.76,  0.6 ,  0.51],
+       [ 0.51,  0.59,  1.  ,  0.63,  0.56,  0.77,  0.62,  0.51],
+       [ 0.61,  0.48,  0.73,  1.  ,  0.62,  0.68,  0.6 ,  0.69],
+       [ 0.49,  0.62,  0.67,  0.55,  1.  ,  0.72,  0.62,  0.51],
+       [ 0.41,  0.62,  0.71,  0.65,  0.77,  1.  ,  0.68,  0.53],
+       [ 0.48,  0.58,  0.7 ,  0.52,  0.53,  0.76,  1.  ,  0.51],
+       [ 0.53,  0.52,  0.7 ,  0.65,  0.49,  0.57,  0.72,  1.  ]])
+
+
+   It shows a good predictor/response relationship. 
+   EUR pretty much influenced by most of them, while it is bad predictor for most of them. 
+   No body predict USD well, and it predicts only EUR and CAD reasonally well. 
+   GBP predicts CHF better than CHF predicts GBP. 
+
+   I also need to take into account their pacf: (normalized to [0,1])
+
+array([[ 1.  ,  0.  ,  0.85,  0.43,  0.47,  0.18,  0.35,  0.6 ],
+       [ 0.  ,  1.  ,  0.84,  0.06,  0.47,  0.72,  0.21,  0.21],
+       [ 0.  ,  0.35,  1.  ,  0.42,  0.15,  0.65,  0.08,  0.48],
+       [ 0.24,  0.  ,  0.88,  1.  ,  0.44,  0.64,  0.47,  0.35],
+       [ 0.26,  0.4 ,  0.6 ,  0.42,  1.  ,  0.71,  0.  ,  0.4 ],
+       [ 0.  ,  0.55,  0.88,  0.5 ,  0.63,  1.  ,  0.62,  0.65],
+       [ 0.2 ,  0.18,  0.59,  0.46,  0.  ,  0.74,  1.  ,  0.43],
+       [ 0.2 ,  0.  ,  0.78,  0.19,  0.27,  0.65,  0.28,  1.  ]])
+
+  it most agrees with pdf_shape.  I think both of these number are useful, I can
+  use elimination: it all depends on the trading selection.
+
+  An intersting question I've been thinking is that: should I use one best multiple
+  regression or several pair-wise regressions and get the vote?  How do I select
+  such pair-wise regressions? 
+
+  So now, the progress is stopped at how to evaluate the fitting with trading. 
+  The big idea is still use pair-wise co-int to vote for.   
+
+  The idea is to spot the mis-price with high confidence without being affected
+  by the noise.  Then how about use it against cp directly?  Too many??? 
+
+  A way to test it, is to code this and see how good is this indicator. 
+
+  When finding the best Combo for 0 out of [1,2,5,6]:
+  >>>  pred, pacf, thres, std = corr.findBestRegressionCombo(ccy_cum_rate_10[:, 720:], np.array([1,2, 5,6]), 0)
+  pacf array: 
+  [0.99630454  0.99714649  0.99632207  0.99601361  0.9945229   0.99615197 0.99403121  0.99694315  0.99614335  0.9969099   0.99656024  0.9958811 0.99405096  0.99509908  0.99426838]
+  [0.42        0.51        0.42        0.41        0.37        0.43       0.39        0.48        0.42        0.49        0.43        0.39      0.38        0.38        0.38]
+  [ 0.00029322  0.00030942  0.00028358  0.00027295  0.00024753  0.00026264 0.00022654  0.0003103   0.0002918   0.00028816  0.00028083  0.00027071 0.00024323  0.00023362  0.00022279]
+
+  The best is [1,5,6], correct answer.  Now I will run it for all the targets and for all possible combinations:
+  >>> findBestRegressionComboForAll(ccy_cum_rate_10[:, 720:])
+      ran about 2 minutes, got:
+
+>>> predictors
+[[1, 2, 5, 6, 7], [2, 3, 4, 5, 6, 7], [1, 3, 4, 5, 7], [0, 2, 4, 5], [0, 2, 3, 6, 7], [0, 1, 2, 6, 7], [0, 1, 2, 5, 7], [0, 1, 2, 5, 6]]
+>>> pacf
+array([ 0.98939074,  0.99161118,  0.99082797,  0.99061705,  0.9902553 ,
+        0.99014379,  0.99180456,  0.99083445])
+>>> pdf_shape
+array([ 0.56,  0.46,  0.53,  0.53,  0.52,  0.55,  0.61,  0.51])
+>>> pdf_std
+array([ 0.00011099,  0.00012547,  0.00019874,  0.00019222,  0.00018941,
+        0.00027134,  0.00019032,  0.00018473])
+
+
+   First reaction, the pdf_shape is too much, is it still usable?  Check the figure, looks good.  but I may need to tune the 
+   the pacf's percentage from 10% to 20%, to see, but it all depends on the trading strategy, perhaps, 10% is more conservative
+   and 20% is more aggressive. 
+
+   Now checking the 60-second picture:
+
+>>> predictors2
+[[1, 2, 5, 6, 7], [2, 3, 4, 5, 6, 7], [1, 3, 4, 5, 7], [0, 2, 4, 5], [0, 2, 3, 7], [0, 1, 2, 6, 7], [0, 1, 2, 5, 7], [0, 1, 2, 5, 6]]
+>>> pacf2
+array([ 0.9427105 ,  0.95507903,  0.94966967,  0.94660041,  0.94665764,
+        0.94519707,  0.95481001,  0.94813361])
+>>> pdf_shape2
+array([ 0.59,  0.48,  0.55,  0.57,  0.56,  0.56,  0.65,  0.55])
+>>> pdf_std2
+array([ 0.00010985,  0.00012369,  0.00019605,  0.00018892,  0.00018911,
+        0.00026875,  0.00018813,  0.00018257])
+
+   all looks the same with the 10-second figure, except JPY, less AUD in predictor, let's compare the fitting in 
+   these 2 time scales
+   
+   Didn't spot big difference between 60 second and 10 second.  If I only look at diff bigger than a threshold, then there are about 1/3 chance that 
+   the predictors move towards the target, but I couldn't trade predictors.  Would it make sense to do so?  Again, would a pair-wise voting makes any sense? 
+   probably not, since the multiple regression has already.  Wait, I know the coefficient of the regression, I could approximate by trading the 
+   most weighted components against the targets. 
+
+   Good, now I have the algo!!! OK, stop digging deeper by trying to find out who leads who, that's a new game, just do a mean reversion. 
+   I tried different multi-regressions, it seems that the loosely fit ones could capture more variability and trades more, but tightly fit ones
+   might be more reliable but didn't trade a lot and captures little variability. 
+
+   Let me first code a strategy to test those parameters.  maybe later I could dig deeper into the optimization. Having an algo first is the key
+
+   Let me test the regression with the data set at home and observe.
+   I have observed over-fitting with the parameters of multi-regression:  the fitting was too good that 
+   there were not much difference could be observed.  
+
+   Two improvements:  1. I should require number of predictors to be minimum.  This should 
+   prevents over-fitting. 2. save the permutation results, so I can tune the parameters
+
+   Was thinking about spotting leader/follower on the reversion - who goes to whom.  - Maybe a pair-wise
+   regression could reveal this better...  This could go into the pair-wise voting scheme, which
+   could be useful...  tomorrow, code this one and try. 
+
+   So to summerize: I found data could be too correlated and therefore no significant mean-reversion
+   could be explored.  The data are either closely fit, or no good mean-reverse behavior spotted. 
+   could this just a bad week of data or a bad scale?  Mean-reversion likes busty noisy data series,
+   but getting to currency maybe less bursty than cp??? 
+
+   Need to test more: 1. use less predictor, 2. use a different time scale (10, 20), 3. use a pair-wise
+   voting mechanism to predict movement.  
+
+   A quest to answer: why multiple regression helps?  Because it helps to detrend the residual, but at
+   the same time it reduces the variation of residual.  My goal is to find key relationships, and follow
+   that.  
+
+   I can detect lead/follow by check pair-wise mean-reversion: who goes to whom.  Together with the
+   regression quality, I could score a trend for the two ccy in the pair.  And do this for all the
+   pairs, and collect the overall results, if the total score for up/down goes over certain thres,
+   than trigger a entrance. 
+   This can do in a quite short time scale. 
+
+   Today I also thought about the LP-related depth of book.  What I have left before? Need to pick them
+   up. 
+
+4/25
+   really need to catch up:
+
+   1. I was stuck on the home data, the regression doesn't provide enough mean-reversion opportunity. 
+      Either the residual is heavily trended, or the residual variance is too small to be profitable. 
+
+      Question: did I study them thoroughly and decided that the mean reversion doesn't work? The 
+      time scale is hard to set, only answer is to test
+
+   2. can I spot the driving force, ccy, from the observation?  Say some announcement, some big transactions,
+      Ideally from different LPs. 
+
+5/21
+
+So far, I've finished
+   1. fixed bug in tick_tap2, got per-lp data ready for the recent week
+   2. read HMM and NLP papers, didn't get quite into it yet. 
+   3. relax
+
+when reviewing previous notes, I noticed 
+1. did I get it correct for ccy order?  EUR, GBP, USD or EUR, USD, GBP?  
+2. for this multiple regression business, why can't I use PCA'd series to regress it?
+3. for pair-wise, the key is to estimate the parameters.  
+    Say, search some very good pairs in various timescale range. Key is to search the time scale.
+    Weight the vote with goodness of the regression
+    Spot significant trend
+
+   as the correlation changes over time, can we predict the next correlation based on the history change? 
+   Can I estimate a time window based on which the correlation relationship changes?  Maybe it can modeled by HMM? 
+
+4. need to test the above, and then I will get into the per-lp base. 
+   LP lead/followers, the dob
+
+5. can I work backwards: decide a trading window and entry/exit strategy, see what are those good entry points have in common? 
+
+Plan for tomorrow: 
+1. familiarize everything over, find out where I left with. 
+2. work on measuring good regression, observe how regression relationship changes over time, including pca
+3. if there are good regression, would a direct pair trading work? Should be a straightforward thing. 
+
+Later this week
+pair-wise voting based on good time scale selection
+explore the change of correlation relationships on certain time scale
+
+Later next week
+per-LP lead/followers, other per-lp based regressions, arb
+
+@11:07 need to remember numpy's horizonal stack, refresh everything - 
+a) interesting to find out how corr/partial_corr as well as how pca changes over time
+changes as well
+
+5/23
+found that the events could be correlated to dramatic ccy movement.  Coded python, awk, bash and c++ code to push ecomonic calendar's csv file into the numpy array. 
+
+Tonight, 
+
+1. I need to plot these event and observe with the ccy curves
+2. compare the cov/partial_cov got from ridge regression and my own code
+3. observe cov change with time, 
+4. pca components changes with time
+
+tomorrow,
+
+find a good way to detect significant change: 
+1. define significant change by entrance/exit rule
+2. consider the time series itself as well as it relationship with others
+
+observations on events and ccy movements:
+
+1. most of the high/medium events result in noticiable movement
+   most of the time, it happened within minutes, a few times 
+   it happend 1.5 hours later, and some times it happened before. 
+2. some times the ccy events results in little movement in the 
+   ccy itself, but big movement on other ccys. Like USD events
+   makes JPY move big, and therefore make eur and chf move 
+   accordingly. 
+3. When big movement happens, some ccy moves alone big with
+   little co-movement, such as GBP or NZD. 
+4. some times the movement happens without any immediate 
+   events nearby.  such movement usually are short lived
+   suits mean/reversion
+
+question: The co-movement behavior on shock vs. during normal 
+study the initiator,  shock size, 
+
+overall model: each ccy drifting at a small constant rate, 
+with some changing correlation relationship between each other. 
+Shocks comes to some ccy and cause global changes. 
+
+Not sure how the correlation relationship is determined.  
+The goal is to observe and learn some rule for predicting
+the correlation relationship during each shock. 
+
+5/27
+got back from Lake George vacation! Need to pick up with the
+correlation behavior study.  It looks like direct compute the 
+SAD of global 8x8 correlation matrix changes. 
+
+*  for SAD of 8x8 correlation matrix, it takes about 4 hours
+   to reach 0.5 per element, which then stays around that number, 
+   I guess that's to say it's a different correlation profile
+   and it never come back.  
+
+*  I need to study how others study
+   the correlation behaviors, and see if there is anything
+   that are persistant during a period of time. 
+
+*  the partial correlation graph has less spikes, only 3 or
+   4 during 2 days, but it doens't co-incident with any of
+   the price movements.  
+
+*  I yet to try PCA hehaviors. 
+
+*  Why do I care about the correlation behavior? because I want
+   to study, during signifant change, how shocks are propigated. 
+   If such model are persistant or predictable, than I can 
+   use new events and once detect a change I can predict the 
+   movement of some other ccy. 
+
+6/12
+The study need to be closer to the trading and pnl. What's the impact
+to the pnl? For correlation, I need to answer these questions:
+1. how these corr changes over time? 
+   a) plot the price/event figure :
+>>> ax = corr.graphPriceByName(ccy_cum_rate, np.array(ccy), 'ccy', 1)
+>>> corr.graphEvent(events, 1366581600, 1366581600+24*3600*5, ax)
+>>> pl.show()
+
+   b) plot the non-overlap corr figure
+
+6/29
+1. figure out the correlation clustering issue, why can I cluster them?
+2. find out the per-lp ccy movement difference
+
+9/12
+working on the per-LP ccy curve. Issues:
+1. the HD series is somehow shifted for different LP and ALL, I need to re-caliberate them.
+in search of leading LP to global. 
+
+10/21/2013
+accumulated several ideas over the time, GTS is now less busy.  Need to re-cap what was
+left, the DoB, CCY Multiple regression, correlation profile and per-LP ccy profile.  
+The basic seems to be some basic thresholding technique that based on 
+observations of different time scale,  but hard to draw a line.  
+Maybe this needs to be back tested, search from PnL?  
+
+***  When there is no obvious pattern, then don't trade ***
+***  only trade when there is good matching achieved at certain time scale ***
+
+Need to establish a base line to start with
+1. code a back testing system, start with the most basic thing - trade strongest ccy
+   vs. weakest ccy
+
+11/6/2013
+fix iter depth, that's my base!
+1. 1 pip has different return ratio - but that kind of make sense, as 1 pip change
+   brings different return for different pair.  So leave it there
+2. When average, I can make a weighted average according to the spread? 
+   the advantage I trust the price of liquid pairs more, this helps trading. 
+3. When average, can I measure which cp contribute how much to ccy's movement? 
+   this could show which cp is leading, which cp is following
+
+11/13/2013
+fixed an error from hd2 data... I need to do an out-lier removal, otherwise, the data would be too noisy. 
+1. direction - from iter depth to detect which cp is leading which cp is lagging in terms of certain ccy movement.  This can be detected by the diff with the average in iter-depth
+2. In the finally outcome, if most cp are matching, than follow, if only a few cp is matching, then mean-reversion.  This is a short time scale thing as trading/market should be very efficient to pick this up. 
+
+01/01/2014
+Happy New Year!  
+TODO - need to establish a base line, uses ccy/cp comparison
+@2:20pm - goal: fix the idea by plot the diff between ccy/cp, possibly in different time scale
+1. fixed the iterDepth to normalize against the median. 
+2. need to extend the plot to show the diff
+   define a time interval \delta
+   cp(t) = ccy1(t)/ccy2(t)
+   cp(t+1)/cp(t) = ( ccy1(t+1)/ccy1(t) ) / ( ccy2(t+1)/ccy2(t) )
+   
+   for that cp, define rate of return (r_\delta(t)) at time t measured as
+   r_{\delta}^*(t), and calculated from ccy rates as
+   r_{\delta}(t). 
+
+   if there is a difference, if ccy is leading, then follow. 
+   improve ccy rate estimation by wieghting each cp's contribution from historical perspective.
+   
+
+01/13/2014
+Today's talk with Paul got a lot of information:
+1. the voting algorithm between venu, I should try that one in Aien! Let's see how he got it.  Maybe I can potentially use this to signal? Now, I don't have so many venu to start with... 
+2. interest rate can be estimated by averaging forward rates from a few banks
+3. Arb between swap and spot on emerging market can be profitable
+4. Future can be used as indicator (maybe 15% of time). 
+5. cross asset trading, pair trading or arb. 
+
+Near term to dos:
+1. clean up IB data, repeat all the tests done so far - maybe this week? 
+
+2/17/2014
+
+About Jian-Min's signal
+1. mean-reversion : enter after a sharp drop
+2. updated every 30S, predicting time frame: 300S
+   ( I feel this could be improved to address bigger impacts on larger time frame)
+3. Backtesting of 2014 Jan
+   Avg Loss - 1 to 2 pips
+   Avg Win - 2 - 20 pips
+   Win Ratio - 70%
+4. Impression
+   The down side risk is not significant
+   Can be improved for execution 
+      need to identify if the trend has finished 
+      avoid taking, paying spread
+      when entering, use stop + limit buy
+      when exiting, use stop + limit sell
+
+5. the intensity of signal, i.e. repeated signal during a short period of time
+   seem to be correlated with the run length.  I should start a new trade 
+
+5. Baseline:
+   Entrance - check the rolling 90-second curve, until the last segments is up enough. 
+   cross the spread and get in
+   stop loss - 10 pips
+   profit taking at + 30pips offer 
+
+   Exit - hold for 2.5 minutes - check the rolling 90 second curve
+          strongly up: stop loss: 10 pips 
+          weakly up - weakly down: stop loss 5 pips - 2 pips
+              exit: if down lower than previous high and up less than previous high
+          strongly down: out. 
+
+6. symetric behavior calls for mean reversion - should work better on larger time scale
+   i.e. hours, get into this!
+
+7. Overall thoughts on this signal
+   1. too good for Jan 2014!  Is it real? 
+   2. signal after deep dive
+   3. very good risk control - stop loss less than 10 pips (5 pip also ok)
+   4. up run's behavior can be different:
+      1. continuos up run, this is the one that needs to be caught, 
+         but they usually have interim sharp pull back, how to spot the time scale?
+         we need maybe two time scale, short term and long term.  If short term trend
+         reverse, but longer term trend strong, I should hold.  The goal is to 
+         let it run, until trend end  (long term trend end)
+
+      2. short up run, then sharp reverse
+
+      3. short up, then going down, then go up
+
+      4. down run, then going up
+
+   5. for those trend identification, I need to use the line segmentation - how many
+      segment is the key - set a threshold for MSE, maybe 70-90 percent of MSE...
+
+   6. trend following: sudden accelleration during a trend make the trend run longer, until the trend got reversed, if spot a symetrical shape, go to the other side.  time scale in half hour to 2 hour.  A prolonged run usually involves short term 1-2pip/sec movement.  A symetrical move is short term moves sharply up and then sharply down.  Should follow. 
+
+    7. if during a rising trend, the up ticks are all very big, surounded by all the small ticks, it's a good rising trend. 
+
+    8. I have an idea of stoploss manipulation:
+       for signals not sure how long it will be effective and doesn't usually have big drawdown
+    
+    9. about the signal - the intensity seems to be correlated with the trend run length
+
+Tomorrow todos:
+
+1. debug the algo1, and test of Feb data, calibrate parameters
+
+       speculation trades went well
+       exit doesn't quite work well as compared with baseline -- why?
+
+       reduce the risk for normal trades
+       increase risk for speculate trades - sometimes, if pnl is good and trend is good, we should also run spec trades, even if no repeated signal within 2400 seconds
+
+2. organize the data online - should be the first thing in the morning
+
+3. layering out a system repository structure and
+
+4. happy coding
+
+goal: 
+   start trading next week!  on 10K lot and study the order types
+
+A thought on conservative market making strategy - study a longer term volatility and trend, and adjust limit order's place according to the current rate
+
+
+2/21/2014
+   working on the improved algo - impression
+   1. the signal has longer term significance than 300, should let it run with mininum stop loss settings.  
+   2. don't trade when volatility is too high - (define high)
+      it's futile to trying to catch up trend without suffering down loss, without
+      signal, better doing market making, or don't trade
+
+   3. multiple signals coming in within short period of time may signal longer run. 
+
+   Design:
+   define a speculation trade - when signal happens, it runs, after it finishes, it
+   checks to see if it should fire a speculation trade:
+   1. define signal_time (st) as #signals generated before the finish of this trade MULTIPLY holding time, if current time is less than st
+   2. previous pnl (>0)
+   3. previous holding time's slope 
+   4. previous holding time's volaility (mse)
+
+
+2/22/2014
+   I need to speed up running to production...  The main thing is to put a simple model of speculation to place.   In any case, I could generate some traning data from last year and train the data, and then, I can use that training to test on the feb data... 3 weeks to tweek...
+   once this is in order, I can start with c++ coding to put this in place ...  Should be done in next week!
+
+   After this baseline, what I can do is to improve this by 
+
+2/25/2014
+Some work progress update:
+1. the speculation trade learning: I made two attempts.  
+    1, just collect 900/2700's rates/trend samples, 
+    2. also collect 1800/5400's rate and window percent.  
+
+   For the first attempt, it looks good, but I found out a look-ahead problem, after correcting it, the results cannot be reproduced with stanford-maxent tool, but with scikit learn, I got about 4/7% accuracy on the hitting, i.e. out of 7 speculation trades, 3 wasn't up 5 pips, 4 was up at least 5 pips.  With scilearn's L1 LogisticRegression, C=1, tolerance=0.000001, I also used PCA with 16 coponents, no whiten.   
+
+   For the second one, I also added more sampling just after the initial signal time, in addition to the 12 more features of 1800/5400.  But it turned out that the result was very bad, it doesn't trigger anything.  I believe it was the problem of my data collection.  I need to look into this.  But first, I need a data to establish my base line.  Tomorrow, I need a clean run on my base line - The minimum set of data to grow from! 
+
+   So the question is - for maxent, or logistic regression, if I add some random crap on top of good features, it will become very bad.  So that comes with the feature selection -- shouldn't maxent automatically selects some best ones for me?  Or is this just Logistic Regression with regulation?  How to tune the stanford tool? 
+
+   some other classifiers to try, like SVM, Nueral Network, GMM, ... benefits of scikit learn.  It should be easy to integrate with C++ later
+
+2. I feel somehow this is a very good exercise for me to really understand what's going on here...  I should start to write C++ simulators to collect features... The code would be able to reused and to evaulate the pnl in a more realistic way. 
+
+3. Maybe I should really just run to the production asap, since the base line is not bad, and then I can always improve.  Lots of things needs to be done - 
+   ticker plant set up
+   traders interface and execution, simulation (to do now)
+   position/risk
+
+4. I also need to review the FX HF stuff got so far.  Tomorrow, I need to come up with a review sheet to record all the knowledges I gained.  I need to prepare for the meeting with Ron and Tudor. I feel somehow the Tudor interview takes some priority.  I need to do that anyway with Ron's visit. 
+
+
+2/26/2014
+
+I have to say that I am a little rusty on these, and that's what worries me.  OK, since I can't do anything but to address this anxiety, I need to go very aggressive (as Jud said) on get prepared and officially kick off on the job hunting!!!  Only I can save myself now and it's achievable, at least worth fighting for!  Compared with previous difficulty, this one is a much better one, and I am glad that this might be a necessary step for me to get my attitude corrected.  Don't worry, this is getting better!
+
+Make myself in a best condition, and make myself a super star of C++ and Algorithms and HF Fx Knowledges.  Here are a study plan:
+1. Go over all C++ stuffs
+   a. read the mayer's book again
+   b. topics: singleton, shared_ptr and auto_ptr, std_containers, C++11 new stuffs, like atomics and rvalues, auto variables, 
+      virtual table
+   c. design patterns - factory pattern, observer pattern, curios-recurrent pattern
+
+2. Algorithms
+   implement all sort algorithms, k-rank value, distributed medium value, 
+   some advanced topics: clock sync and multi-write lock free queue
+   brain teasers: go over the logs
+
+3. FX Knowledge
+   Market Knowledge: 
+      market structure, spot, forward, swap, future, option, ndf, relationship with short term rates spreads, Emergen markets
+      Venu knowledge: 
+          ECN, Banks, 
+             Minimum Quote Life, random shuffling, Order types, last looks, 
+             platform structures such as how credit checking happened, market data priority, settlement dates
+             last look
+             every daily volumne, daily trades: EBS 7000 trades/day on EUR/USD, Hotspot and Currenex about 4000 trades/day
+             phisical connectivities, locations
+
+      Basic behaviors:
+          pip movement time scale:  1min 1pip, 2min 2pip, 10 min 5 pip, 30 min 10 pip
+          dob behavior : voting
+          rejections/toxical measurement and solutions, model for quote age and rejection - need to review this one!
+          currency correlations: EUR and CHF, USD and JPY, CAD, AUD and NZD, other correlation structures (need to get from notes)
+          EM strategy: arb between spot/forward with swap, follow latest EM news
+          HF strategies:  1) arb between future and spot/forward(future lead about 15% of the time), short term rate can get by averaging forward rate from several major banks
+                          2) venu arb - comparing dob of each venu, hide a limit order behind and wait for large orders to arrive and arb with other venus
+                          3) ccy arb - triangle, co-int-corr-arb, price action - orders tend to arrive in a busty fashion, stoploss, etc
+                          4) market making of LL - short term trend, coupled with online learning
+
+          Intra-day:  price action of mean-reversion, ccy and spot arb(emphasis on this, think all the details about this one), 
+
+Today - 
+    get on the C++ thing now!!! 
+
+4/2/2014
+understand the diff between the two time series. 
+
+5/1/2014
+1. parser for dob data to bar data
+2. get JM's model to test trade 
+3. need to understand more about the MaxEnt
+4. get more data 
+
+

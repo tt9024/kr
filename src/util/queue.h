@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "circular_buffer.h"
+#include <vector>
 
 /** This is for multi-threaded environment.
  * Goal is to achieve multi-write, multi-read
@@ -196,6 +197,7 @@ namespace utils {
                 //seekToTop();
                 // initialize m_pos with the existing ready bytes and
                 // go from there
+                syncPos();
             }
             Reader(const Reader&);
             volatile BufferType<QLen, SwQueue<QLen, DataLen, BufferType>::HeaderLen>* const m_buffer;
@@ -236,6 +238,10 @@ namespace utils {
         Writer& theWriter() {
             return m_writer;
         };
+
+        Writer* newWriter() {
+            return &m_writer;
+        }
 
     private:
         volatile QPos *getPtrReadyBytes() const { return (volatile QPos*) m_buffer.getHeaderStart(); } ;
@@ -574,8 +580,236 @@ namespace utils {
         return QStat_OVERFLOW;
     }
 
-    // TODO
-    // need a version of seqlock
-    // you always gets the latest
+    // an equal length version
+    template<int DataLen, int ItemCount, template<int, int> class BufferType = CircularBuffer>
+    class MwQueue2
+    {
+    public:
+        class Reader;
+        class Writer;
+
+        // this is for multi-threaded environment using heap
+        explicit MwQueue2(const char* queue_name = "ThreadMwQueue2") : m_name(queue_name) {};
+
+        // this is for multi-process environment using shm
+        MwQueue2(const char* shm_name, bool read_only, bool init_to_zero = true) :
+                m_name(shm_name), m_buffer(shm_name, read_only, init_to_zero) {};
+
+        ~MwQueue2() {
+            for (size_t i = 0; i<_writersToDelete.size(); ++i) {
+                delete (Writer*) (_writersToDelete[i]);
+            }
+            _writersToDelete.clear();
+        };
+        Reader* newReader() {
+            // the caller responsible for deleting the instance
+            return new Reader(*this);
+        }
+        Writer* newWriter() {
+            // the caller responsible for deleting the instance
+            return new Writer(*this);
+        }
+
+        Writer& theWriter() {
+            Writer* wtr = new Writer(*this);
+            _writersToDelete.push_back(wtr);
+            return *wtr;
+        }
+
+        volatile QPos *getPtrPosWrite() const { return (volatile QPos*) m_buffer.getHeaderStart() ; };
+        volatile QPos *getPtrPosDirty() const { return (volatile QPos*) (m_buffer.getHeaderStart() + sizeof(QPos)) ; };
+        volatile QPos *getPtrReadyBytes() const { return (volatile QPos*) (m_buffer.getHeaderStart() + 64); } ;
+        std::vector<Writer*> _writersToDelete;
+
+    private:
+        static const int HeaderLen = 128;   // three 64-bit counters, occupying 2 cache lines
+                                            // one for writers - write + dirty, one for read
+                                            // also aligning to the cache line
+        const std::string m_name;
+        static const int QLen = DataLen * ItemCount;
+        BufferType<QLen, HeaderLen> m_buffer;
+
+    public:
+        // each reader will have have shared access to the queue,
+        // has it's own read position
+        class Reader {
+        public:
+            typedef MwQueue2<DataLen, ItemCount, BufferType> QType;
+            explicit Reader(QType& queue)
+            : m_buffer(queue.m_buffer),
+              m_pos_write(queue.getPtrPosWrite()),
+              m_ready_bytes(queue.getPtrReadyBytes()),
+              m_pos(0)
+              {
+                syncPos();
+              };
+
+            QStatus copyNextIn(char* buffer) ;
+            // this doesn't copy the bytes in most cases,
+            // because QLen is a multiple of Datalen,
+            // it should never go across the circular buffer boundary
+            QStatus takeNextPtr(volatile char*& buffer) ;
+            QStatus seekToTop();
+
+            // this just set the reader position to the
+            // existing writer position
+            void syncPos() { m_pos = *m_ready_bytes; };
+            void advance() { m_pos += DataLen; };
+            void reset()   { m_pos = 0; };
+            ~Reader() {};
+        private:
+            const BufferType<QLen, QType::HeaderLen>& m_buffer;
+            // readonly volatile pointer to a ever changing memory location
+            const volatile QPos* const m_pos_write;
+            const volatile QPos* const m_ready_bytes;
+            QPos m_pos;
+        };
+
+        // each writer will have shared access to the queue
+        class Writer {
+        public:
+            typedef MwQueue2<DataLen, ItemCount, BufferType> QType;
+            explicit Writer(QType& queue)
+            : m_buffer(queue.m_buffer),
+              m_pos_write(queue.getPtrPosWrite()),
+              m_pos_dirty(queue.getPtrPosDirty()),
+              m_ready_bytes(queue.getPtrReadyBytes())
+            {
+                reset();
+            };
+            void reset() { *m_pos_write = 0; *m_pos_dirty = 0; *m_ready_bytes = 0;};
+            void put(const char* content);
+
+            // this will fail (and return false) if
+            // the immediate write is not possible, i.e.
+            // dirty bytes would exceed QLen
+            bool putNoSpin(const char* content);
+
+        private:
+            BufferType<QLen, QType::HeaderLen>& m_buffer;
+            volatile QPos* const m_pos_write;
+            volatile QPos* const m_pos_dirty;
+            volatile QPos* const m_ready_bytes;
+            QPos getWritePos();
+            void finalizeWrite();
+            static const int SpinThreshold = QLen/4;
+        };
+    };
+
+    // it first get the write pos, write a size, write the content
+    // and check if it detects a synchronous point and update read
+    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    inline
+    void MwQueue2<DataLen, ItemCount, BufferType>::Writer::put(const char* content) {
+        QPos pos = getWritePos();
+        m_buffer.template copyBytes<true>(pos, (char*) content, DataLen);
+        finalizeWrite();
+    }
+
+    // it first get the write pos, write a size, write the content
+    // and check if it detects a synchronous point and update read
+    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    inline
+    bool MwQueue2<DataLen, ItemCount, BufferType>::Writer::putNoSpin(const char* content) {
+        if (__builtin_expect(((int)(*m_pos_write - *m_ready_bytes) >= SpinThreshold), 0)) {
+            return false;
+        }
+        put(content);
+        return true;
+    }
+
+    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    inline
+    QPos MwQueue2<DataLen, ItemCount, BufferType>::Writer::getWritePos() {
+        if (__builtin_expect(((int)(*m_pos_write - *m_ready_bytes) >= SpinThreshold), 0)) {
+            while (1) {
+                // spin for too many unfinished write
+                QPos pos = *m_pos_write;
+                while (__builtin_expect(((int)(pos - *m_ready_bytes) >= SpinThreshold), 0)) {
+                    pos = *m_pos_write;
+                } ;
+                // multiple writers could be released here, release the first one
+                // and put the rest back to spin
+                QPos newPos = pos + DataLen;
+                if (compareAndSwap(m_pos_write, pos, newPos) == pos) {
+                    return pos;
+                }
+            }
+        }
+        // normal case
+        return fetchAndAdd(m_pos_write, DataLen);
+    }
+
+    // m_pos_dirty is the total bytes written so far
+    // m_pos_write is the current write starting position
+    // m_ready_bytes is the current point upto where content is readable
+    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    inline
+    void MwQueue2<DataLen, ItemCount, BufferType>::Writer::finalizeWrite() {
+        QPos dirty = AddAndfetch(m_pos_dirty, DataLen);
+        if (dirty == *m_pos_write) {
+            // detected a sync point
+            // ready bytes are at least dirty bytes
+            // try to update the read position
+            QPos prev_ready_bytes = *m_ready_bytes;
+            while (prev_ready_bytes < dirty) {
+                // multiple writers may be updating ready_bytes
+                // take the hight dirty value
+                prev_ready_bytes = compareAndSwap(m_ready_bytes, prev_ready_bytes, dirty);
+            }
+        }
+    }
+
+    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    inline
+    QStatus MwQueue2<DataLen, ItemCount, BufferType>::Reader::takeNextPtr(volatile char*& buffer) {
+        if (__builtin_expect((*m_pos_write - m_pos >= QLen), 0)) {
+            return QStat_OVERFLOW;
+        }
+        QPos unread_bytes = *m_ready_bytes - m_pos;
+        if (unread_bytes <= 0) {
+            if (__builtin_expect((unread_bytes < 0),0)) {
+                syncPos();
+            }
+            return QStat_EAGAIN;
+        }
+        // get size
+        buffer = m_buffer.getBufferPtr(m_pos);
+        return QStat_OK;
+    };
+
+    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    inline
+    QStatus MwQueue2<DataLen, ItemCount, BufferType>::Reader::copyNextIn(char* buffer) {
+        if (__builtin_expect((*m_pos_write - m_pos >= QLen), 0)) {
+            return QStat_OVERFLOW;
+        }
+        QPos unread_bytes = *m_ready_bytes - m_pos;
+        if (unread_bytes <= 0) {
+            if (__builtin_expect((unread_bytes < 0),0)) {
+                syncPos();
+            }
+            return QStat_EAGAIN;
+        }
+        // get size
+        m_buffer.template CopyBytesFromBuffer(m_pos, buffer, DataLen);
+        // check after copy
+        if (__builtin_expect((*m_pos_write - m_pos >= QLen), 0)) {
+            return QStat_OVERFLOW;
+        }
+        return QStat_OK;
+    }
+
+    // it traverse all the way to top, and get the position of top update,
+    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    inline
+    QStatus MwQueue2<DataLen, ItemCount, BufferType>::Reader::seekToTop() {
+        int unread_bytes = *m_ready_bytes - m_pos;
+        if (unread_bytes == 0)
+            return QStat_EAGAIN;
+
+        m_pos = *m_ready_bytes - DataLen;
+        return QStat_OK;
+    }
 
 }

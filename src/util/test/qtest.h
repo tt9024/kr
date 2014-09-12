@@ -10,6 +10,7 @@ using namespace utils;
 struct ItemType {
     uint64_t _seq;
     uint64_t _ts;
+    uint64_t _id;
 };
 
 template<typename WriterType>
@@ -28,11 +29,12 @@ public:
             for (int i=0; i<len; ++i) {
                 buf[i]._seq = _num;
                 buf[i]._ts = now;
+                buf[i]._id = _id;
             }
             _writer.put((char*)buf);
 
             if ((_num & 0xffff) == 0 ) {
-                printf("writer wrote %llu\n", _num);
+                printf("writer %d wrote %llu\n", _id, _num);
             }
             now += _wait_micro;
             while (TimeUtil::cur_time_micro() < now);
@@ -56,48 +58,33 @@ template<typename ReaderType>
 class QueueReader {
 public:
     QueueReader(int id, ReaderType& rdr) :
-        _id(id), _reader(rdr), _lat(0), _cnt(0), _should_run(false) {};
+        _id(id), _reader(rdr), _should_run(false) {};
+
+    struct WriterInfo {
+        uint64_t seq;
+        uint64_t lat;
+        uint64_t cnt;
+        uint64_t id;
+        WriterInfo() {
+            memset(this, 0, sizeof(WriterInfo));
+        }
+    };
 
     void run(void* data_len_ptr) {
         int len = *((int*)data_len_ptr);
         ItemType* buf = (ItemType*)malloc(len*sizeof(ItemType));
-        uint64_t num = 0;
-        _lat = _cnt = 0;
         _should_run = true;
+        uint64_t num = 0;
         while (_should_run) {
             utils::QStatus qstatus = _reader.copyNextIn((char*)buf);
             if (qstatus == utils::QStat_OK) {
                 if (!checkContent(buf, len)) {
-                    printf("reader %d found error at %llu, seek to top.\n", _id, (unsigned long long) num);
-                    _reader.seekToTop();
-                    continue;
-                }
-                ItemType *iptr = buf + (num%len);
-                uint64_t new_num = iptr->_seq;
-                if (num)
-                {
-                    if (num != new_num-1) {
-                        printf("reader %d found gap of %lld, seek to top.\n", _id, (long long) (new_num - num - 1));
-                        _reader.seekToTop();
-                        num = 0;
-                        continue;
-                    }
+                    printf("reader %d found error at %llu!\n", _id, (unsigned long long) (ItemType *)buf->_seq);
                 } else {
-                    printf("reader %d started with %llu", _id, (unsigned long long) new_num);
+                    ItemType *iptr = buf + (++num%len);
+                    processWriterInfo(iptr);
                 }
-                num = new_num;
-                uint64_t now = TimeUtil::cur_time_micro();
-                _lat += (now - iptr->_ts);
-                _cnt += 1;
-
-                if ((_cnt & 0xffff) == 0) {
-                    printf("reader %d latency: %llu (micro)\n", _id, (unsigned long long) _lat/_cnt);
-                    _lat = 0;
-                    _cnt = 0;
-                }
-
                 _reader.advance();
-
             } else {
                 if (qstatus != QStat_EAGAIN) {
                     printf("reader %d got qstatus %s.\n", _id, QStatStr(qstatus));
@@ -109,6 +96,7 @@ public:
     }
 
     void stop() {
+
         _should_run = false;
     }
 
@@ -117,13 +105,54 @@ private:
     ReaderType& _reader;
     bool checkContent(ItemType* buf, int len) {
         for (int i=1; i<len; ++i) {
-            if (memcmp(buf+i, buf, sizeof(ItemType)))
+            if (memcmp(buf+i, buf, sizeof(ItemType))) {
+                printf ("check failed at %d: [%llu %llu %llu] vs [%llu %llu %llu]\n",
+                        i, (unsigned long long)buf->_id, (unsigned long long)buf->_seq,
+                        (unsigned long long)buf->_ts, (unsigned long long)buf[i]._id,
+                        (unsigned long long)buf[i]._seq, (unsigned long long)buf[i]._ts);
                 return false;
+            }
         }
         return true;
     }
-    uint64_t _lat, _cnt;
+
+    void processWriterInfo(ItemType* iptr) {
+
+        WriterInfo& wr(_writerInfo[iptr->_id]);
+        uint64_t& _lat (wr.lat);
+        uint64_t& _cnt (wr.cnt);
+        uint64_t& num (wr.seq);
+
+        // keeping the stats for that content
+        uint64_t new_num = iptr->_seq;
+        if (num)
+        {
+            if (num != new_num-1) {
+                printf("Failure! Reader %d found gap of %lld, (mine: %llu, writer%d: %llu), catching up\n",
+                        _id,
+                        (long long) (new_num - num - 1),
+                        (unsigned long long) num,
+                        (int) iptr->_id,
+                        (unsigned long long) new_num);
+            }
+        } else {
+            printf("reader %d started with %llu", _id, (unsigned long long) new_num);
+        }
+        num = new_num;
+        uint64_t now = TimeUtil::cur_time_micro();
+        _lat += (now - iptr->_ts);
+        _cnt += 1;
+
+        if ((_cnt & 0xffff) == 0) {
+            printf("reader %d latency from writer %d: %llu (micro)\n", _id, (int)iptr->_id, (unsigned long long) _lat/_cnt);
+            _lat = 0;
+            _cnt = 0;
+        }
+    }
+
     bool _should_run;
+    static const int MaxWriter = 16;
+    WriterInfo _writerInfo[MaxWriter];
 };
 
 #define ITEMLEN sizeof(ItemType)  /* seq + timestamp */

@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-std=c++0x -DIB_USE_STD_STRING -Wall -Wno-switch -g
+CXXFLAGS=-std=c++0x -DIB_USE_STD_STRING -Wall -Wno-switch -O3 -g
 ROOT_DIR=/home/zfu/kisco
 BASE_SRC_DIR=${ROOT_DIR}/src
 LIBS=-lpthread -lrt
@@ -34,6 +34,9 @@ mtrader:
 
 booktap:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/book_reader.cpp $(LIBS)
+
+tickrec:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/tick_recorder.cpp $(LIBS)
 
 clean:
 	rm -f $(OBJ_DIR)/*.o

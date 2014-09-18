@@ -581,7 +581,7 @@ namespace utils {
     }
 
     // an equal length version
-    template<int DataLen, int ItemCount, template<int, int> class BufferType = CircularBuffer>
+    template<int QLen, int DataLen, template<int, int> class BufferType = CircularBuffer>
     class MwQueue2
     {
     public:
@@ -589,7 +589,9 @@ namespace utils {
         class Writer;
 
         // this is for multi-threaded environment using heap
-        explicit MwQueue2(const char* queue_name = "ThreadMwQueue2") : m_name(queue_name) {};
+        explicit MwQueue2(const char* queue_name = "ThreadMwQueue2") : m_name(queue_name) {
+            static_assert(QLen == (QLen/DataLen*DataLen), "QLen has to be a multiple of DataLen");
+        };
 
         // this is for multi-process environment using shm
         MwQueue2(const char* shm_name, bool read_only, bool init_to_zero = true) :
@@ -626,7 +628,7 @@ namespace utils {
                                             // one for writers - write + dirty, one for read
                                             // also aligning to the cache line
         const std::string m_name;
-        static const int QLen = DataLen * ItemCount;
+        static const int ItemCount = (QLen / DataLen);
         BufferType<QLen, HeaderLen> m_buffer;
 
     public:
@@ -634,7 +636,7 @@ namespace utils {
         // has it's own read position
         class Reader {
         public:
-            typedef MwQueue2<DataLen, ItemCount, BufferType> QType;
+            typedef MwQueue2<QLen, DataLen, BufferType> QType;
             explicit Reader(QType& queue)
             : m_buffer(queue.m_buffer),
               m_pos_write(queue.getPtrPosWrite()),
@@ -668,7 +670,7 @@ namespace utils {
         // each writer will have shared access to the queue
         class Writer {
         public:
-            typedef MwQueue2<DataLen, ItemCount, BufferType> QType;
+            typedef MwQueue2<QLen, DataLen, BufferType> QType;
             explicit Writer(QType& queue)
             : m_buffer(queue.m_buffer),
               m_pos_write(queue.getPtrPosWrite()),
@@ -698,9 +700,9 @@ namespace utils {
 
     // it first get the write pos, write a size, write the content
     // and check if it detects a synchronous point and update read
-    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
-    void MwQueue2<DataLen, ItemCount, BufferType>::Writer::put(const char* content) {
+    void MwQueue2<QLen, DataLen, BufferType>::Writer::put(const char* content) {
         QPos pos = getWritePos();
         m_buffer.template copyBytes<true>(pos, (char*) content, DataLen);
         finalizeWrite();
@@ -708,9 +710,9 @@ namespace utils {
 
     // it first get the write pos, write a size, write the content
     // and check if it detects a synchronous point and update read
-    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
-    bool MwQueue2<DataLen, ItemCount, BufferType>::Writer::putNoSpin(const char* content) {
+    bool MwQueue2<QLen, DataLen, BufferType>::Writer::putNoSpin(const char* content) {
         if (__builtin_expect(((int)(*m_pos_write - *m_ready_bytes) >= SpinThreshold), 0)) {
             return false;
         }
@@ -718,9 +720,9 @@ namespace utils {
         return true;
     }
 
-    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
-    QPos MwQueue2<DataLen, ItemCount, BufferType>::Writer::getWritePos() {
+    QPos MwQueue2<QLen, DataLen, BufferType>::Writer::getWritePos() {
         if (__builtin_expect(((int)(*m_pos_write - *m_ready_bytes) >= SpinThreshold), 0)) {
             while (1) {
                 // spin for too many unfinished write
@@ -743,9 +745,9 @@ namespace utils {
     // m_pos_dirty is the total bytes written so far
     // m_pos_write is the current write starting position
     // m_ready_bytes is the current point upto where content is readable
-    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
-    void MwQueue2<DataLen, ItemCount, BufferType>::Writer::finalizeWrite() {
+    void MwQueue2<QLen, DataLen, BufferType>::Writer::finalizeWrite() {
         QPos dirty = AddAndfetch(m_pos_dirty, DataLen);
         if (dirty == *m_pos_write) {
             // detected a sync point
@@ -760,9 +762,9 @@ namespace utils {
         }
     }
 
-    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
-    QStatus MwQueue2<DataLen, ItemCount, BufferType>::Reader::takeNextPtr(volatile char*& buffer) {
+    QStatus MwQueue2<QLen, DataLen, BufferType>::Reader::takeNextPtr(volatile char*& buffer) {
         if (__builtin_expect((*m_pos_write - m_pos >= QLen), 0)) {
             return QStat_OVERFLOW;
         }
@@ -778,9 +780,9 @@ namespace utils {
         return QStat_OK;
     };
 
-    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
-    QStatus MwQueue2<DataLen, ItemCount, BufferType>::Reader::copyNextIn(char* buffer) {
+    QStatus MwQueue2<QLen, DataLen, BufferType>::Reader::copyNextIn(char* buffer) {
         if (__builtin_expect((*m_pos_write - m_pos >= QLen), 0)) {
             return QStat_OVERFLOW;
         }
@@ -801,9 +803,9 @@ namespace utils {
     }
 
     // it traverse all the way to top, and get the position of top update,
-    template<int DataLen, int ItemCount, template<int, int> class BufferType>
+    template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
-    QStatus MwQueue2<DataLen, ItemCount, BufferType>::Reader::seekToTop() {
+    QStatus MwQueue2<QLen, DataLen, BufferType>::Reader::seekToTop() {
         int unread_bytes = *m_ready_bytes - m_pos;
         if (unread_bytes == 0)
             return QStat_EAGAIN;

@@ -246,8 +246,20 @@ public:
         case 202:  // canceled
             orderCanceled(id);
             break;
+        case 317:  // reset depth of book
+        {
+            utils::eSecurity secid = getSecId(id);
+            _book_writer->resetBook(secid);
+            logInfo("IBClient reset book %s", getSymbol(secid));
+            break;
+        }
+        case 1102:
+            disconnect();
+            break;
         }
     }
+
+
 
 private:
 

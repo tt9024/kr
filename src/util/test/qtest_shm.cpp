@@ -3,7 +3,7 @@
 #define QItems (1024*64)
 
 typedef SwQueue<QLEN, DATALEN, ShmCircularBuffer> SQType;
-typedef MwQueue2<DATALEN, QItems, ShmCircularBuffer> MQType;
+typedef MwQueue2<QLEN, DATALEN, ShmCircularBuffer> MQType;
 
 template<typename QType>
 void runTest(QType& queue, bool is_read, int num_threads, int itemCount, int wait_micro, int writer_start_id) {

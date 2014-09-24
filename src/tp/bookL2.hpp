@@ -40,9 +40,16 @@ struct PriceEntry {
         price = 0; size = 0;ts_micro=0;
     }
 
+    Price getPrice(bool is_bid) const {
+        return is_bid? price:-price;
+    }
+
+    double getPriceDouble(utils::eSecurity secid, bool is_bid) const {
+        return pxToDouble(secid, getPrice(is_bid));
+    }
+
     std::string toString(utils::eSecurity secid=utils::TotalSecurity, bool is_bid = true) const {
-        double px = (secid == utils::TotalSecurity)? (double) price : pxToDouble(secid, price);
-        px = is_bid?px:-px;
+        double px = (secid >= utils::TotalSecurity)? (double) price : getPriceDouble(secid, is_bid);
         char buf[64];
         snprintf(buf, sizeof(buf), "%.7lf,%lld,%llu", px, (long long)size, (unsigned long long) ts_micro);
         return std::string(buf);
@@ -93,6 +100,51 @@ struct BookDepot {
         }
         memcpy (this, &book, sizeof(BookDepot));
         return *this;
+    }
+
+    Price getBid() const {
+        if ((avail_level[0] < 1))
+            return 0;
+
+        for (size_t i = 0; i<avail_level[0]; ++i) {
+            if (pe[i].size > 0)
+                return pe[i].getPrice(true);
+        }
+        return 0;
+    }
+
+    Price getAsk() const {
+        if ((avail_level[1] < 1))
+            return 0;
+        for (size_t i = 0; i<avail_level[1]; ++i) {
+            if (pe[BookLevel + i].size > 0)
+                return pe[i].getPrice(false);
+        }
+        return 0;
+    }
+
+    Price getBestPrice(bool is_bid) const {
+        return is_bid?getBid():getAsk();
+    }
+
+    Price getMid() const {
+        if ((avail_level[0] < 1) || (avail_level[1] < 1))
+            return 0;
+        Price bid = pe[0].getPrice(true);
+        Price ask = pe[BookLevel].getPrice(false);
+        return (bid+ask)/2;
+    }
+
+    double getBidDouble() const {
+        return pxToDouble((utils::eSecurity)security_id, getBid());
+    }
+
+    double getAskDouble() const {
+        return pxToDouble((utils::eSecurity)security_id, getAsk());
+    }
+
+    double getMidDouble() const {
+        return pxToDouble((utils::eSecurity)security_id, getMid());
     }
 
     std::string toString() const {
@@ -492,6 +544,61 @@ public:
         }
 
     };
+
+};
+
+struct BarLine {
+    const int bar_sz;  // in seconds
+    time_t next_update_ts;
+    double open_px, max_px, min_px, close_px;
+
+    explicit BarLine(int bar_size_seconds): bar_sz(bar_size_seconds), next_update_ts(0),
+            open_px(-1), max_px(-10000000), min_px(10000000), close_px(-1) {
+    }
+
+    // new price update
+    void update(const BookDepot& book) {
+        close_px = book.getMidDouble();
+        if (close_px > max_px) {
+            max_px = close_px;
+        }
+        if (close_px < min_px) {
+            min_px = close_px;
+        }
+        if (__builtin_expect((next_update_ts == 0), 0)) {
+            next_update_ts = book.update_ts_micro/1000000;
+            reset();
+        }
+    }
+
+    // returns true if reset is due
+    bool oneSecond(time_t ts, bool reset_if_due, char* buf = NULL, int* buf_len = NULL) {
+        if (__builtin_expect((next_update_ts == 0), 0)) {
+            return false;
+        }
+
+        if (ts >= next_update_ts) {
+            if ((buf != NULL) && (buf_len != NULL)) {
+                 *buf_len = toString(next_update_ts - bar_sz, buf, *buf_len);
+            }
+            if (reset_if_due)
+                reset();
+            return true;
+        }
+        return false;
+    }
+
+    int toString(time_t ts, char* buf, int buf_len) const {
+        return snprintf(buf, buf_len, "%u %.7f %.7f %.7f %.7f", (unsigned int)ts,
+                open_px, max_px, min_px, close_px);
+    }
+
+    void reset() {
+        open_px = close_px;
+        max_px = close_px;
+        min_px = close_px;
+        next_update_ts += bar_sz;
+    }
 
 };
 

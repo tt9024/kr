@@ -75,7 +75,7 @@ namespace utils {
         memset( &sa, 0, sizeof(sa));
         sa.sin_family = AF_INET;
         sa.sin_port = htons( port);
-        sa.sin_addr.s_addr = inet_addr( host);
+        sa.sin_addr.s_addr = inet_addr(host);
 
         // try to connect
         if( (connect( fd, (struct sockaddr *) &sa, sizeof( sa))) < 0) {
@@ -94,7 +94,7 @@ namespace utils {
 
         if (result < 0) {
             char buf[256];
-            snprintf(buf, sizeof(buf), "tcp socket %d cannot set TCP_NODELAY "
+           snprintf(buf, sizeof(buf), "tcp socket %d cannot set TCP_NODELAY "
                     "(connected to %s:%u)", fd, host, port);
             perror(buf);
         }
@@ -115,8 +115,8 @@ namespace utils {
 
     int tcp_send(int fd, const char* buf, size_t sz)
     {
-        int nResult = ::send( fd, buf, sz, 0);
-        if( nResult == -1) {
+        int nResult = ::send( fd, buf, sz, MSG_NOSIGNAL);
+        if( nResult < 0) {
             char buf[256];
             snprintf(buf, sizeof(buf), "tcp socket %d cannot send %d bytes of data."
                     ,fd, (int)sz);

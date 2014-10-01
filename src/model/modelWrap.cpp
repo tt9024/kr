@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
             return -1;
     }
     // hand shake with the model first
-    if (argc != 3) {
+    if (argc != 4) {
         printf("Usage: %s IP Port Symbol\n", argv[0]);
         return 0;
     }
@@ -79,6 +79,10 @@ int main(int argc, char** argv) {
     int fd = 0;
     bool is_connected = false;
     buf[255] = 0;
+    time_t cover_time = 0;
+    bool cover_buy = false;
+
+    time_t next_reconnect_sec = cur_sec -1;
 
     while (!interrupted) {
         // read book update
@@ -92,44 +96,62 @@ int main(int argc, char** argv) {
         if (this_sec >  cur_sec) {
             int buf_len = sizeof(buf);
             if (bar.oneSecond(this_sec, true, buf, &buf_len)) {
-                if (is_connected)
-                    tcp_send(fd, buf, buf_len+1);
+                printf("%s", buf);
+                if (is_connected) {
+                    if (utils::tcp_send(fd, buf, buf_len) < 0)
+                        is_connected = false;
+                }
             }
             cur_sec = this_sec;
         }
+
+        if (this_sec == cover_time) {
+            if (cover_buy)
+                makeOrder(secid, true, 100000, owriter);
+            else
+                makeOrder(secid, false, 100000, owriter);
+            cover_time = 0;
+        };
 
         if (ereader->getNextUpdate(fe)) {
             logInfo("Execution Event: %s", fe.toString().c_str());
         }
 
         if (!is_connected) {
-            fd = utils::tcp_socket( argv[1], atoi(argv[2]), true);
-            if (fd < 0) {
-                printf("cannot connect to: Host %s, Port %s, retry in 5 seconds\n", argv[1], argv[2]);
-                sleep(5);
-                continue;
+            if (this_sec > next_reconnect_sec) {
+                fd = utils::tcp_socket( argv[1], atoi(argv[2]), false);
+                if (fd < 0) {
+                    printf("cannot connect to: Host %s, Port %s, retry in 5 seconds\n", argv[1], argv[2]);
+                    next_reconnect_sec = this_sec + 5;
+                    continue;
+                }
+                printf("connected to Host %s Port %s\n", argv[1], argv[2]);
+                const char* hello_msg = "modelID\n";
+                if (utils::tcp_send(fd, hello_msg, strlen(hello_msg)) <= 0) {
+                    printf("send error, retry in 5 seconds\n");
+                    next_reconnect_sec = this_sec + 5;
+                    continue;
+                }
+                is_connected = true;
             }
-            printf("connected to Host %s Port %s\n", argv[1], argv[2]);
-            const char* hello_msg = "modelID";
-            if (utils::tcp_send(fd, hello_msg, sizeof(hello_msg)) <= 0) {
-                printf("send error, retry in 5 seconds\n");
-                sleep(5);
-                continue;
-            }
-            is_connected = true;
         }
 
-        int recv_bytes = tcp_receive(fd, buf, sizeof(buf)-1);
-        if (recv_bytes > 0) {
-            buf[recv_bytes] = 0;
-            logInfo("received %s", buf);
-            if (strncmp(buf, "BUY", 3) == 0) {
-                makeOrder(secid, true, 100000, owriter);
-            } else if (strncmp(buf, "SELL", 4) == 0) {
-                makeOrder(secid, false, 100000, owriter);
-            }
-        } else {
-            if (recv_bytes < 0) {
+        if (is_connected) {
+            int recv_bytes = tcp_receive(fd, buf, sizeof(buf)-1);
+            if (recv_bytes > 0) {
+                buf[recv_bytes] = 0;
+                logInfo("received %s", buf);
+                if (strncmp(buf+11, "buy", 3) == 0) {
+                    makeOrder(secid, true, 100000, owriter);
+                    cover_time = ::time(NULL) + 300;
+                    cover_buy = false;
+                } else if (strncmp(buf+11, "sell", 4) == 0) {
+                    makeOrder(secid, false, 100000, owriter);
+                    cover_time = ::time(NULL) + 300;
+                    cover_buy = true;
+                }
+            } else if (recv_bytes < 0) {
+                printf("receive failed.\n");
                 is_connected = false;
             }
         }

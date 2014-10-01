@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-std=c++0x -DIB_USE_STD_STRING -Wall -Wno-switch -O3 -g
+CXXFLAGS=-std=c++0x -DIB_USE_STD_STRING -Wall -Wno-switch -g
 ROOT_DIR=/home/zfu/kisco
 BASE_SRC_DIR=${ROOT_DIR}/src
 LIBS=-lpthread -lrt

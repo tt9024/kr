@@ -589,7 +589,7 @@ struct BarLine {
     }
 
     int toString(time_t ts, char* buf, int buf_len) const {
-        return snprintf(buf, buf_len, "%u %.7f %.7f %.7f %.7f", (unsigned int)ts,
+        return snprintf(buf, buf_len, "%u %.7f %.7f %.7f %.7f\n", (unsigned int)ts,
                 open_px, max_px, min_px, close_px);
     }
 

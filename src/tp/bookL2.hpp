@@ -117,14 +117,16 @@ struct BookDepot {
         if ((avail_level[1] < 1))
             return 0;
         for (size_t i = 0; i<avail_level[1]; ++i) {
-            if (pe[BookLevel + i].size > 0)
-                return pe[i].getPrice(false);
+	  if (pe[BookLevel + i].size > 0) {
+	    //               return pe[i].getPrice(false);
+	    return pe[BookLevel + i].getPrice(false);
+	  }
         }
         return 0;
     }
 
     Price getBestPrice(bool is_bid) const {
-        return is_bid?getBid():getAsk();
+         return is_bid?getBid():getAsk();
     }
 
     Price getMid() const {
@@ -300,7 +302,7 @@ struct BookL2 {
     }
 
     void reset() {
-        memset(&_book, sizeof(BookDepot), 0);
+        memset(&_book, 0, sizeof(BookDepot));
         _book.security_id = (uint16_t) _sec_id;
         _avail_level[0] = _avail_level[1] = 0;
     }
@@ -554,6 +556,7 @@ struct BarLine {
 
     explicit BarLine(int bar_size_seconds): bar_sz(bar_size_seconds), next_update_ts(0),
             open_px(-1), max_px(-10000000), min_px(10000000), close_px(-1) {
+        next_update_ts = ::time(NULL) / bar_sz * bar_sz + bar_sz;
     }
 
     // new price update
@@ -565,31 +568,32 @@ struct BarLine {
         if (close_px < min_px) {
             min_px = close_px;
         }
-        if (__builtin_expect((next_update_ts == 0), 0)) {
-            next_update_ts = book.update_ts_micro/1000000;
-            reset();
+        if (open_px == -1) {
+            reset();   
         }
     }
 
     // returns true if reset is due
     bool oneSecond(time_t ts, bool reset_if_due, char* buf = NULL, int* buf_len = NULL) {
-        if (__builtin_expect((next_update_ts == 0), 0)) {
+        if (__builtin_expect((open_px == -1), 0)) {
             return false;
         }
-
+	
         if (ts >= next_update_ts) {
             if ((buf != NULL) && (buf_len != NULL)) {
                  *buf_len = toString(next_update_ts - bar_sz, buf, *buf_len);
             }
-            if (reset_if_due)
+            if (reset_if_due) {
                 reset();
+                next_update_ts += bar_sz;
+            }
             return true;
         }
         return false;
     }
 
     int toString(time_t ts, char* buf, int buf_len) const {
-        return snprintf(buf, buf_len, "%u %.7f %.7f %.7f %.7f\n", (unsigned int)ts,
+        return snprintf(buf, buf_len, "%u %.6f %.6f %.6f %.6f", (unsigned int)ts,
                 open_px, max_px, min_px, close_px);
     }
 
@@ -597,7 +601,6 @@ struct BarLine {
         open_px = close_px;
         max_px = close_px;
         min_px = close_px;
-        next_update_ts += bar_sz;
     }
 
 };

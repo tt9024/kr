@@ -2,8 +2,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
+#define _GNU_SOURCE
+#define __USE_GNU
 #include <sched.h>
+#include <unistd.h>
+#include <pthread.h>
 #include <errno.h>
 #include <time.h>
 
@@ -19,7 +22,7 @@ namespace utils {
 	template<typename Runnable>
 	class ThreadWrapper {
 	public:
-		ThreadWrapper(Runnable& runnable) : m_runnable(runnable), m_param(NULL), m_isRunning(false), m_thread(-1) {};
+		ThreadWrapper(Runnable& runnable) : m_runnable(runnable), m_param(NULL), m_isRunning(false), m_thread(0) {};
 		void run(void* para) {
 			if (!m_isRunning) {
 				m_param = para;
@@ -41,6 +44,7 @@ namespace utils {
 			};
 		}
 
+		/* Note supported in cygwin, try mingw maybe???
 		void setAffinity(int cpuID) {
 			  cpu_set_t mask;
 			  CPU_ZERO(&mask);
@@ -49,6 +53,7 @@ namespace utils {
 				  throw std::runtime_error(std::string("set thread affinity error! errno=") + std::to_string(errno));
 			  }
 		};
+		*/
 
 		~ThreadWrapper() {
 			if (m_isRunning) {
@@ -57,7 +62,7 @@ namespace utils {
 				struct timespec tspec;
 				tspec.tv_sec = 0;
 				tspec.tv_nsec = 100000000 ;
-				nanosleep(CLOCK_REALTIME, &tspec);
+				nanosleep(&tspec, &tspec);
 			}
 			pthread_cancel(m_thread);
 		};

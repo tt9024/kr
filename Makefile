@@ -1,6 +1,7 @@
 CXX=g++
-CXXFLAGS=-std=c++0x -DIB_USE_STD_STRING -Wall -Wno-switch -g
-ROOT_DIR=/home/zfu/kisco
+#CXXFLAGS=-std=c++0x -DIB_USE_STD_STRING -Wall -Wno-switch -g
+CXXFLAGS=-DIB_USE_STD_STRING -Wall -Wno-switch -g
+ROOT_DIR=/cygdrive/e/ib/kisco
 BASE_SRC_DIR=${ROOT_DIR}/src
 LIBS=-lpthread -lrt
 OBJ_DIR=${ROOT_DIR}/obj
@@ -40,6 +41,13 @@ booktap:
 
 tickrec:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/tick_recorder.cpp $(LIBS)
+
+histclient:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/EClientSocketBase.o -c $(IB_SRC_DIR)/sdk/EClientSocketBase.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/EPosixClientSocket.o -c $(IB_SRC_DIR)/sdk/EPosixClientSocket.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/PosixTestClient.o -c $(IB_SRC_DIR)/PosixTestClient.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/HistClient.o -c $(IB_SRC_DIR)/HistClient.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(OBJ_DIR)/EClientSocketBase.o $(OBJ_DIR)/EPosixClientSocket.o $(OBJ_DIR)/PosixTestClient.o $(OBJ_DIR)/HistClient.o $(LIBS)
 
 clean:
 	rm -f $(OBJ_DIR)/*.o

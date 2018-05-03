@@ -10,6 +10,7 @@
 
 #include "EWrapper.h"
 #include "plcc/PLCC.hpp"
+#include <map>
 
 #define FunctionPrint(fmt, arg...) logInfo("In %s: %s = " fmt "", __func__, #arg, ##arg);
 #define FunctionPrintEmpty() logInfo("In %s", __func__);
@@ -46,13 +47,19 @@ public:
 	time_t getIdleSeconds() {
 	    return time(NULL) - m_last_idle_second;
 	}
+	std::map<std::string, std::string> ib_cmefx;
+	std::map<char, std::string> ib_futmon;
 
 protected:
 	void makeFxContract(Contract &con, const char* symbol);
 	void makeMetalContract(Contract &con, const char* symbol);
 	void makeNymContract(Contract &con, const char* symbol);
+	void makeCmeContract(Contract &con, const char* symbol);
+	void makeCbtContract(Contract &con, const char* symbol);
+	void makeEuxContract(Contract &con, const char* symbol);
 	void makeVixContract(Contract &con, const char* symbol, const char* curDate);
     void makeContract(Contract &con, const char* symbol, const char* curDate = NULL);
+
 
 public:
 	// events

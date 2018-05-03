@@ -30,6 +30,28 @@ PosixTestClient::PosixTestClient()
 	, m_last_idle_second(time(NULL))
     , m_oid(10000)
 {
+	ib_cmefx["6E"]="EUR";
+	ib_cmefx["6A"]="AUD";
+	ib_cmefx["6C"]="CAD";
+	ib_cmefx["6B"]="GBP";
+	ib_cmefx["6J"]="JPY";
+	ib_cmefx["6N"]="NZD";
+	ib_cmefx["6R"]="RUB";
+	ib_cmefx["6Z"]="ZAR";
+	ib_cmefx["6M"]="MXP";
+
+	ib_futmon['F']="01";
+	ib_futmon['G']="02";
+	ib_futmon['H']="03";
+	ib_futmon['J']="04";
+	ib_futmon['K']="05";
+	ib_futmon['M']="06";
+	ib_futmon['N']="07";
+	ib_futmon['Q']="08";
+	ib_futmon['U']="09";
+	ib_futmon['V']="10";
+	ib_futmon['X']="11";
+	ib_futmon['Z']="12";
 }
 
 PosixTestClient::~PosixTestClient()
@@ -173,6 +195,71 @@ void PosixTestClient::makeNymContract(Contract &con, const char* symbol) {
     logInfo("Contract: %s", con.ToString().c_str());
 }
 
+// invoked by symbol "CME/ESM8"
+void PosixTestClient::makeCmeContract(Contract &con, const char* symbol) {
+
+    const std::string sym = std::string(symbol+4, 2);
+    const auto iter = ib_cmefx.find(sym);
+    if (iter != ib_cmefx.end()) {
+    	con.symbol = iter->second;
+    } else {
+    	con.symbol = sym;
+    }
+    con.currency = "USD";
+    con.exchange = "GLOBEX";
+    con.secType = "FUT";
+    con.localSymbol = std::string(symbol+4, 4);
+    con.includeExpired = true;
+    logInfo("Contract: %s", con.ToString().c_str());
+}
+
+// invoked by symbol "CBT/ZBM8"
+void PosixTestClient::makeCbtContract(Contract &con, const char* symbol) {
+    con.symbol = std::string(symbol+4, 2);
+    con.currency = "USD";
+    con.exchange = "ECBOT";
+    con.secType = "FUT";
+    //con.localSymbol = std::string(symbol+4, 2) + "  ";
+    IBString exp = "201";
+    exp+=(symbol+7);
+    exp+=ib_futmon[symbol[6]];
+    //con.tradingClass = std::string(symbol+4, 2);
+    con.expiry=exp;
+    //con.multiplier = "1000";
+    con.includeExpired = true;
+    logInfo("Contract: %s", con.ToString().c_str());
+}
+
+// invoked by symbol "EUX/FDX"
+void PosixTestClient::makeEuxContract(Contract &con, const char* symbol) {
+	const IBString sym=std::string(symbol+4, 2);
+	if (sym=="FD") {
+		con.symbol = "DAX";
+	    con.tradingClass="FDAX";
+	} else if (sym=="ST") {
+		con.symbol = "ESTX50";
+	    con.tradingClass="FESX";
+	} else if (sym=="FG") {
+		con.symbol=std::string(symbol+5,3);
+	    con.tradingClass=std::string(symbol+4,4);
+	} else {
+		throw std::runtime_error("eux future not found!");
+	}
+    con.currency = "EUR";
+    con.exchange = "DTB";
+    con.secType = "FUT";
+    //con.localSymbol = std::string(symbol+4, 2) + "  ";
+    IBString exp = "201";
+    const size_t n = strlen(symbol);
+    exp+=(symbol+(n-1));
+    exp+=ib_futmon[symbol[n-2]];
+    //con.tradingClass = std::string(symbol+4, 2);
+    con.expiry=exp;
+    //con.multiplier = "1000";
+    con.includeExpired = true;
+    logInfo("Contract: %s", con.ToString().c_str());
+}
+
 // invoked by symbol VIX/VXU4
 void PosixTestClient::makeVixContract(Contract &con, const char* symbol, const char* curDate) {
     con.symbol = std::string(symbol, 3);
@@ -190,7 +277,13 @@ void PosixTestClient::makeContract(Contract &con, const char* symbol, const char
         makeNymContract(con, symbol);
     } else if (strncmp(symbol, "VIX", 3) == 0) {
         makeVixContract(con, symbol, curDate);
-    } else {
+    } else if (strncmp(symbol, "CME", 3) == 0) {
+        makeCmeContract(con, symbol);
+    }  else if (strncmp(symbol, "CBT", 3) == 0) {
+        makeCbtContract(con, symbol);
+    }  else if (strncmp(symbol, "EUX", 3)==0) {
+    	makeEuxContract(con, symbol);
+    }  else {
         makeFxContract(con, symbol);
     }
 }

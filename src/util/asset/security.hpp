@@ -135,9 +135,9 @@ namespace utils {
 { USDJPY, SECTYPE_FX,    "USD/JPY",  1000,    "",        "",         0,            USD, JPY },
 { USDMXN, SECTYPE_FX,    "USD/MXN",  10000,   "",        "",         0,            USD, MXN },
 
-{ FUT_CL, SECTYPE_FT,    "NYM/CLX4", 100,     "X4",      "20141013", 0,            USD, USD },
-{ FUT_NG, SECTYPE_FT,    "NYM/NGX4", 1000,    "X4",      "20141013", 0,            USD, USD },
-{ FUT_ES, SECTYPE_FT,    "CME/ESZ4", 100,     "Z4",      "20141213", 0,            USD, USD },
+{ FUT_CL, SECTYPE_FT,    "NYM/CLM8", 100,     "M8",      "20180522", 0,            USD, USD },
+{ FUT_NG, SECTYPE_FT,    "NYM/NGM8", 1000,    "M8",      "20180522", 0,            USD, USD },
+{ FUT_ES, SECTYPE_FT,    "CME/ESM8", 100,     "M8",      "20180522", 0,            USD, USD },
     };
 
     static const CCYInfo g_ccyInfo[] = {

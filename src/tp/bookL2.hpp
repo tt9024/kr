@@ -8,8 +8,6 @@
 #include <unordered_map>
 
 #include "plcc/PLCC.hpp"
-#include "asset/security.hpp"
-
 #include "time_util.h"
 #include "queue.h"  // needed for SwQueue for BookQ
 
@@ -29,29 +27,25 @@ struct PriceEntry {
     Price price;  // price is integer - pip adjusted and side signed (bid+ ask-)
     Quantity size;
     TSMicro ts_micro;
+    Quantity count;
 #pragma pack(pop)
-    PriceEntry() : price(0), size(0), ts_micro(0) {};
-    PriceEntry(Price p, Quantity s, TSMicro ts=0) : price(p), size(s), ts_micro(ts) {
+    PriceEntry() : price(0), size(0), ts_micro(0), count(0) {};
+    PriceEntry(Price p, Quantity s, Quantity cnt, TSMicro ts) : price(p), size(s), ts_micro(ts), count(cnt) {
         if (!ts) {
             ts_micro = utils::TimeUtil::cur_time_gmt_micro();
         }
     };
     void reset() {
-        price = 0; size = 0;ts_micro=0;
+        price = 0; size = 0;ts_micro=0;count=0;
     }
 
     Price getPrice(bool is_bid) const {
         return is_bid? price:-price;
     }
 
-    double getPriceDouble(utils::eSecurity secid, bool is_bid) const {
-        return pxToDouble(secid, getPrice(is_bid));
-    }
-
-    std::string toString(utils::eSecurity secid=utils::TotalSecurity, bool is_bid = true) const {
-        double px = (secid >= utils::TotalSecurity)? (double) price : getPriceDouble(secid, is_bid);
+    std::string toString(bool is_bid = true) const {
         char buf[64];
-        snprintf(buf, sizeof(buf), "%.7lf,%lld,%llu", px, (long long)size, (unsigned long long) ts_micro);
+        snprintf(buf, sizeof(buf), "%lld(%.7lf:%d)", (unsigned long long) ts_micro, price, size);
         return std::string(buf);
     }
 };

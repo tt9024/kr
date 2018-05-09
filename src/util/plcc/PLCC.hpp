@@ -21,9 +21,9 @@ static const char* ConfigFilePath =  "config/main.cfg";
 
 // TODO: include file and line number
 //#define logDebug(a...) utils::PLCC::instance().logDebug(a)
-#define logDebug(a...)
-#define logInfo(a...) utils::PLCC::instance().logInfo(a)
-#define logError(a...) utils::PLCC::instance().logError(a)
+#define logDebug(a...) utils::PLCC::instance().logDebug(__FILE__,__LINE__,a)
+#define logInfo(a...) utils::PLCC::instance().logInfo(__FILE__,__LINE__,a)
+#define logError(a...) utils::PLCC::instance().logError(__FILE__,__LINE__,a)
 
 #define plcc_getInt(a...) utils::PLCC::instance().getInt(a)
 #define plcc_getDouble(a...) utils::PLCC::instance().getDouble(a)

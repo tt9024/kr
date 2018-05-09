@@ -38,22 +38,22 @@ namespace utils {
 
   class Logger {
   public:
-    void logInfo(const char* fmt, ...) {
+    void logInfo(const char* file, int line, const char* fmt, ...) {
         va_list ap;
         va_start(ap, fmt);
-        log(Info, fmt, ap);
+        log(Info, file, line, fmt, ap);
     }
 
-    void logDebug(const char* fmt, ...) {
+    void logDebug(const char* file, int line, const char* fmt, ...) {
         va_list ap;
         va_start(ap, fmt);
-        log(Debug, fmt, ap);
+        log(Debug, file, line, fmt, ap);
     }
 
-    void logError(const char* fmt, ...) {
+    void logError(const char* file, int line, const char* fmt, ...) {
         va_list ap;
         va_start(ap, fmt);
-        log(Error, fmt, ap);
+        log(Error, file, line, fmt, ap);
     }
 
     virtual void flush() = 0;
@@ -61,9 +61,9 @@ namespace utils {
     };
 
   protected:
-    void log(LogLevel level, const char* fmt, va_list ap) {
+    void log(LogLevel level, const char* file, int line, const char* fmt, va_list ap) {
       char char_buffer[MAX_LOG_ENTRY];
-      int len = Logger::prepare_log_string(level, char_buffer, MAX_LOG_ENTRY-1);
+      int len = Logger::prepare_log_string(level, file, line, char_buffer, MAX_LOG_ENTRY-1);
 
       len += vsnprintf(char_buffer+len, MAX_LOG_ENTRY-len-1, fmt, ap);
       char_buffer[len++] = '\n';
@@ -74,9 +74,9 @@ namespace utils {
        writeLog(level, str, str_len);
     };
 
-    static int prepare_log_string(LogLevel level, char* char_buffer, int buf_size) {
+    static int prepare_log_string(LogLevel level, const char* file, int line, char* char_buffer, int buf_size) {
       int len = TimeUtil::cur_time_string_nanos_SOD(char_buffer, buf_size);
-      len += sprintf(char_buffer+len, ",%s,", getLevelStr(level));
+      len += sprintf(char_buffer+len, ",%s,%s:%d,", getLevelStr(level),file,line);
       return len;
     }
 

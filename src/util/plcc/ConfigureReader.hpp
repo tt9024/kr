@@ -111,6 +111,25 @@ public:
         return ::atof(valStr.c_str());
     }
 
+    std::vector<std::string> getStringArr(const char* key, bool* found = NULL) {
+		std::vector<std::string> ret;
+    	std::string valStr = getString(key, found);
+    	if (!(*found)) {
+    		return ret;
+    	}
+    	size_t n = valStr.size();
+    	const char* vs=valStr.c_str();
+    	size_t i0=1;
+    	for (size_t i=i0;i<n-1;++i) {
+    		if (vs[i]==',') {
+    			ret.push_back(valStr.substr(i0,i));
+    			i0=i+1;
+    		}
+    	}
+    	ret.push_back(valStr.substr(i0,n-1));
+    	return ret;
+    }
+
 private:
     std::string m_configFileName;
     FILE* m_configFile;

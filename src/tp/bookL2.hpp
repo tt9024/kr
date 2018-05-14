@@ -18,7 +18,7 @@
 
 namespace tp {
 
-typedef int32_t Price;
+typedef double Price;
 typedef int32_t Quantity;
 typedef uint64_t TSMicro;
 
@@ -35,17 +35,24 @@ struct PriceEntry {
             ts_micro = utils::TimeUtil::cur_time_gmt_micro();
         }
     };
+    void set(Price px, Quantity sz, TSMicro ts) {
+    	price=px;
+    	size=sz;
+    	ts_micro=ts;
+    }
+
     void reset() {
         price = 0; size = 0;ts_micro=0;count=0;
     }
 
     Price getPrice(bool is_bid) const {
-        return is_bid? price:-price;
+        //return is_bid? price:-price;
+    	return price;
     }
 
     std::string toString(bool is_bid = true) const {
         char buf[64];
-        snprintf(buf, sizeof(buf), "%lld(%.7lf:%d)", (unsigned long long) ts_micro, price, size);
+        snprintf(buf, sizeof(buf), "%lld(%.7lf:%d)", (unsigned long long) ts_micro, getPrice(is_bid), size);
         return std::string(buf);
     }
 };
@@ -64,6 +71,9 @@ struct BookConfig {
     std::string symbol;
     BookConfig(const std::string v, const std::string s) :
         venue(v), symbol(s) {};
+    std::string toString() const {
+    	return venue+"_"+symbol;
+    }
 };
 
 #define BookLevel 8
@@ -72,21 +82,17 @@ struct BookDepot {
     // this structure needs to be aligned
     uint64_t update_ts_micro;  // this can be obtained from pe's ts
     // bid first, ask second
+    int update_level;
+    int update_type;
     PriceEntry pe[2*BookLevel];
-
-    uint16_t security_id;
-    uint16_t reserved;
-    uint8_t update_level; // direct offset, no bid/ask adjustment
-    uint8_t update_side;  // 0 is bid, 1 is ask
-    uint8_t avail_level[2];
+    int avail_level[2];
+    Price trade_price;
+    Quantity trade_size;
+    int trade_attr;  // buy(0)/sell(1)
 #pragma pack(pop)
 
     BookDepot() {
-        memset(this, 0, sizeof(BookDepot));
-    }
-    explicit BookDepot(utils::eSecurity secid) {
-        memset(this, 0, sizeof(BookDepot));
-        security_id = secid;
+    	reset();
     }
     BookDepot& operator = (const BookDepot& book) {
         if (&book == this) {
@@ -94,6 +100,10 @@ struct BookDepot {
         }
         memcpy (this, &book, sizeof(BookDepot));
         return *this;
+    }
+
+    void reset() {
+    	memset(this, 0, sizeof(BookDepot));
     }
 
     Price getBid() const {
@@ -119,49 +129,78 @@ struct BookDepot {
         return 0;
     }
 
-    Price getBestPrice(bool is_bid) const {
-         return is_bid?getBid():getAsk();
+    Price getBestPrice(bool isBid) const {
+    	int side=isBid?0:1;
+        if ((avail_level[side] < 1))
+            return 0;
+
+        for (size_t i = BookLevel*side; i<avail_level[side]+BookLevel*side; ++i) {
+            if (pe[i].size > 0)
+                return pe[i].getPrice(isBid);
+        }
+        return 0;
     }
 
     Price getMid() const {
         if ((avail_level[0] < 1) || (avail_level[1] < 1))
             return 0;
-        Price bid = pe[0].getPrice(true);
-        Price ask = pe[BookLevel].getPrice(false);
-        return (bid+ask)/2;
+        return (getBid() + getAsk())/2;
     }
 
     double getBidDouble() const {
-        return pxToDouble((utils::eSecurity)security_id, getBid());
+    	return getBid();
     }
 
     double getAskDouble() const {
-        return pxToDouble((utils::eSecurity)security_id, getAsk());
+    	return getAsk();
     }
 
     double getMidDouble() const {
-        return pxToDouble((utils::eSecurity)security_id, getMid());
+    	return getMid();
+    }
+
+    const char* getUpdateType() const {
+    	switch (update_type) {
+    	case 0 : return "Bid";
+    	case 1 : return "Ask";
+    	case 2 : return "Trade";
+    	}
+    	logError("unknown update type %d", update_type);
+    	throw std::runtime_error("unknown update type!");
+    }
+
+    void setUpdateType(bool isTrade, bool isBid) {
+    	if (isTrade) {
+    		update_type=2;
+        } else {
+        	if (isBid) {
+        		update_type=0;
+        	} else {
+    		    update_type=1;
+    	    }
+        }
     }
 
     std::string toString() const {
         char buf[1024];
         int n = 0;
-        n += snprintf(buf+n, sizeof(buf)-n, "ID(%d) UpdateLevel(%s:%d) Time(%llu) ",
-                (int)security_id, update_side==0?"BID":"ASK",
-                (int) update_level, (unsigned long long) update_ts_micro);
-        for (int s = 0; s < 2; ++s)
-        {
-            int levels = avail_level[s];
-            n += snprintf(buf+n, sizeof(buf)-n, " %s(%d) [ ", s==0?"Bid":"Ask", levels);
-            const PriceEntry* pe_ = &(pe[s*BookLevel]);
-            for (int i = 0; i<levels; ++i) {
-                if (pe_->size) {
-                    n += snprintf(buf+n, sizeof(buf)-n, " (%d)%s ", i, pe_->toString((utils::eSecurity)security_id, s==0).c_str());
-                }
-                ++pe_;
-            }
-            n += snprintf(buf+n, sizeof(buf)-n, " ] ");
-        }
+        const char* update_type = getUpdateType();
+        n += snprintf(buf+n, sizeof(buf)-n, "%llu (%s-%d)", update_ts_micro,update_type,update_level);
+		for (int s = 0; s < 2; ++s)
+		{
+			int levels = avail_level[s];
+			n += snprintf(buf+n, sizeof(buf)-n, " %s(%d) [ ", s==0?"Bid":"Ask", levels);
+			const PriceEntry* pe_ = &(pe[s*BookLevel]);
+			for (int i = 0; i<levels; ++i) {
+				if (pe_->size) {
+					n += snprintf(buf+n, sizeof(buf)-n, " (%d)%s ", i, pe_->toString());
+				}
+				++pe_;
+			}
+			n += snprintf(buf+n, sizeof(buf)-n, " ] ");
+		}
+		const char* bs = trade_attr==0?"Buy":"Sell";
+		n += snprintf(buf+n, sizeof(buf)-n, "%s %d@%f", bs, trade_size, trade_price);
         return std::string(buf);
     }
 };
@@ -176,13 +215,11 @@ struct BookL2 {
     // to obtain all necessary updates.
 
     const BookConfig _cfg;
-    const utils::eSecurity _sec_id;
     BookDepot _book;
-    uint8_t* const _avail_level;
+    int* const _avail_level;
 
     explicit BookL2(const BookConfig& cfg):
-            _cfg(cfg) ,_sec_id(utils::SecMappings::instance().getSecId(_cfg.symbol.c_str())),
-            _book(_sec_id), _avail_level(_book.avail_level){
+            _cfg(cfg), _book(), _avail_level(_book.avail_level){
         reset();
     }
 
@@ -206,17 +243,14 @@ struct BookL2 {
         }
 
         _book.update_level = level;
-        _book.update_side = side;
+        _book.setUpdateType(false, side);
         // move subsequent levels down
         PriceEntry* pe = getEntry(level, side);
         if (levels > level) {
             memmove(pe+1, pe, (levels - level)*sizeof(PriceEntry));
         };
 
-        pe->price = is_bid?price : -price;
-        pe->size = size;
-        pe->ts_micro = ts_micro;
-
+        pe->set(price, size, ts_micro);
         ++(_avail_level[side]);
         return true;
     }
@@ -230,7 +264,7 @@ struct BookL2 {
         }
 
         _book.update_level = level;
-        _book.update_side = side;
+        _book.setUpdateType(false, side);
         // move subsequent levels up
         unsigned int levels = _avail_level[side];
         if (levels > level + 1) {
@@ -249,19 +283,13 @@ struct BookL2 {
             //throw new std::runtime_error("error!");
         }
 
-        _book.update_level = level;
-        _book.update_side = side;
         PriceEntry* pe = getEntry(level, side);
-
-        // check if the update is necessary
-        // Should this be a performance hit?
-        pe->ts_micro = ts_micro;
-        if (!is_bid) price = -price;
         if (__builtin_expect(((pe->price == price) && (pe->size == size)), 0)) {
             return false;
         }
-        pe->price = price;
-        pe->size = size;
+        _book.update_level = level;
+        _book.setUpdateType(false, side);
+        pe->set(price, size, ts_micro);
         return true;
     }
 
@@ -290,14 +318,12 @@ struct BookL2 {
         if (__builtin_expect((0 == _avail_level[side]), 0)) {
             return newPrice(0, size, 0, is_bid, ts_micro);
         }
-        Price price = getEntry(0, side)->price;
-        price = is_bid?price:-price;
+        Price price = getEntry(0, side)->getPrice(is_bid);
         return updPrice(price, size, 0, is_bid, ts_micro);
     }
 
     void reset() {
         memset(&_book, 0, sizeof(BookDepot));
-        _book.security_id = (uint16_t) _sec_id;
         _avail_level[0] = _avail_level[1] = 0;
     }
 
@@ -333,16 +359,16 @@ class BookQ {
 public:
     static const int BookLen = sizeof(BookDepot);
     static const int QLen = (1024*BookLen);
-    const std::vector<BookConfig> _cfg;
+    const BookConfig _cfg;
     const std::string _q_name;
     class Writer;
     class Reader;
 
-    BookQ(const char* q_name, bool readonly, const std::vector<BookConfig>* config = NULL) :
-        _cfg(config? *config : std::vector<BookConfig>()), _q_name(q_name), _q(q_name, readonly, true),
+    BookQ(const char* q_name, bool readonly, const BookConfig config) :
+        _cfg(config), _q_name(q_name), _q(q_name, readonly, true),
         _writer(readonly? NULL:new Writer(*this))
     {
-        logInfo("BookQ %s started %s with %d configs.", q_name, readonly?"ReadOnly":"ReadWrite", (int)_cfg.size());
+        logInfo("BookQ %s started %s with %d configs (%s).", q_name, readonly?"ReadOnly":"ReadWrite", _cfg.toString().c_str());
     };
 
     // This is to enforce that for SwQueue, at most one writer should
@@ -380,78 +406,63 @@ public:
         // no checking on NULL pointer of book is performed
         // TP will ensure secid is valid. constructor of writer
         // will ensure book is not NULL
-        void newPrice(utils::eSecurity secid, double price, Quantity size, int level, bool is_bid, uint64_t ts_micro) {
-            BookL2* book = getBook(secid);
-            if (__builtin_expect(book->newPrice(pxToInt(secid, price), size, level, is_bid, ts_micro), 1)) {
-                updateQ(secid, ts_micro);
+        void newPrice(double price, Quantity size, int level, bool is_bid, uint64_t ts_micro) {
+            if (__builtin_expect(_bookL2.newPrice(price, size, level, is_bid, ts_micro), 1)) {
+                updateQ(ts_micro);
                 return;
             }
             //logError("BookQ newPrice() security not updated %d", (int)secid);
         }
 
-        void delPrice(utils::eSecurity secid, int level, bool is_bid, uint64_t ts_micro) {
-            BookL2* book = getBook(secid);
-            if (__builtin_expect((book->delPrice(level, is_bid)),1)) {
-                updateQ(secid, ts_micro);
+        void delPrice(int level, bool is_bid, uint64_t ts_micro) {
+            if (__builtin_expect((_bookL2.delPrice(level, is_bid)),1)) {
+                updateQ(ts_micro);
                 return;
             }
             //logError("BookQ delPrice() security not updated %d", (int)secid);
         }
 
-        void updPrice(utils::eSecurity secid, double price, Quantity size, int level, bool is_bid, uint64_t ts_micro) {
-            BookL2* book = getBook(secid);
-            if (__builtin_expect(book->updPrice(pxToInt(secid, price), size, level, is_bid, ts_micro),1)) {
-                updateQ(secid, ts_micro);
+        void updPrice(double price, Quantity size, int level, bool is_bid, uint64_t ts_micro) {
+            if (__builtin_expect(_bookL2.updPrice(price, size, level, is_bid, ts_micro),1)) {
+                updateQ(ts_micro);
                 return;
             }
             //logError("BookQ updPrice() security not updated %d", (int)secid);
         }
 
-        void updBBO(utils::eSecurity secid, double price, Quantity size, bool is_bid, uint64_t ts_micro) {
-            BookL2* book = getBook(secid);
-            if (__builtin_expect(book->updBBO(pxToInt(secid, price), size, is_bid, ts_micro), 1)) {
-                updateQ(secid, ts_micro);
+        void updBBO(double price, Quantity size, bool is_bid, uint64_t ts_micro) {
+            if (__builtin_expect(_bookL2.updBBO(price, size, is_bid, ts_micro), 1)) {
+                updateQ(ts_micro);
                 return;
             }
             //logError("BookQ updBBO security not updated %d", (int) secid);
         }
 
-        void updBBOPriceOnly(utils::eSecurity secid, double price, bool is_bid, uint64_t ts_micro) {
-            BookL2* book = getBook(secid);
-            if (book->updBBOPriceOnly(pxToInt(secid, price), is_bid, ts_micro)) {
-                updateQ(secid, ts_micro);
+        void updBBOPriceOnly(double price, bool is_bid, uint64_t ts_micro) {
+            if (_bookL2.updBBOPriceOnly(price, is_bid, ts_micro)) {
+                updateQ(ts_micro);
                 return;
             }
             //logDebug("BookQ updBBOPriceOnly security not updated %d", (int) secid);
         }
 
-        void updBBOSizeOnly(utils::eSecurity secid, Quantity size, bool is_bid, uint64_t ts_micro) {
-            BookL2* book = getBook(secid);
-            if (book->updBBOSizeOnly(size, is_bid, ts_micro)) {
-                updateQ(secid, ts_micro);
+        void updBBOSizeOnly(Quantity size, bool is_bid, uint64_t ts_micro) {
+            if (_bookL2.updBBOSizeOnly(size, is_bid, ts_micro)) {
+                updateQ(ts_micro);
                 return;
             }
             //logDebug("BookQ updBBOSizeOnly security not updated %d", (int) secid);
         }
 
-        void resetALLBooks() {
-            for (int i=0; i<utils::TotalSecurity; ++i) {
-                resetBook((utils::eSecurity)i);
-            }
+        void resetBook() {
+            _bookL2.reset();
         }
 
-        void resetBook(utils::eSecurity secid) {
-            if (_books[(int)secid]) {
-                _books[(int)secid]->reset();
-                updateQ(secid, utils::TimeUtil::cur_time_gmt_micro());
-            }
+        BookL2* getBook() const {
+            return &_bookL2;
         }
 
-        BookL2* getBook(utils::eSecurity secid) const {
-            return _books[(int)secid];
-        }
-
-        void addTrade(utils::eSecurity secid, double price, Quantity size, int attr){
+        void addTrade(double price, Quantity size, int attr){
             // TODO
             // implement this
         };
@@ -460,33 +471,20 @@ public:
             return _bq._cfg;
         }
 
-        ~Writer() {
-            for (int i = 0; i< utils::TotalSecurity; ++i) {
-                if (_books[i]) {
-                    delete _books[i];
-                    _books[i] = NULL;
-                }
-            }
-        }
+        ~Writer() {};
     private:
         BookQ& _bq;
         typename BookQ::QType::Writer& _wq;  // the writer's queue
-        BookL2* _books[utils::TotalSecurity]; // all possible books
+        BookL2 _bookL2; // the L2 books, each book per queue
 
         friend class BookQ<BufferType>;
-        Writer(BookQ& bq) : _bq(bq), _wq(_bq._q.theWriter()) {
-            memset(_books, 0, sizeof(BookL2*) * utils::TotalSecurity);
-            // create books according to the config
-            for (size_t i = 0; i<_bq._cfg.size(); ++i) {
-                const std::string& sym(_bq._cfg[i].symbol);
-                utils::eSecurity sec = utils::SecMappings::instance().getSecId(sym.c_str());
-                _books[(int)sec] = new BookL2(_bq._cfg[i]);
-            }
+        Writer(BookQ& bq) : _bq(bq), _wq(_bq._q.theWriter()), _bookL2(_bq._cfg) {
+        	resetBook();
         }
 
-        void updateQ(utils::eSecurity secid, uint64_t ts_micro) {
-            _books[(int)secid]->_book.update_ts_micro = ts_micro;
-            _wq.put((char*)&(_books[(int)secid]->_book));
+        void updateQ(uint64_t ts_micro) {
+            _bookL2._book.update_ts_micro = ts_micro;
+            _wq.put((char*)&(_bookL2._book));
         }
     };
 
@@ -598,5 +596,22 @@ struct BarLine {
     }
 
 };
+
+static inline
+std::string symbol_to_fname(const char* symbol) {
+	size_t n = strlen(symbol);
+	char s[128];
+	for (size_t i=0;i<n;++i){
+		if (symbol[i]=='/') {
+			s[i]='_';
+		} else {
+			s[i]=symbol[i];
+		}
+	}
+	s[n]=0;
+	return std::string(s);
+}
+
+
 
 }

@@ -70,6 +70,26 @@ bool ClientBaseImp::isConnected() const
 	return m_pClient->isConnected();
 }
 
+
+void ClientBaseImp::reqMDDoB(const char* symbol, int ticker_id, int numLevel) {
+	if (isConnected())
+	{
+	    Contract con;
+	    RicContract::get().makeContract(con, symbol);
+	    m_pClient->reqMktDepth(ticker_id, con, numLevel,TagValueListSPtr());
+	}
+}
+
+void ClientBaseImp::reqMDBBO(const char* symbol, int ticker_id) {
+	if (isConnected())
+	{
+	    Contract con;
+	    RicContract::get().makeContract(con,symbol);
+	    m_pClient->reqMktData(ticker_id, con, "165,233,256", false,false,TagValueListSPtr());
+	}
+}
+
+
 int ClientBaseImp::processMessages()
 {
 	int processed_count = 0;

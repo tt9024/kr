@@ -15,6 +15,7 @@
 #include "IBContract.hpp"
 #include <memory.h>
 #include <iostream>
+#include <plcc/plcc.hpp>
 
 #define TWS_PORT 7496
 #define IBG_PORT 4001
@@ -143,12 +144,18 @@ public:
 	}
 
 	int getReceived() const {
-		if (m_errorCode==162) { // no historical data returned
-			m_errorCode=0;
-			return 1;
-		}
 		return received;
 	};
+
+	void error(int id, int errorCode, const std::string& errorString)
+	{
+		logInfo( "Error. Id: %d, Code: %d, Msg: %s", id, errorCode, errorString.c_str());
+		m_errorCode=errorCode;
+		if (m_errorCode==162) { // no historical data returned
+			logInfo("received error code %d, mark received",m_errorCode);
+			received += 1;
+		}
+	}
 
 private:
 	int tid;
@@ -160,7 +167,7 @@ private:
 	Contract con;
 	const std::string historyFile;
 	const int client_id;
-	int received;
+	volatile int received;
 	FILE *fp;
 };
 

@@ -24,7 +24,7 @@ public:
 		return instance;
 	}
 
-	void makeContract(Contract &con, const char* symbol, const char* curDate) const {
+	void makeContract(Contract &con, const char* symbol, const char* curDate=NULL) const {
 	    if (strncmp(symbol, "XAU", 3) == 0) {
 	        makeMetalContract(con, symbol);
 	    } else if (strncmp(symbol, "NYM", 3) == 0) {
@@ -37,8 +37,10 @@ public:
 	        makeCbtContract(con, symbol);
 	    }  else if (strncmp(symbol, "EUX", 3)==0) {
 	    	makeEuxContract(con, symbol);
-	    }  else {
-	        makeFxContract(con, symbol);
+	    }  else if (strncmp(symbol, "FX/", 3) == 0) {
+	        makeFxContract(con, symbol+3);
+	    } else {
+	    	throw std::runtime_error(std::string("unknown contract: ") + std::string (symbol));
 	    }
 	}
 
@@ -52,7 +54,7 @@ private:
 		ib_cmefx["6B"]="GBP";
 		ib_cmefx["6J"]="JPY";
 		ib_cmefx["6N"]="NZD";
-		ib_cmefx["6R"]="RUB";
+		ib_cmefx["6R"]="RUR";
 		ib_cmefx["6Z"]="ZAR";
 		ib_cmefx["6M"]="MXP";
 
@@ -69,7 +71,7 @@ private:
 		ib_futmon['X']="11";
 		ib_futmon['Z']="12";
 	}
-	// FX Spot, symbol is assumed to be EUR/USD
+	// FX Spot, symbol is assumed to be FX/EUR/USD
 	void makeFxContract(Contract &con, const char* symbol) const {
 	    con.symbol = std::string(symbol, 3);
 	    con.currency = std::string(symbol+4, 3);

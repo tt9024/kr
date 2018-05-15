@@ -157,7 +157,7 @@ private:
     }
 
     std::string findKey(const std::string& key, bool* found) const {
-        const ConfigMapType::iterator iter = m_configMap.find(key);
+        const ConfigMapType::const_iterator iter = m_configMap.find(key);
         if (iter == m_configMap.end()) {
             if (found) *found = false;
             return "";

@@ -152,8 +152,14 @@ public:
 		logInfo( "Error. Id: %d, Code: %d, Msg: %s", id, errorCode, errorString.c_str());
 		m_errorCode=errorCode;
 		if (m_errorCode==162) { // no historical data returned
-			logInfo("received error code %d, mark received",m_errorCode);
-			received += 1;
+			if (errorString.find("definition")!=std::string::npos || errorString.find("found")!=std::string::npos) {
+				logInfo("received definition error, mark received");
+				received += 1;
+			}
+			// is this a pacing violation or security not found????
+			//if ( errorString.find("pacing")!=std::string::npos || errorString.find("violation")!=std::string::npos) {
+				// logError("pacing violation!");
+			//}
 		}
 	}
 

@@ -71,21 +71,36 @@ bool ClientBaseImp::isConnected() const
 }
 
 
-void ClientBaseImp::reqMDDoB(const char* symbol, int ticker_id, int numLevel) {
+void ClientBaseImp::reqMDL2(const char* symbol, int ticker_id, int numLevel) {
 	if (isConnected())
 	{
 	    Contract con;
 	    RicContract::get().makeContract(con, symbol);
 	    m_pClient->reqMktDepth(ticker_id, con, numLevel,TagValueListSPtr());
+	} else {
+		logError("reqMDDoB error not connected!");
 	}
 }
 
-void ClientBaseImp::reqMDBBO(const char* symbol, int ticker_id) {
+void ClientBaseImp::reqMDL1(const char* symbol, int ticker_id) {
 	if (isConnected())
 	{
 	    Contract con;
 	    RicContract::get().makeContract(con,symbol);
-	    m_pClient->reqMktData(ticker_id, con, "165,233,256", false,false,TagValueListSPtr());
+	    m_pClient->reqMktData(ticker_id, con, "233", false,false,TagValueListSPtr());
+	} else {
+		logError("reqMDBBO error not connected!");
+	}
+}
+
+void ClientBaseImp::reqMDTbT(const char* symbol, int ticker_id) {
+	if (isConnected()) {
+	    Contract con;
+	    RicContract::get().makeContract(con,symbol);
+	    m_pClient->reqTickByTickData(ticker_id, con, "AllLast", 0, false);
+	    m_pClient->reqTickByTickData(ticker_id, con, "BidAsk", 0, true);
+	} else {
+		logError("req error not connected!");
 	}
 }
 

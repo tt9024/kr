@@ -78,7 +78,7 @@ public:
         }
     }
 
-    int getInt(const char* key, bool* found = NULL, int defaultVal = 0) {
+    int getInt(const char* key, bool* found = NULL, int defaultVal = 0) const {
         std::string valStr;
         bool res;
         valStr = findKey(key, &res);
@@ -89,7 +89,7 @@ public:
         return ::atoi(valStr.c_str());
     }
 
-    std::string getString(const char* key, bool* found = NULL, const std::string defaultVal = "") {
+    std::string getString(const char* key, bool* found = NULL, const std::string defaultVal = "") const {
         std::string valStr;
         bool res;
         valStr = findKey(key, &res);
@@ -100,7 +100,7 @@ public:
         return valStr;
     }
 
-    double getDouble(const char* key, bool* found = NULL, double defaultVal = 0.0) {
+    double getDouble(const char* key, bool* found = NULL, double defaultVal = 0.0) const {
         std::string valStr;
         bool res;
         valStr = findKey(key, &res);
@@ -111,7 +111,7 @@ public:
         return ::atof(valStr.c_str());
     }
 
-    std::vector<std::string> getStringArr(const char* key, bool* found = NULL) {
+    std::vector<std::string> getStringArr(const char* key, bool* found = NULL) const {
 		std::vector<std::string> ret;
     	std::string valStr = getString(key, found);
     	if (!(*found)) {
@@ -156,8 +156,8 @@ private:
         *wptr = 0;
     }
 
-    std::string findKey(const std::string& key, bool* found) {
-        ConfigMapType::iterator iter = m_configMap.find(key);
+    std::string findKey(const std::string& key, bool* found) const {
+        const ConfigMapType::iterator iter = m_configMap.find(key);
         if (iter == m_configMap.end()) {
             if (found) *found = false;
             return "";

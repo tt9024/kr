@@ -5,9 +5,6 @@
  *      Author: zfu
  */
 
-
-
-
 #pragma once
 
 #include <stdio.h>
@@ -33,64 +30,70 @@ typedef IBBookQType::Writer BookWriter;
 class TPIB : public ClientBaseImp {
 private:
     const int _client_id;
-    int _last_tickerid;
+    const std::vector<std::string> _symL1;
+    const std::vector<std::string> _symL2;
+    const std::vector<std::string> _symTbT;
+    int _next_tickerid;
     std::string _ipAddr;
     int _port;
-    BookWriter* _book_writer;
+    std::vector<IBBookQType*> _book_queue;
     volatile bool _should_run;
+    void md_subscribe(const std::vector<std::string>&symL1,
+    		          const std::vector<std::string>&symTbT,
+					  const std::vector<std::string>&symL2) {
+    	// want live data
+    	m_pClient->reqMarketDataType(1);
+
+    	// L1
+        for (const auto& s : symL1) {
+        	auto bp = new IBBookQType(BookConfig(s,L1),false);
+        	_book_queue.push_back(bp);
+            reqMDL1(s.c_str(), _next_tickerid++);
+        }
+
+    	// TbT
+        for (const auto& s : symTbT) {
+        	auto bp = new IBBookQType(BookConfig(s,TbT),false);
+        	_book_queue.push_back(bp);
+            reqMDTbT(s.c_str(), _next_tickerid++);
+        }
+
+        // L2
+        for (const auto& s : symL2) {
+        	auto bp = new IBBookQType(BookConfig(s,L2),false);
+        	_book_queue.push_back(bp);
+            reqMDL2(s.c_str(), _next_tickerid++);
+        }
+    }
 
 public:
     static const int TickerStart = 2;
-    explicit TPIB (int client_id) : _client_id(client_id), _last_tickerid(0),
-        _ipAddr("127.0.0.1"), _port(0), _book_writer(0), _should_run(false) {
-        bool found0, found1, found2, found3;
+    explicit TPIB (int client_id) : _client_id(client_id),
+    		_symL1(plcc_getStringArr("SubL1")),
+			_symL2(plcc_getStringArr("SubL2")),
+			_symTbT(plcc_getStringArr("SubTbT")),
+			_next_tickerid(TickerStart),
+			_ipAddr("127.0.0.1"), _port(0), _should_run(false) {
+        bool found0, found1, found2;
         _client_id = plcc_getInt("IBClientId", &found0, 0);
         _ipAddr = plcc_getString("IBClientIP", &found1, "127.0.0.1");
         _port = plcc_getInt("IBClientPort", &found2, 0);
-        const std::vector<std::string> symL1=plcc_getStringArr("SubL1", &found3);
-        const std::vector<std::string> symL1=plcc_getStringArr("SubL2", &found3);
-        const std::vector<std::string> symL1=plcc_getStringArr("SubTbT", &found3);
 
-        if ((!found0) || (!found1) || (!found2) ||(!found3)) {
-            logError("IBClient failed to run - config error IBClientID(%s) IBClientIP(%s) IBClientPort(%s)",
+        if ((!found0) || (!found1) || (!found2)) {
+            logError("TPIB failed to run - config error IBClientID(%s) IBClientIP(%s) IBClientPort(%s)",
                     found0? "Found":"Not Found", found1?"Found":"Not Found", found2?"Found":"Not Found");
-            throw std::runtime_error("IBClient failed to run - required config setting not found.");
+            throw std::runtime_error("TPIB failed to run - required config setting not found.");
         }
+
+        if (!_symL1.size() && !_symL2.size() && !_symTbT.size()) {
+        	logError("TPIB started without subscription found!");
+        }
+
         logInfo("TPIB (%s:%d) initiated with client id %d.", _ipAddr.c_str(), _port, _client_id);
+    }
 
-        std::string subs;
-        for (const auto s : sym) {
-        	subs += s;
-        	subs += " ";
-        }
-        logInfo("TPIB got subs: %s",subs.c_str());
-        // subscribe
-
-        _last_tickerid = TickerStart;
-        _book_writer->resetBook();
-
-        // get symbols to subscribe
-        const std::vector<BookConfig>& cfg(_book_writer->getBookConfig());
-        for (size_t i=0; i<cfg.size(); ++i) {
-            utils::eSecurity secid = utils::SecMappings::instance().getSecId(cfg[i].symbol.c_str());
-
-            // subscribe to DoB
-            reqMDDoB(cfg[i].symbol.c_str(), _last_tickerid, BookLevel);
-            logInfo("IBClient subscribing DoB for %s, ticker_id = %d", cfg[i].symbol.c_str(), _last_tickerid);
-
-            _tickerVec.push_back(secid);
-            ++_last_tickerid;
-
-            // also subscribe BBO in case DoB subscription is failed,
-            // last trade is also obtained by this.  Don't know
-            // how to merge them
-            reqMDBBO(cfg[i].symbol.c_str(), _last_tickerid);
-            logInfo("IBClient subscribing BBO for %s, ticker_id = %d", cfg[i].symbol.c_str(), _last_tickerid);
-
-            _tickerVec.push_back(secid);
-            ++_last_tickerid;
-
-        }
+    void md_subscribe() {
+    	md_subscribe(_symL1,_symTbT,_symL2);
     }
 
     // connect to venue
@@ -102,7 +105,6 @@ public:
         logInfo("TPIB started.");
         _should_run = true;
         while (_should_run) {
-            init();
             if (!connect(_ipAddr.c_str(), _port, _client_id)) {
                 sleep(10);
                 continue;
@@ -110,15 +112,10 @@ public:
             md_subscribe();
             // enter into the main loop
             while (isConnected() && _should_run) {
-                sock_recv(0,0);  // spinning
-                OrderInput oi;
-                if (_order_reader->getNextUpdate(oi)) {
-                    makeOrder(oi);
-                }
+            	processMessages();
             }
             logInfo("IBClient disconnected.");
         }
-
         logInfo("IBClient stopped.");
     }
 
@@ -127,9 +124,10 @@ public:
         _should_run = false;
     }
 
-    ~IBClient() {
-        delete _order_reader;
-        _order_reader = NULL;
+    ~TPIB() {
+        for (auto&q : _book_queue) {
+        	delete(q);
+        }
     }
 
     // Market Data Stuff
@@ -140,65 +138,66 @@ public:
                                           double price, int size) {
         // log the ticks
         unsigned long long tm = utils::TimeUtil::cur_time_gmt_micro();
-        logDebug("IBClient updateMktDepth: %llu %d %d %d %d %.7lf %d\n",
+        logDebug("TPIB updateMktDepth: %llu %d %d %d %d %.7lf %d\n",
                 tm, (int)(id), position, operation, side, price, size);
-
-        utils::eSecurity secid = getSecId(id);
-        if (__builtin_expect((secid == utils::TotalSecurity), 0)) {
-            logError("IBClient: received unknown ticker id %d, ignored.", id);
-            return;
-        }
 
         // side 0:ask 1:bid
         bool is_bid = (side == 1?true:false);
         switch (operation) {
         case 0: // new
-            _book_writer->newPrice(secid, price, size, position, is_bid, tm);
+            _book_queue[id-TickerStart]->theWriter().newPrice(price, size, position, is_bid, tm);
             break;
         case 1: // update
-            _book_writer->updPrice(secid, price, size, position, is_bid, tm);
+        	_book_queue[id-TickerStart]->theWriter().updPrice(price, size, position, is_bid, tm);
             break;
         case 2: // del
-            _book_writer->delPrice(secid, position, is_bid, tm);
+        	_book_queue[id-TickerStart]->theWriter().delPrice(position, is_bid, tm);
             break;
         default:
             logError("IBClient received unknown operation %d", operation);
         }
     }
 
-    void tickPrice(TickerId id, TickType field, double price, int canAutoExecute) {
-        if ((field < 1) || (field > 2)) return;
-        logDebug("IBClient tickPrice: %llu %d %d %d %d %.7lf %d\n",
-                utils::TimeUtil::cur_time_gmt_micro(), (int)(id), 0, 1, (field==1)? 1:0, price, canAutoExecute);
-
-        utils::eSecurity secid = getSecId(id);
-        if (__builtin_expect((secid == utils::TotalSecurity), 0)) {
-            logError("IBClient: received unknown ticker id %d, ignored.", id);
-            return;
+    void tickPrice(TickerId id, TickType field, double price, const TickAttrib& attribs) {
+        logInfo("TPIB tickPrice: %llu %d %d %.7lf\n",
+                utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
+        switch (field) {
+        case BID :
+        case ASK :
+            bool is_bid = (field == BID?true:false);
+            _book_queue[id-TickerStart]->theWriter().updBBOPriceOnly(price, is_bid, utils::TimeUtil::cur_time_gmt_micro());
+            break;
+        case LAST :
+            _book_queue[id-TickerStart]->theWriter().updTrdPriceOnly(price, utils::TimeUtil::cur_time_gmt_micro());
+            break;
+        default:
+            logError("TPIB unhandled tickPrice: %llu %d %d %.7lf\n",
+                    utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
         }
-
-        bool is_bid = (field == 1?true:false);
-        _book_writer->updBBOPriceOnly(secid, price, is_bid, utils::TimeUtil::cur_time_gmt_micro());
     }
 
     void tickSize(TickerId id, TickType field, int size) {
-        if ((field != 0) && (field != 3)) return;
-        logDebug("IBClient tickSize: %llu %d %d %d %d %d\n",
-                utils::TimeUtil::cur_time_gmt_micro(), (int)(id), 0, 1, (field==0)? 1:0, size);
-
-        utils::eSecurity secid = getSecId(id);
-        if (__builtin_expect((secid == utils::TotalSecurity), 0)) {
-            logError("IBClient: received unknown ticker id %d, ignored.", id);
-            return;
+        logInfo("TPIB tickSize: %llu %d %d %d\n",
+                utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
+        switch (field) {
+        case BID_SIZE :
+        case ASK_SIZE :
+            bool is_bid = (field == BID_SIZE?true:false);
+            _book_queue[id-TickerStart]->theWriter().updBBOSizeOnly(size, is_bid, utils::TimeUtil::cur_time_gmt_micro());
+            break;
+        case LAST :
+            _book_queue[id-TickerStart]->theWriter().updTrdSizeOnly(size, utils::TimeUtil::cur_time_gmt_micro());
+            break;
+        default:
+            logError("TPIB unhandled tickSize: %llu %d %d %.7lf\n",
+                    utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
         }
-
-        bool is_bid = (field == 0?true:false);
-        _book_writer->updBBOSizeOnly(secid, size, is_bid, utils::TimeUtil::cur_time_gmt_micro());
 
     }
 
     // if TickType == 48, RTVolume, it's the last sale.
-    void tickString(TickerId id, TickType tickType, const IBString& value) {
+    void tickString(TickerId id, TickType tickType, const std::string& value) {
+        ClientBaseImp::tickString(id, tickType, value);
         if (tickType == RT_VOLUME) {
             //bool multi_fill = false;
             double price = 0;
@@ -212,176 +211,41 @@ public:
             //}
             //logDebug("IBClient tickString: %llu %d %d %d %d %.7lf %d\n",
             //        utils::TimeUtil::cur_time_gmt_micro(), (int)(id), 0, 1, multi_fill?3:4, price, size);
-
-            utils::eSecurity secid = getSecId(id);
-            if (__builtin_expect((secid == utils::TotalSecurity), 0)) {
-                logError("IBClient: received unknown ticker id %d, ignored.", id);
-                return;
-            }
-            _book_writer->addTrade(secid, price, size, -1);
-
+            _book_queue[id-TickerStart]->theWriter().addTrade(price, size);
             return;
         }
-        if (tickType == LAST_TIMESTAMP)
-            return;
-        PosixTestClient::tickString(id, tickType, value);
     }
 
-    typedef long IBOrderId;
-    struct TraderOrderInfo {
-        OrderID oid;
-        uint16_t tid; // trader id;
-        uint16_t secid;
-    };
-
-    // only limit orders can be made for this venue
-    IBOrderId makeOrder(OrderId oid, const char* symbol, int qty, double price, bool isBuy) {
-        Contract contract;
-        Order order;
-        makeContract(contract, symbol);
-
-        long this_oid = m_oid++;
-        order.action = isBuy? "BUY":"SELL";
-        order.totalQuantity = qty;
-        order.orderType = "LMT";
-        order.lmtPrice = price;
-        order.orderId = this_oid;
-
-        logInfo( "IBClient Placing Order %lu(%lu): %s %ld %s at %f\n", (unsigned long) oid,
-                (unsigned long) this_oid, order.action.c_str(), order.totalQuantity, contract.symbol.c_str(), order.lmtPrice);
-        m_pClient->placeOrder( this_oid, contract, order);
-        return this_oid;
+    void tickByTickBidAsk(int reqId, time_t time, double bidPrice, double askPrice, int bidSize, int askSize, const TickAttrib& attribs) {
+        logInfo("Tick-By-Tick. ReqId: %d, TickType: BidAsk, Time: %s, BidPrice: %g, AskPrice: %g, BidSize: %d, AskSize: %d, BidPastLow: %d, AskPastHigh: %d",
+            reqId, ctime(&time), bidPrice, askPrice, bidSize, askSize, attribs.bidPastLow, attribs.askPastHigh);
     }
 
-    IBOrderId cancelOrder(OrderId ref_oid) {
-        IBOrderId this_oid = m_ibOidMap[ref_oid];
-        logInfo( "IBClient Cancel Order:  Canceling %lu(%lu)",
-                (unsigned long) ref_oid, (unsigned long) this_oid);
-
-        m_pClient->cancelOrder(this_oid);
-        return this_oid;
+    void tickByTickAllLast(int reqId, int tickType, time_t time, double price, int size, const TickAttrib& attribs, const std::string& exchange, const std::string& specialConditions) {
+        logInfo("Tick-By-Tick. ReqId: %d, TickType: %s, Time: %s, Price: %g, Size: %d, PastLimit: %d, Unreported: %d, Exchange: %s, SpecialConditions:%s",
+            reqId, (tickType == 1 ? "Last" : "AllLast"), ctime(&time), price, size, attribs.pastLimit, attribs.unreported, exchange.c_str(), specialConditions.c_str());
     }
 
-    void openOrder( IBOrderId orderId, const Contract& contract, const Order& order, const OrderState& ostate) {
-        if (strcmp(ostate.status.c_str(), "Submitted") == 0) {
-            orderNew(orderId);
-        }
-        FunctionPrint("IBClient openOrder %lu, %s, %s, %s",  (unsigned long) orderId,
-                contract.ToString().c_str(), order.ToString().c_str(), ostate.ToString().c_str());
-    }
-
-    void execDetails( int reqId, const Contract& contract, const Execution& execution) {
-        FunctionPrint("IBClient execDetails: %d, %s, %s", reqId, contract.ToString().c_str(), execution.ToString().c_str());
-        // FillEvent
-        orderFilled(execution.orderId, execution.shares, execution.price);
-    }
-
-    void error(const int id, const int errorCode, const IBString errorString)
+    void error(const int id, const int errorCode, const std::string errorString)
     {
-        FunctionPrint( "Error id=%d, errorCode=%d, msg=%s", id, errorCode, errorString.c_str());
+        logError( "Error id=%d, errorCode=%d, msg=%s", id, errorCode, errorString.c_str());
         switch (errorCode) {
         case 1100:
             if( id == -1) // if "Connectivity between IB and TWS has been lost"
                 disconnect();
             break;
-        case 135:  // can't find OID
-        case 201:  // reject
-        case 110:  // wrong price
-            orderRejected(id);
-            break;
-        case 202:  // canceled
-            orderCanceled(id);
-            break;
         case 317:  // reset depth of book
         {
-            utils::eSecurity secid = getSecId(id);
-            _book_writer->resetBook(secid);
-            logInfo("IBClient reset book %s", getSymbol(secid));
+        	_book_queue[id-TickerStart]->theWriter().resetBook();
+            logInfo("TPIB reset book %s", _book_queue[id-TickerStart]->_cfg.toString().c_str());
             break;
         }
         case 1102:
             disconnect();
             break;
         }
-    }
-
-
-
-private:
-
-    void orderFilled(IBOrderId orderId, int shares, double price) {
-        TraderOrderInfo& info(m_oidMap[orderId]);
-        _event_writer[info.tid]->eventFill(info.oid, shares, pxToInt(info.secid, price), OS_Filled);
-        logInfo("IBClient Sending Fill to trader(%d) OID(%lu)", (int)info.tid, (unsigned long) info.oid);
-    }
-
-    void orderCanceled(IBOrderId orderId) {
-        TraderOrderInfo& info(m_oidMap[orderId]);
-        _event_writer[info.tid]->eventCanceled(info.oid);
-    }
-
-    void orderRejected(IBOrderId orderId) {
-        TraderOrderInfo& info(m_oidMap[orderId]);
-        _event_writer[info.tid]->eventRejected(info.oid);
-    }
-
-    void orderNew(IBOrderId orderId) {
-        TraderOrderInfo& info(m_oidMap[orderId]);
-        _event_writer[info.tid]->eventNew(info.oid);
-    }
-
-    // set up queues
-    void init() {
-        // md initializations are moved to md_subscribe
-        // order specific initializations here
-        m_state = ST_DISCONNECTED;
-    }
-
-
-
-    utils::eSecurity getSecId(int ticker_id) const {
-        if (__builtin_expect((ticker_id <= _last_tickerid) && (ticker_id >= TickerStart), 1)) {
-            return _tickerVec[ticker_id - TickerStart];
-        }
-        return utils::TotalSecurity;
-    }
-
-    void makeOrder(const OrderInput &oi) {
-        IBOrderId iboid = 0;
-        TraderOrderInfo info;
-        TraderOrderInfo* infop = &info;
-
-        switch ((OrderOps)oi._op) {
-        case  OP_New :
-            if ((OrderType) oi._ot != OT_Limit) {
-                logError("IBClient only support limit order. Ignored Order: %s", oi.toString().c_str());
-                return;
-            }
-            iboid = makeOrder(oi._oid,
-                    getSymbol(oi._secid),
-                    oi._sz,
-                    pxToDouble(oi._secid, oi._px),
-                    oi._side == BS_Buy
-                    );
-
-            info.oid = oi._oid;
-            info.tid = oi._traderid;
-            info.secid = oi._secid;
-
-            break;
-        case OP_Cancel :
-            iboid = cancelOrder(oi._ref_oid);
-
-            infop = &(m_oidMap[iboid]);
-            infop->oid = oi._oid;
-            break;
-        default:
-            logError("IBClient unknown order input: %s", oi.toString().c_str());
-            return;
-        }
-
-        m_oidMap[iboid] = *infop;
-        m_ibOidMap[oi._oid] = iboid;
+        default :
+        	logError("Error ignored.  errorCode=%d",errorCode);
     }
 
 };

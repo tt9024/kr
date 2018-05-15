@@ -66,13 +66,42 @@ struct LastTrade {
     uint32_t reserved;
 };
 
+enum BookType {
+	L1,
+	TbT,
+	L2,
+	Bar,
+	Total_Types
+};
+
 struct BookConfig {
     std::string venue;
     std::string symbol;
-    BookConfig(const std::string v, const std::string s) :
-        venue(v), symbol(s) {};
+    BookType type; // "L1, L2, TbT"
+
+    BookConfig(const std::string& v, const std::string& s, const BookType bt) :
+        venue(v), symbol(s), type(bt) {
+    	logInfo("BookConfig %s", toString().c_str());
+    };
+
+    // construct by venue/symbol
+    BookConfig(const std::string& venu_symbol, const BookType bt) : type(bt) {
+    	size_t n = strlen(venu_symbol.c_str());
+    	auto pos = venu_symbol.find("/");
+    	if (pos == std::string::npos) {
+    		logError("venue/symbol cannot be parsed, slash not found: %s", venu_symbol.c_str());
+    		throw std::runtime_error(std::string("venue/symbol cannot be parsed!") + venu_symbol);
+    	}
+    	venue=venu_symbol.substr(0,pos);
+    	symbol=venu_symbol.substr(pos+1,n);
+    	logInfo("BookConfig %s", toString().c_str());
+    }
+
+    std::string qname() const {
+    	return venue+"_"+symbol+"_"+std::to_string((int)type);
+    }
     std::string toString() const {
-    	return venue+"_"+symbol;
+    	return qname();
     }
 };
 
@@ -226,7 +255,7 @@ struct BookL2 {
     std::string toString() const {
         char buf[1024];
         int n = 0;
-        n += snprintf(buf+n, sizeof(buf)-n, "Book %s %s { %s }", _cfg.symbol.c_str(), _cfg.venue.c_str(), _book.toString().c_str());
+        n += snprintf(buf+n, sizeof(buf)-n, "Book %s { %s }", _cfg.toString().c_str(), _book.toString().c_str());
         return std::string(buf);
     }
 
@@ -328,9 +357,9 @@ struct BookL2 {
     }
 
     void plccLogError(const char* msg, int number) {
-        logError("book (%s %s) update error: "
+        logError("book (%s) update error: "
                 "%s, %d, book dump: %s",
-                _cfg.symbol.c_str(), _cfg.venue.c_str(), msg, number, toString().c_str());
+                _cfg.toString().c_str(), msg, number, toString().c_str());
     }
     PriceEntry* getEntry(unsigned int level, int side) const {
         return (PriceEntry*) &(_book.pe[side*BookLevel+level]);
@@ -364,11 +393,11 @@ public:
     class Writer;
     class Reader;
 
-    BookQ(const char* q_name, bool readonly, const BookConfig config) :
-        _cfg(config), _q_name(q_name), _q(q_name, readonly, true),
+    BookQ(const BookConfig config, bool readonly) :
+        _cfg(config), _q_name(_cfg.qname()), _q(_q_name, readonly, true),
         _writer(readonly? NULL:new Writer(*this))
     {
-        logInfo("BookQ %s started %s with %d configs (%s).", q_name, readonly?"ReadOnly":"ReadWrite", _cfg.toString().c_str());
+        logInfo("BookQ %s started %s with %d configs (%s).", _q_name, readonly?"ReadOnly":"ReadWrite", _cfg.toString().c_str());
     };
 
     // This is to enforce that for SwQueue, at most one writer should
@@ -466,6 +495,8 @@ public:
             // TODO
             // implement this
         };
+
+
 
         const std::vector<BookConfig> & getBookConfig() const {
             return _bq._cfg;
@@ -596,22 +627,5 @@ struct BarLine {
     }
 
 };
-
-static inline
-std::string symbol_to_fname(const char* symbol) {
-	size_t n = strlen(symbol);
-	char s[128];
-	for (size_t i=0;i<n;++i){
-		if (symbol[i]=='/') {
-			s[i]='_';
-		} else {
-			s[i]=symbol[i];
-		}
-	}
-	s[n]=0;
-	return std::string(s);
-}
-
-
 
 }

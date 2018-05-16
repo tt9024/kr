@@ -28,7 +28,7 @@ static const char* ConfigFilePath =  "config/main.cfg";
 #define plcc_getInt(a...) utils::PLCC::instance().getInt(a)
 #define plcc_getDouble(a...) utils::PLCC::instance().getDouble(a)
 #define plcc_getString(a...) utils::PLCC::instance().getString(a)
-#define plcc_getStringArr(a...) utils::PLCC::instance().getStrigArr(a)
+#define plcc_getStringArr(a...) utils::PLCC::instance().getStringArr(a)
 
 namespace utils {
 

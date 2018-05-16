@@ -46,21 +46,21 @@ private:
 
     	// L1
         for (const auto& s : symL1) {
-        	auto bp = new IBBookQType(BookConfig(s,L1),false);
+        	auto bp = new IBBookQType(BookConfig(s,"L1"),false);
         	_book_queue.push_back(bp);
             reqMDL1(s.c_str(), _next_tickerid++);
         }
 
     	// TbT
         for (const auto& s : symTbT) {
-        	auto bp = new IBBookQType(BookConfig(s,TbT),false);
+        	auto bp = new IBBookQType(BookConfig(s,"TbT"),false);
         	_book_queue.push_back(bp);
             reqMDTbT(s.c_str(), _next_tickerid++);
         }
 
         // L2
         for (const auto& s : symL2) {
-        	auto bp = new IBBookQType(BookConfig(s,L2),false);
+        	auto bp = new IBBookQType(BookConfig(s,"L2"),false);
         	_book_queue.push_back(bp);
             reqMDL2(s.c_str(), _next_tickerid++);
         }
@@ -168,7 +168,7 @@ public:
             _book_queue[id-TickerStart]->theWriter().updBBOPriceOnly(price, is_bid, utils::TimeUtil::cur_time_gmt_micro());
             break;
         case LAST :
-            _book_queue[id-TickerStart]->theWriter().updTrdPriceOnly(price, utils::TimeUtil::cur_time_gmt_micro());
+            _book_queue[id-TickerStart]->theWriter().updTrdPrice(price);
             break;
         default:
             logError("TPIB unhandled tickPrice: %llu %d %d %.7lf\n",
@@ -186,11 +186,14 @@ public:
             _book_queue[id-TickerStart]->theWriter().updBBOSizeOnly(size, is_bid, utils::TimeUtil::cur_time_gmt_micro());
             break;
         case LAST :
-            _book_queue[id-TickerStart]->theWriter().updTrdSizeOnly(size, utils::TimeUtil::cur_time_gmt_micro());
+            if (__builtin_expect(!_book_queue[id-TickerStart]->theWriter().updTrdSize(size),0)) {
+            	logError("TPIB update trade error: %s",
+            			_book_queue[id-TickerStart]->theWriter().getBook()->toString().c_str());
+            }
             break;
         default:
-            logError("TPIB unhandled tickSize: %llu %d %d %.7lf\n",
-                    utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
+            logError("TPIB unhandled tickSize: %llu %d %d %d\n",
+                    utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
         }
 
     }
@@ -211,7 +214,10 @@ public:
             //}
             //logDebug("IBClient tickString: %llu %d %d %d %d %.7lf %d\n",
             //        utils::TimeUtil::cur_time_gmt_micro(), (int)(id), 0, 1, multi_fill?3:4, price, size);
-            _book_queue[id-TickerStart]->theWriter().addTrade(price, size);
+            if(__builtin_expect(!_book_queue[id-TickerStart]->theWriter().updTrade(price, size),0)) {
+            	logError("TPIB update trade error: %s",
+            			_book_queue[id-TickerStart]->theWriter().getBook()->toString().c_str());
+            }
             return;
         }
     }

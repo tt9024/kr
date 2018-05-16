@@ -113,20 +113,30 @@ public:
 
     std::vector<std::string> getStringArr(const char* key, bool* found = NULL) const {
 		std::vector<std::string> ret;
-    	std::string valStr = getString(key, found);
-    	if (!(*found)) {
+		bool bf;
+    	std::string valStr = getString(key, &bf);
+    	if (!bf) {
+    		if (found) *found=false;
     		return ret;
     	}
     	size_t n = valStr.size();
     	const char* vs=valStr.c_str();
+    	if (vs[0]!='[' || vs[n-1]!=']') {
+    		if (found) *found=false;
+    		return ret;
+    	}
     	size_t i0=1;
     	for (size_t i=i0;i<n-1;++i) {
     		if (vs[i]==',') {
-    			ret.push_back(valStr.substr(i0,i));
+    			if (i>i0)
+    			    ret.push_back(valStr.substr(i0,i-i0));
     			i0=i+1;
     		}
     	}
-    	ret.push_back(valStr.substr(i0,n-1));
+    	if (n-1>i0)
+    	    ret.push_back(valStr.substr(i0,n-1-i0));
+
+    	if (found) *found=true;
     	return ret;
     }
 

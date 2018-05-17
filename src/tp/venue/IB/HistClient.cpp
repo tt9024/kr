@@ -17,9 +17,6 @@
 #include <iostream>
 #include <plcc/plcc.hpp>
 
-#define TWS_PORT 7496
-#define IBG_PORT 4001
-
 class HistoryDataClient : public ClientBaseImp {
 public:
 	enum BARTYPE {
@@ -155,6 +152,9 @@ public:
 			if (errorString.find("definition")!=std::string::npos || errorString.find("found")!=std::string::npos) {
 				logInfo("received definition error, mark received");
 				received += 1;
+			} else if (errorString.find("no data")!=std::string::npos || errorString.find("query returned")!=std::string::npos) {
+					logInfo("received no data for the query, mark received");
+					received += 1;
 			}
 			// is this a pacing violation or security not found????
 			//if ( errorString.find("pacing")!=std::string::npos || errorString.find("violation")!=std::string::npos) {
@@ -203,9 +203,8 @@ int main(int argc, char** argv)
 	    printf("\ncan't catch SIGINT\n");
 	    return -1;
     }
-
+    utils::PLCC::instance("hist");
 	int clientId = atoi(argv[1]);
-
 	const char* symbol = argv[2];
 	const char* date = argv[3];
 	int barSize = atoi(argv[4]);
@@ -243,11 +242,7 @@ int main(int argc, char** argv)
 		delete client;
 		client = new HistoryDataClient(clientId,symbol, histFile, is_trade, barSize);
 		// switch a port
-		if (port == IBG_PORT) {
-			port = TWS_PORT;
-		} else {
-			port = IBG_PORT;
-		}
+		port = IBPortSwitch(port);
 		printf("switching to port %d...\n", port);
 		if (++retrycnt > 1) {
 			printf("wait and retry...\n");

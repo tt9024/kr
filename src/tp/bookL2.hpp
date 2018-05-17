@@ -141,7 +141,7 @@ struct BookDepot {
         if ((avail_level[0] < 1))
             return 0;
 
-        for (size_t i = 0; i<avail_level[0]; ++i) {
+        for (int i = 0; i<avail_level[0]; ++i) {
             if (pe[i].size > 0) {
             	if (size) {
             		*size=pe[i].size;
@@ -155,7 +155,7 @@ struct BookDepot {
     Price getAsk(Quantity* size=NULL) const {
         if ((avail_level[1] < 1))
             return 0;
-        for (size_t i = BookLevel; i<BookLevel+avail_level[1]; ++i) {
+        for (int i = BookLevel; i<BookLevel+avail_level[1]; ++i) {
 			if (pe[i].size > 0) {
 				if (size) {
 					*size=pe[i].size;
@@ -171,7 +171,7 @@ struct BookDepot {
         if ((avail_level[side] < 1))
             return 0;
 
-        for (size_t i = BookLevel*side; i<avail_level[side]+BookLevel*side; ++i) {
+        for (int i = BookLevel*side; i<avail_level[side]+BookLevel*side; ++i) {
             if (pe[i].size > 0)
                 return pe[i].getPrice(isBid);
         }
@@ -197,7 +197,8 @@ struct BookDepot {
     }
 
     bool isValidQuote() const {
-    	return getBid()*getAsk() != 0;
+    	const Price bp=getBid(), ap=getAsk();
+    	return (bp*ap!= 0) && (ap>bp);
     }
 
     bool isValidTrade() const {
@@ -214,8 +215,8 @@ struct BookDepot {
 
     const char* getUpdateType() const {
     	switch (update_type) {
-    	case 0 : return "Bid";
-    	case 1 : return "Ask";
+    	case 0 : return "Quote(Bid)";
+    	case 1 : return "Quote(Ask)";
     	case 2 : return "Trade";
     	}
     	logError("unknown update type %d", update_type);
@@ -238,7 +239,8 @@ struct BookDepot {
         char buf[1024];
         int n = 0;
         const char* update_type = getUpdateType();
-        n += snprintf(buf+n, sizeof(buf)-n, "%llu (%s-%d)", update_ts_micro,update_type,update_level);
+        n += snprintf(buf+n, sizeof(buf)-n, "%llu (%s-%d)",
+        		(unsigned long long)update_ts_micro,update_type,update_level);
 		for (int s = 0; s < 2; ++s)
 		{
 			int levels = avail_level[s];
@@ -246,7 +248,7 @@ struct BookDepot {
 			const PriceEntry* pe_ = &(pe[s*BookLevel]);
 			for (int i = 0; i<levels; ++i) {
 				if (pe_->size) {
-					n += snprintf(buf+n, sizeof(buf)-n, " (%d)%s ", i, pe_->toString());
+					n += snprintf(buf+n, sizeof(buf)-n, " (%d)%s ", i, pe_->toString().c_str());
 				}
 				++pe_;
 			}
@@ -257,21 +259,9 @@ struct BookDepot {
         return std::string(buf);
     }
 
-    /*
-     *     uint64_t update_ts_micro;  // this can be obtained from pe's ts
-    // bid first, ask second
-    int update_level;
-    int update_type;
-    PriceEntry pe[2*BookLevel];
-    int avail_level[2];
-    Price trade_price;
-    Quantity trade_size;
-    int trade_attr;  // buy(0)/sell(1) possible implied
-     *
-     */
     std::string prettyPrint() const {
     	char buf[1024];
-    	size_t n = snprintf(buf,sizeof(buf), "%lld:upd_type(%s),upd_lvl(%d-%d:%d)\n",
+    	size_t n = snprintf(buf,sizeof(buf), "%lld:%s,upd_lvl(%d-%d:%d)\n",
     			(long long)update_ts_micro,
 				getUpdateType(),
 				update_level,
@@ -279,7 +269,7 @@ struct BookDepot {
 				avail_level[1]);
     	if (update_type==2) {
     		// trade
-    		n+=snprintf(buf+n,sizeof(buf)-n,"\t%s %d@%.7lf\n",
+    		n+=snprintf(buf+n,sizeof(buf)-n,"   %s %d@%.7lf\n",
     				trade_attr==0?"B":"S",
     			    trade_size,
 					trade_price);
@@ -288,7 +278,7 @@ struct BookDepot {
     		int lvl=avail_level[0];
     		if (lvl > avail_level[1]) lvl=avail_level[1];
     		for (int i=0;i<lvl;++i) {
-    			n+=snprintf(buf+n,sizeof(buf)-n,"\t%10d%10f:%10f%10d\n",
+    			n+=snprintf(buf+n,sizeof(buf)-n,"\t%d\t%f:%f\t%d\n",
     					pe[i].size,
 						pe[i].price,
 						pe[i+BookLevel].price,
@@ -342,7 +332,7 @@ struct BookL2 {
         }
 
         _book.update_level = level;
-        _book.setUpdateType(false, side);
+        _book.setUpdateType(false, side==0);
         // move subsequent levels down
         PriceEntry* pe = getEntry(level, side);
         if (levels > level) {
@@ -363,7 +353,7 @@ struct BookL2 {
         }
 
         _book.update_level = level;
-        _book.setUpdateType(false, side);
+        _book.setUpdateType(false, side==0);
         // move subsequent levels up
         unsigned int levels = _avail_level[side];
         if (levels > level + 1) {
@@ -387,7 +377,7 @@ struct BookL2 {
             return false;
         }
         _book.update_level = level;
-        _book.setUpdateType(false, side);
+        _book.setUpdateType(false, side==0);
         pe->set(price, size, ts_micro);
         return true;
     }
@@ -437,7 +427,7 @@ struct BookL2 {
     	const Price bd=std::abs(_book.getBid()-_book.trade_price);
     	const Price ad=std::abs(_book.getAsk()-_book.trade_price);
     	if (ad>bd) {
-    		_book.trade_attr=1;
+    		_book.trade_attr=1;  // sell close to best bid
     	} else {
     		_book.trade_attr=0;
     	}
@@ -482,21 +472,24 @@ class BookQ {
 public:
     static const int BookLen = sizeof(BookDepot);
     static const int QLen = (1024*BookLen);
+    // This is to enforce that for SwQueue, at most one writer should
+    // be created for each BookQ
+    typedef utils::SwQueue<QLen, BookLen, BufferType> QType;
     const BookConfig _cfg;
     const std::string _q_name;
     class Writer;
     class Reader;
 
     BookQ(const BookConfig config, bool readonly) :
-        _cfg(config), _q_name(_cfg.qname()), _q(_q_name, readonly, true),
+        _cfg(config), _q_name(_cfg.qname()), _q(_q_name.c_str(), readonly, false),
         _writer(readonly? NULL:new Writer(*this))
     {
-        logInfo("BookQ %s started %s with %d configs (%s).", _q_name, readonly?"ReadOnly":"ReadWrite", _cfg.toString().c_str());
+        logInfo("BookQ %s started %s configs (%s).",
+        		_q_name.c_str(),
+				readonly?"ReadOnly":"ReadWrite",
+				_cfg.toString().c_str());
     };
 
-    // This is to enforce that for SwQueue, at most one writer should
-    // be created for each BookQ
-    typedef utils::SwQueue<QLen, BookLen, BufferType> QType;
     Writer& theWriter() {
         if (!_writer)
             throw std::runtime_error("BookQ writer instance NULL");
@@ -582,9 +575,8 @@ public:
             _bookL2.updTrdPrice(price);
         }
 
-        bool updTrdSize(Quantity size) {
+        void updTrdSize(Quantity size) {
             _bookL2.updTrdSize(size);
-            return addTrade();
         }
 
         bool updTrade(double price, Quantity size) {
@@ -605,7 +597,7 @@ public:
             _bookL2.reset();
         }
 
-        BookL2* getBook() const {
+        const BookL2* getBook() const {
             return &_bookL2;
         }
 

@@ -164,14 +164,21 @@ public:
      return strftime(char_buf, buf_size, "%Y%m%d,%H:%M:%S", tmsec);
    }
 
+   static std::string cur_time_to_string_day() {
+	   time_t sec=time(NULL);
+	   char char_buf[32];
+	   int_to_string_day_UTC_Packed(sec,char_buf,sizeof(char_buf)-1);
+	   return std::string(char_buf);
+   }
+
    static int int_to_string_second_UTC_Packed(time_t sec, char*char_buf, int buf_size) {
      struct tm *tmsec = localtime(&sec);
      return strftime(char_buf, buf_size, "%Y%m%d%H%M%S", tmsec);
    }
 
-   static int int_to_string_hour_UTC_Packed(time_t sec, char*char_buf, int buf_size) {
+   static int int_to_string_day_UTC_Packed(time_t sec, char*char_buf, int buf_size) {
      struct tm *tmsec = localtime(&sec);
-     return strftime(char_buf, buf_size, "%Y%m%d%H", tmsec);
+     return strftime(char_buf, buf_size, "%Y%m%d", tmsec);
    }
     
    static int timeval_to_string_nanos_SOD(const struct timeval* tv, char*char_buf, int buf_size) {

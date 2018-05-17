@@ -9,6 +9,8 @@
 #include "EReader.h"
 #include "EClientSocket.h"
 #include "EPosixClientSocketPlatform.h"
+#define TWS_PORT 7496
+#define IBG_PORT 4001
 
 class ClientBaseImp : public EWrapper {
 public:
@@ -36,3 +38,11 @@ protected:
     bool m_extraAuth;
     int m_errorCode;
 };
+
+static inline int IBPortSwitch(int port) {
+	switch(port) {
+		case TWS_PORT: return IBG_PORT;
+		case IBG_PORT: return TWS_PORT;
+	}
+	return port;
+}

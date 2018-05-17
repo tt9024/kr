@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include "plcc/Logger.hpp"
 #include "plcc/ConfigureReader.hpp"
+#include <map>
 
 static const char* LoggerConfigKey = "logger";
 static const char* ConfigFilePath =  "config/main.cfg";
@@ -39,19 +40,48 @@ public:
         // TODO - read from the shell as well
         return ConfigFilePath;
     };
+    static const std::string getLogFileName(std::string logfile,
+    		                                std::string instname) {
+    	 return logfile+
+    	        (instname.size()>0?(std::string("_")+instname):std::string(""))+
+    	        std::string("_")+
+				TimeUtil::cur_time_to_string_day() +
+    			std::string(".txt");
+    }
 
-    static PLCC& instance() {
-        static PLCC plcc(PLCC::getConfigPath());
-        return plcc;
+    static PLCC& instance(const char* instname=NULL) {
+        static std::map<std::string, PLCC*>plcc_map;
+        static PLCC* default_plcc=NULL;
+
+        // not thread safe
+        const std::string inststr=std::string(instname?instname:"");
+        if (!default_plcc) {
+			default_plcc=new PLCC(getConfigPath(),inststr);
+        	plcc_map[inststr] = default_plcc;
+        	return *default_plcc;
+        }
+
+        if (inststr.size()==0) {
+        	return *default_plcc;
+        }
+        auto iter=plcc_map.find(inststr);
+        if (iter !=plcc_map.end()) {
+        	return *(iter->second);
+        }
+        PLCC* inst=new PLCC(getConfigPath(), inststr);
+        plcc_map[inststr]=inst;
+        return *inst;
     }
 
 private:
-    PLCC(const char* configFileName) :
+
+    explicit PLCC(const char* configFileName, const std::string& instname) :
         ConfigureReader(configFileName),
-        FileLogger(getString(LoggerConfigKey).c_str()),
+        FileLogger(getLogFileName(getString(LoggerConfigKey),instname).c_str()),
         m_configFileName(configFileName)
     {}
-    ~PLCC() {};
+    ~PLCC() {
+    };
 
 
     std::string m_configFileName;

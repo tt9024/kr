@@ -29,7 +29,7 @@ typedef IBBookQType::Writer BookWriter;
 
 class TPIB : public ClientBaseImp {
 private:
-    const int _client_id;
+    int _client_id;
     const std::vector<std::string> _symL1;
     const std::vector<std::string> _symL2;
     const std::vector<std::string> _symTbT;
@@ -68,20 +68,19 @@ private:
 
 public:
     static const int TickerStart = 2;
-    explicit TPIB (int client_id) : _client_id(client_id),
+    explicit TPIB (int client_id = 1) : _client_id(client_id),
     		_symL1(plcc_getStringArr("SubL1")),
 			_symL2(plcc_getStringArr("SubL2")),
 			_symTbT(plcc_getStringArr("SubTbT")),
 			_next_tickerid(TickerStart),
 			_ipAddr("127.0.0.1"), _port(0), _should_run(false) {
-        bool found0, found1, found2;
-        _client_id = plcc_getInt("IBClientId", &found0, 0);
+        bool found1, found2;
         _ipAddr = plcc_getString("IBClientIP", &found1, "127.0.0.1");
         _port = plcc_getInt("IBClientPort", &found2, 0);
 
-        if ((!found0) || (!found1) || (!found2)) {
-            logError("TPIB failed to run - config error IBClientID(%s) IBClientIP(%s) IBClientPort(%s)",
-                    found0? "Found":"Not Found", found1?"Found":"Not Found", found2?"Found":"Not Found");
+        if ((!found1) || (!found2)) {
+            logError("TPIB failed to run - IBClientIP(%s) IBClientPort(%s)",
+                    found1?"Found":"Not Found", found2?"Found":"Not Found");
             throw std::runtime_error("TPIB failed to run - required config setting not found.");
         }
 
@@ -100,13 +99,15 @@ public:
     // subscribe market data
     // and start the infinite loop
     // which will update market data bookL2, read OrderQ, write Execution/events
-    void run(void*) {
+    void run() {
         // connect
         logInfo("TPIB started.");
         _should_run = true;
         while (_should_run) {
             if (!connect(_ipAddr.c_str(), _port, _client_id)) {
-                sleep(10);
+                _client_id+=1;
+                _port = IBPortSwitch(_port);
+                sleep(2);
                 continue;
             }
             md_subscribe();
@@ -114,13 +115,13 @@ public:
             while (isConnected() && _should_run) {
             	processMessages();
             }
-            logInfo("IBClient disconnected.");
+            logInfo("TPIB disconnected.");
         }
-        logInfo("IBClient stopped.");
+        logInfo("TPIB stopped.");
     }
 
     void stop() {
-        logInfo("Stopping IBClient.");
+        logInfo("Stopping TPIB.");
         _should_run = false;
     }
 
@@ -163,10 +164,11 @@ public:
                 utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
         switch (field) {
         case BID :
-        case ASK :
+        case ASK : {
             bool is_bid = (field == BID?true:false);
             _book_queue[id-TickerStart]->theWriter().updBBOPriceOnly(price, is_bid, utils::TimeUtil::cur_time_gmt_micro());
             break;
+        }
         case LAST :
             _book_queue[id-TickerStart]->theWriter().updTrdPrice(price);
             break;
@@ -181,16 +183,23 @@ public:
                 utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
         switch (field) {
         case BID_SIZE :
-        case ASK_SIZE :
+        case ASK_SIZE : {
             bool is_bid = (field == BID_SIZE?true:false);
             _book_queue[id-TickerStart]->theWriter().updBBOSizeOnly(size, is_bid, utils::TimeUtil::cur_time_gmt_micro());
             break;
-        case LAST :
-            if (__builtin_expect(!_book_queue[id-TickerStart]->theWriter().updTrdSize(size),0)) {
+        }
+        case LAST_SIZE :
+        	_book_queue[id-TickerStart]->theWriter().updTrdSize(size);
+            break;
+        case VOLUME:
+        	// It's IB's convention that trade is updated by price, size and a
+        	// cumulative daily volume.
+        	// It sucks to have to have such assumption, well, just stick to it.
+            if (__builtin_expect(!_book_queue[id-TickerStart]->theWriter().addTrade(),0)) {
             	logError("TPIB update trade error: %s",
             			_book_queue[id-TickerStart]->theWriter().getBook()->toString().c_str());
             }
-            break;
+        	break;
         default:
             logError("TPIB unhandled tickSize: %llu %d %d %d\n",
                     utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
@@ -214,6 +223,7 @@ public:
             //}
             //logDebug("IBClient tickString: %llu %d %d %d %d %.7lf %d\n",
             //        utils::TimeUtil::cur_time_gmt_micro(), (int)(id), 0, 1, multi_fill?3:4, price, size);
+
             if(__builtin_expect(!_book_queue[id-TickerStart]->theWriter().updTrade(price, size),0)) {
             	logError("TPIB update trade error: %s",
             			_book_queue[id-TickerStart]->theWriter().getBook()->toString().c_str());
@@ -249,9 +259,9 @@ public:
         case 1102:
             disconnect();
             break;
-        }
         default :
         	logError("Error ignored.  errorCode=%d",errorCode);
+        }
     }
 
 };

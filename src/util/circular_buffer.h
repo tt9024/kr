@@ -1,5 +1,7 @@
 #pragma once
 
+//#pragma message __INSIDE_CYGWIN__ " " __POSIX_VISIBLE " " __XSI_VISIBLE
+
 #include <fcntl.h>    /* For O_RDWR */
 #include <unistd.h>
 #include <sys/types.h>
@@ -14,7 +16,6 @@
  * Shm is used, processes need to configure a shm file name as
  * the queue name, same for writers and readers.
  */
-
 namespace utils {
 
     enum QStatus {

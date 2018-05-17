@@ -33,6 +33,7 @@ int main(int argc, char**argv) {
             printf("\ncan't catch SIGINT\n");
             return -1;
     }
+    utils::PLCC::instance("booktap");
     BookConfig bcfg(argv[1],argv[2]);
     BookQType bq(bcfg, true);
     BookQType::Reader* book_reader = bq.newReader();

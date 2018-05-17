@@ -302,9 +302,14 @@ struct BookL2 {
     const BookConfig _cfg;
     BookDepot _book;
     int* const _avail_level;
+    // filters for duplicate trade size updates
+    static const unsigned long long MaxMicroSizeFilter=40ULL;
+    uint64_t _last_size_micro;
+    Quantity _last_size;
 
     explicit BookL2(const BookConfig& cfg):
-            _cfg(cfg), _book(), _avail_level(_book.avail_level){
+            _cfg(cfg), _book(), _avail_level(_book.avail_level),
+			_last_size_micro(0), _last_size(0) {
         reset();
     }
 
@@ -412,11 +417,27 @@ struct BookL2 {
     }
 
     void updTrdPrice(Price px) {
+    	_last_size=0;
     	_book.trade_price=px;
     }
 
-    void updTrdSize(Quantity size) {
-    	_book.trade_size=size;
+    bool updTrdSize(Quantity size) {
+    	// this is just to filter out duplicate trade size
+    	// update
+		const uint64_t cur_micro=utils::TimeUtil::cur_time_gmt_micro();
+    	if(_last_size==size) {
+    		if (cur_micro-_last_size_micro<MaxMicroSizeFilter) {
+    			logInfo("duplicate trade size update detected: "
+    					"size(%d), lat_micro(%lld)",
+    					size, (long long) cur_micro-_last_size_micro);
+    			return false;
+    		}
+    	} else {
+    		_last_size=size;
+        	_book.trade_size=size;
+    	}
+    	_last_size_micro=cur_micro;
+    	return true;
     }
 
     bool addTrade() {
@@ -575,23 +596,21 @@ public:
             _bookL2.updTrdPrice(price);
         }
 
-        void updTrdSize(Quantity size) {
-            _bookL2.updTrdSize(size);
+        bool updTrdSize(Quantity size) {
+        	// make it stageful, filter same
+        	// updates (same size within 50 micro
+        	// updTrdPrice or other size will disable it
+            if (_bookL2.updTrdSize(size)) {
+            	return addTrade();
+            }
+            logInfo("last trade update filtered.");
+            return true;
         }
 
         bool updTrade(double price, Quantity size) {
         	updTrdPrice(price);
-        	updTrdSize(size);
-        	return addTrade();
+        	return updTrdSize(size);
         };
-
-        bool addTrade() {
-        	if(__builtin_expect(!_bookL2.addTrade(),0)) {
-        		return false;
-        	}
-        	updateQ(utils::TimeUtil::cur_time_gmt_micro());
-        	return true;
-        }
 
         void resetBook() {
             _bookL2.reset();
@@ -614,6 +633,14 @@ public:
         friend class BookQ<BufferType>;
         Writer(BookQ& bq) : _bq(bq), _wq(_bq._q.theWriter()), _bookL2(_bq._cfg) {
         	resetBook();
+        }
+
+        bool addTrade() {
+        	if(__builtin_expect(!_bookL2.addTrade(),0)) {
+        		return false;
+        	}
+        	updateQ(utils::TimeUtil::cur_time_gmt_micro());
+        	return true;
         }
 
         void updateQ(uint64_t ts_micro) {

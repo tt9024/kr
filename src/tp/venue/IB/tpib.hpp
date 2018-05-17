@@ -160,7 +160,7 @@ public:
     }
 
     void tickPrice(TickerId id, TickType field, double price, const TickAttrib& attribs) {
-        logInfo("TPIB tickPrice: %llu %d %d %.7lf\n",
+        logDebug("TPIB tickPrice: %llu %d %d %.7lf\n",
                 utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
         switch (field) {
         case BID :
@@ -171,6 +171,8 @@ public:
         }
         case LAST :
             _book_queue[id-TickerStart]->theWriter().updTrdPrice(price);
+            //logInfo("TPIB tickPrice: %llu %d %d %.7lf\n",
+            //        utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
             break;
         default:
             logError("TPIB unhandled tickPrice: %llu %d %d %.7lf\n",
@@ -179,7 +181,7 @@ public:
     }
 
     void tickSize(TickerId id, TickType field, int size) {
-        logInfo("TPIB tickSize: %llu %d %d %d\n",
+        logDebug("TPIB tickSize: %llu %d %d %d\n",
                 utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
         switch (field) {
         case BID_SIZE :
@@ -189,19 +191,24 @@ public:
             break;
         }
         case LAST_SIZE :
-        	_book_queue[id-TickerStart]->theWriter().updTrdSize(size);
-            break;
-        case VOLUME:
-        	// It's IB's convention that trade is updated by price, size and a
-        	// cumulative daily volume.
-        	// It sucks to have to have such assumption, well, just stick to it.
-            if (__builtin_expect(!_book_queue[id-TickerStart]->theWriter().addTrade(),0)) {
+        	logDebug("TPIB LAST_SIZE: %llu %d %d %d\n",
+        	                utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
+        	if (__builtin_expect(!_book_queue[id-TickerStart]->theWriter().updTrdSize(size),0)) {
+            //if (__builtin_expect(!_book_queue[id-TickerStart]->theWriter().addTrade(),0)) {
             	logError("TPIB update trade error: %s",
             			_book_queue[id-TickerStart]->theWriter().getBook()->toString().c_str());
             }
+            break;
+        case VOLUME:
+        	// This is Broken, getting back to LAST_SIZE with filtering
+        	// It's IB's convention that trade is updated by price, size and a
+        	// cumulative daily volume.
+        	// It sucks to have to have such assumption, well, just stick to it.
+            logDebug("TPIB ticksize_VOLUME: %llu %d %d %d\n",
+                    utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
         	break;
         default:
-            logError("TPIB unhandled tickSize: %llu %d %d %d\n",
+            logInfo("TPIB unhandled tickSize: %llu %d %d %d\n",
                     utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
         }
 

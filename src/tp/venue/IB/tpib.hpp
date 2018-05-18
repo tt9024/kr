@@ -160,7 +160,7 @@ public:
     }
 
     void tickPrice(TickerId id, TickType field, double price, const TickAttrib& attribs) {
-        logDebug("TPIB tickPrice: %llu %d %d %.7lf\n",
+        logDebug("TPIB tickPrice: %llu %d %d %.7lf",
                 utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
         switch (field) {
         case BID :
@@ -175,13 +175,13 @@ public:
             //        utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
             break;
         default:
-            logError("TPIB unhandled tickPrice: %llu %d %d %.7lf\n",
+            logError("TPIB unhandled tickPrice: %llu %d %d %.7lf",
                     utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
         }
     }
 
     void tickSize(TickerId id, TickType field, int size) {
-        logDebug("TPIB tickSize: %llu %d %d %d\n",
+        logDebug("TPIB tickSize: %llu %d %d %d",
                 utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
         switch (field) {
         case BID_SIZE :
@@ -191,24 +191,28 @@ public:
             break;
         }
         case LAST_SIZE :
-        	logDebug("TPIB LAST_SIZE: %llu %d %d %d\n",
-        	                utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
+        	/*
+        	 * MOVING entire trade capture to RT_VOLUME, the SIZE and VOLUME is really off!
+        	 * Sometimes the LAST SIZE could notify twice for the same RT_VOLUME update, with delay
+        	 * Sometimes never
+        	 * I am not sure why they keep this broken LAST SIZE and VOLUME there just to confuse people?
+        	 *
+        	logInfo("TRADE SIZE: %d", size);
         	if (__builtin_expect(!_book_queue[id-TickerStart]->theWriter().updTrdSize(size),0)) {
-            //if (__builtin_expect(!_book_queue[id-TickerStart]->theWriter().addTrade(),0)) {
             	logError("TPIB update trade error: %s",
             			_book_queue[id-TickerStart]->theWriter().getBook()->toString().c_str());
             }
+            */
             break;
         case VOLUME:
         	// This is Broken, getting back to LAST_SIZE with filtering
         	// It's IB's convention that trade is updated by price, size and a
         	// cumulative daily volume.
         	// It sucks to have to have such assumption, well, just stick to it.
-            logDebug("TPIB ticksize_VOLUME: %llu %d %d %d\n",
-                    utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
+            //logInfo("TRADE VOLUME: %d", size);
         	break;
         default:
-            logInfo("TPIB unhandled tickSize: %llu %d %d %d\n",
+            logInfo("TPIB unhandled tickSize: %llu %d %d %d",
                     utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, size);
         }
 
@@ -216,7 +220,7 @@ public:
 
     // if TickType == 48, RTVolume, it's the last sale.
     void tickString(TickerId id, TickType tickType, const std::string& value) {
-        ClientBaseImp::tickString(id, tickType, value);
+        //ClientBaseImp::tickString(id, tickType, value);
         if (tickType == RT_VOLUME) {
             //bool multi_fill = false;
             double price = 0;
@@ -228,9 +232,7 @@ public:
             //if (num_read >= 3) {
             //    multi_fill = (buf[0] == 't');
             //}
-            //logDebug("IBClient tickString: %llu %d %d %d %d %.7lf %d\n",
-            //        utils::TimeUtil::cur_time_gmt_micro(), (int)(id), 0, 1, multi_fill?3:4, price, size);
-
+            logDebug("RT_VOLUME: %.7lf %d",price, size);
             if(__builtin_expect(!_book_queue[id-TickerStart]->theWriter().updTrade(price, size),0)) {
             	logError("TPIB update trade error: %s",
             			_book_queue[id-TickerStart]->theWriter().getBook()->toString().c_str());
@@ -249,7 +251,7 @@ public:
             reqId, (tickType == 1 ? "Last" : "AllLast"), ctime(&time), price, size, attribs.pastLimit, attribs.unreported, exchange.c_str(), specialConditions.c_str());
     }
 
-    void error(const int id, const int errorCode, const std::string errorString)
+    void error(int id, int errorCode, const std::string& errorString)
     {
         logError( "Error id=%d, errorCode=%d, msg=%s", id, errorCode, errorString.c_str());
         switch (errorCode) {
@@ -266,9 +268,33 @@ public:
         case 1102:
             disconnect();
             break;
+
+        case 2110:  //Connectivity between Trader
+        	        // Workstation and server is broken.
+        	        // It will be restored automatically
+        case 2104:
+        	        // Market data hfarm/jfarm/eufarm/usfuture/
+        	        // farm connection is OK
+        	        // usually after 2110
+        case 2106:  // HMDS data is OK
+        	// nothing can be doen
+        	logInfo("Market Data disconnection/reconnection.  errorCode=%d",errorCode);
+        	//disconnect();
+        	break;
+        case 200 :
+        	// security definition not found???
+        	logError("Security definition not found??? exiting...  errorCode=%d",errorCode);
+        	//disconnect();
+        	stop();
+        	break;
         default :
         	logError("Error ignored.  errorCode=%d",errorCode);
         }
+    }
+
+    void connectionClosed() {
+    	disconnect();
+    	logInfo( "Connection Closed");
     }
 
 };

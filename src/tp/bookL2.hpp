@@ -278,7 +278,7 @@ struct BookDepot {
     		int lvl=avail_level[0];
     		if (lvl > avail_level[1]) lvl=avail_level[1];
     		for (int i=0;i<lvl;++i) {
-    			n+=snprintf(buf+n,sizeof(buf)-n,"\t%d\t%f:%f\t%d\n",
+    			n+=snprintf(buf+n,sizeof(buf)-n,"\t%d\t%.7lf:%.7lf\t%d\n",
     					pe[i].size,
 						pe[i].price,
 						pe[i+BookLevel].price,
@@ -440,6 +440,10 @@ struct BookL2 {
     	return true;
     }
 
+    void updTrdSizeNoCheck(Quantity size) {
+    	_book.trade_size=size;
+    }
+
     bool addTrade() {
     	if (__builtin_expect( (!_book.isValidQuote()) ||
     			              (!_book.isValidTrade()) ,0)) {
@@ -457,8 +461,9 @@ struct BookL2 {
      }
 
     void reset() {
-        memset(&_book, 0, sizeof(BookDepot));
-        _avail_level[0] = _avail_level[1] = 0;
+        _book.reset();
+        _last_size_micro = 0;
+        _last_size = 0;
     }
 
     void plccLogError(const char* msg, int number) {
@@ -609,7 +614,8 @@ public:
 
         bool updTrade(double price, Quantity size) {
         	updTrdPrice(price);
-        	return updTrdSize(size);
+        	_bookL2.updTrdSizeNoCheck(size);
+        	return addTrade();
         };
 
         void resetBook() {

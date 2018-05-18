@@ -87,8 +87,8 @@ void ClientBaseImp::reqMDL1(const char* symbol, int ticker_id) {
 	{
 	    Contract con;
 	    RicContract::get().makeContract(con,symbol);
-	    //std::string generic_ticks="233"; // this is RT_VOLUME
-	    std::string generic_ticks="";
+	    std::string generic_ticks="233"; // this is RT_VOLUME
+	    //std::string generic_ticks="";
 	    m_pClient->reqMktData(ticker_id, con, generic_ticks, false,false,TagValueListSPtr());
 	} else {
 		logError("reqMDBBO error not connected!");

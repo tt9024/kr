@@ -126,7 +126,7 @@ public:
     }
 
     ~TPIB() {
-        for (auto&q : _book_queue) {
+        for (auto q : _book_queue) {
         	delete(q);
         }
     }
@@ -170,7 +170,8 @@ public:
             break;
         }
         case LAST :
-            _book_queue[id-TickerStart]->theWriter().updTrdPrice(price);
+        	// Trade captured via RT_VOLUME and tickstring()
+            //_book_queue[id-TickerStart]->theWriter().updTrdPrice(price);
             //logInfo("TPIB tickPrice: %llu %d %d %.7lf\n",
             //        utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
             break;

@@ -7,13 +7,12 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
-#include <algorithm>
 
 using namespace tp;
 using namespace utils;
 using namespace std;
 
-typedef BookQ<ShmCircularBuffer> BookQType;
+typedef BarLine<ShmCircularBuffer> BARType;
 volatile bool user_stopped = false;
 
 void sig_handler(int signo)
@@ -24,53 +23,61 @@ void sig_handler(int signo)
   user_stopped = true;
 }
 
-int main(int argc, char**argv) {
+void sleepApproxBefore(long long next_bar_micro, long long spin_micro=5*1000LL) {
+	long long cur= (long long) utils::TimeUtil::cur_time_micro();
+	long long diff = next_bar_micro-cur;
+	if (diff > spin_micro) {
+		usleep(diff-spin_micro);
+	}
+}
+
+int main() {
+	// read all the l1 symbols and write to bar files
     if (signal(SIGINT, sig_handler) == SIG_ERR)
     {
             printf("\ncan't catch SIGINT\n");
             return -1;
     }
-    if (argc != 2) {
-        printf("Usage: %s Path_To_Repo\n", argv[0]);
-        return 0;
+    utils::PLCC::instance("tickrecord");
+    std::vector<std::string> symL1(plcc_getStringArr("SubL1"));
+    if (symL1.size()<1) {
+    	throw std::runtime_error("No L1 symbol in config");
     }
-    string path (argv[1]);
+    // create BookConfig, Book Reader and Bar Writers
+    std::vector<BARType*> bws;
+    int bsec = plcc_getInt("BarSec");
+    long long next_bar_micro= ((long long)time(NULL)+1)*1000000LL;
 
-    FILE* fps[utils::TotalSecurity];
-    memset(fps, 0, sizeof(fps));
-
-    BookQType bq("IBClientBook", true);
-    BookQType::Reader* book_reader = bq.newReader();
+    for (const auto& sym : symL1 ) {
+        BookConfig bcfg(sym,"L1");
+        BARType*bw(new BARType(bcfg,bsec));
+        bws.push_back(bw);
+    }
     BookDepot myBook;
-
     //uint64_t start_tm = utils::TimeUtil::cur_time_micro();
     user_stopped = false;
+    long long fcnt=0;
     while (!user_stopped) {
-        if (book_reader->getNextUpdate(myBook))
-        {
-            int secid = myBook.security_id;
-            if (fps[secid] == NULL) {
-                string file_path = path;
-                string sym = getSymbol(secid);
-                sym.erase(std::remove(sym.begin(), sym.end(), '/'), sym.end());
-                file_path.append("/").append(sym);
-                fps[secid] = fopen( file_path.c_str(), "a+");
-                if (fps[secid] == NULL) {
-                    printf("cannot create file for id %d: %s\n", (int)secid, file_path.c_str());
-                    continue;
-                }
-            }
-            fwrite(&myBook, sizeof(BookDepot), 1, fps[secid]);
-            fflush(fps[secid]);
+    	sleepApproxBefore(next_bar_micro);
+        while ((long long)utils::TimeUtil::cur_time_micro() < next_bar_micro) {
+            // spin
         }
+    	for (auto bw : bws) {
+    		bw->update((time_t) (next_bar_micro/1000000LL));
+    	}
+    	next_bar_micro+=((long long)bsec*1000000LL);
+    	long long i = fcnt;
+    	for (; i<fcnt+(long long)bws.size(); ++i) {
+    		if ((long long)utils::TimeUtil::cur_time_micro() < next_bar_micro - 10*1000LL)
+    			bws[(i%(long long)bws.size())]->flush();
+    		else
+    			break;
+    	}
+    	fcnt=i;
     }
-    for (int i = 0; i< (int)utils::TotalSecurity; ++i) {
-        if (fps[i]) {
-            fclose(fps[i]);
-            fps[i] = 0;
-        }
+    for (auto bw : bws) {
+    	delete bw;
     }
-    delete book_reader;
     printf("Done.\n");
     return 0;
 }

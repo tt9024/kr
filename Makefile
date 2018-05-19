@@ -44,7 +44,5 @@ tpib:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/tpib.o   -c $(IB_SRC_DIR)/tpib.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(OBJ_DIR)/IBClientBase.o $(OBJ_DIR)/tpib.o $(LIBS)
 
-booktap:
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/book_reader.cpp $(LIBS)
 clean:
 	rm -f $(OBJ_DIR)/*.o

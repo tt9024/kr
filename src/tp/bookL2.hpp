@@ -105,6 +105,12 @@ struct BookConfig {
     std::string toString() const {
     	return qname();
     }
+
+    std::string bfname(int barsec) const {
+    	return plcc_getString("BarPath")+"/"+
+    		   venue+"_"+symbol+"_B"+
+			   std::to_string(barsec)+"S.csv";
+    }
 };
 
 #define BookLevel 8
@@ -120,6 +126,8 @@ struct BookDepot {
     Price trade_price;
     Quantity trade_size;
     int trade_attr;  // buy(0)/sell(1) possible implied
+    Quantity bvol_cum; // the cumulative buy volume since tp up
+    Quantity svol_cum; // the cummulative sell volume since tp up
 #pragma pack(pop)
 
     BookDepot() {
@@ -235,6 +243,12 @@ struct BookDepot {
         }
     }
 
+    bool addTrade(Price px, Quantity sz) {
+    	trade_price=px;
+    	trade_size=sz;
+    	return addTrade();
+    }
+
     std::string toString() const {
         char buf[1024];
         int n = 0;
@@ -255,7 +269,8 @@ struct BookDepot {
 			n += snprintf(buf+n, sizeof(buf)-n, " ] ");
 		}
 		const char* bs = trade_attr==0?"Buy":"Sell";
-		n += snprintf(buf+n, sizeof(buf)-n, "%s %d@%f", bs, trade_size, trade_price);
+		n += snprintf(buf+n, sizeof(buf)-n, "%s %d@%f %d-%d",
+				bs, trade_size, trade_price, bvol_cum, svol_cum);
         return std::string(buf);
     }
 
@@ -269,10 +284,11 @@ struct BookDepot {
 				avail_level[1]);
     	if (update_type==2) {
     		// trade
-    		n+=snprintf(buf+n,sizeof(buf)-n,"   %s %d@%.7lf\n",
+    		n+=snprintf(buf+n,sizeof(buf)-n,"   %s %d@%.7lf %d-%d\n",
     				trade_attr==0?"B":"S",
     			    trade_size,
-					trade_price);
+					trade_price,
+					bvol_cum,svol_cum);
     	} else {
     		// quote
     		int lvl=avail_level[0];
@@ -287,6 +303,27 @@ struct BookDepot {
     	}
     	return std::string(buf);
     }
+
+private:
+    bool addTrade() {
+    	// this assumes that the price and size
+    	// has been set before this call
+    	if (__builtin_expect( (!isValidQuote()) ||
+    			              (!isValidTrade()) ,0)) {
+    		return false;
+    	}
+    	const Price bd=std::abs(getBid()-trade_price);
+    	const Price ad=std::abs(getAsk()-trade_price);
+    	if (ad>bd) {
+    		trade_attr=1;  // sell close to best bid
+    		svol_cum+=trade_size;
+    	} else {
+    		trade_attr=0;
+    		bvol_cum+=trade_size;
+    	}
+    	setUpdateType(true, false);
+    	return true;
+     }
 
 };
 
@@ -422,6 +459,15 @@ struct BookL2 {
     }
 
     bool updTrdSize(Quantity size) {
+    	// THIS CODE IS COMPLETELY BROKEN!!!
+    	// duplication, misses, delays all happens without any
+    	// certainty. No way to fix it, tried, many times!
+    	// So don't use the ticktype of 5/6 (TickPrice or TickSize)
+    	// use the RT_VOLUME and get from tickstring()
+
+    	updTrdSizeNoCheck(size);
+    	return true;
+
     	// this is just to filter out duplicate trade size
     	// update
 		const uint64_t cur_micro=utils::TimeUtil::cur_time_gmt_micro();
@@ -444,20 +490,8 @@ struct BookL2 {
     	_book.trade_size=size;
     }
 
-    bool addTrade() {
-    	if (__builtin_expect( (!_book.isValidQuote()) ||
-    			              (!_book.isValidTrade()) ,0)) {
-    		return false;
-    	}
-    	const Price bd=std::abs(_book.getBid()-_book.trade_price);
-    	const Price ad=std::abs(_book.getAsk()-_book.trade_price);
-    	if (ad>bd) {
-    		_book.trade_attr=1;  // sell close to best bid
-    	} else {
-    		_book.trade_attr=0;
-    	}
-    	_book.setUpdateType(true, false);
-    	return true;
+    bool addTrade(Price px, Quantity sz) {
+    	return _book.addTrade(px, sz);
      }
 
     void reset() {
@@ -596,6 +630,7 @@ public:
             }
             //logDebug("BookQ updBBOSizeOnly security not updated %d", (int) secid);
         }
+        /*
 
         void updTrdPrice(double price) {
             _bookL2.updTrdPrice(price);
@@ -611,11 +646,14 @@ public:
             logInfo("last trade update filtered.");
             return true;
         }
+        */
 
         bool updTrade(double price, Quantity size) {
-        	updTrdPrice(price);
-        	_bookL2.updTrdSizeNoCheck(size);
-        	return addTrade();
+        	if(__builtin_expect(!_bookL2.addTrade(price,size),0)) {
+        		return false;
+        	}
+        	updateQ(utils::TimeUtil::cur_time_gmt_micro());
+        	return true;
         };
 
         void resetBook() {
@@ -639,14 +677,6 @@ public:
         friend class BookQ<BufferType>;
         Writer(BookQ& bq) : _bq(bq), _wq(_bq._q.theWriter()), _bookL2(_bq._cfg) {
         	resetBook();
-        }
-
-        bool addTrade() {
-        	if(__builtin_expect(!_bookL2.addTrade(),0)) {
-        		return false;
-        	}
-        	updateQ(utils::TimeUtil::cur_time_gmt_micro());
-        	return true;
         }
 
         void updateQ(uint64_t ts_micro) {
@@ -710,60 +740,83 @@ public:
 
 };
 
-struct BarLine {
-    const int bar_sz;  // in seconds
-    time_t next_update_ts;
-    double open_px, max_px, min_px, close_px;
+class BarLineWriter {
+public:
+    const std::string bfname;
 
-    explicit BarLine(int bar_size_seconds): bar_sz(bar_size_seconds), next_update_ts(0),
-            open_px(-1), max_px(-10000000), min_px(10000000), close_px(-1) {
-        next_update_ts = ::time(NULL) / bar_sz * bar_sz + bar_sz;
+    explicit BarLineWriter(const char* barfile_name):
+    		bfname(barfile_name), bfp(0), bvol(0),svol(0) {
+    	bfp=fopen(bfname.c_str(), "at+");
+    	if (!bfp) {
+    		throw std::runtime_error(std::string("fopen error")+bfname);
+    	}
     }
 
     // new price update
-    void update(const BookDepot& book) {
-        close_px = book.getMidDouble();
-        if (close_px > max_px) {
-            max_px = close_px;
-        }
-        if (close_px < min_px) {
-            min_px = close_px;
-        }
-        if (open_px == -1) {
-            reset();   
-        }
-    }
-
-    // returns true if reset is due
-    bool oneSecond(time_t ts, bool reset_if_due, char* buf = NULL, int* buf_len = NULL) {
-        if (__builtin_expect((open_px == -1), 0)) {
-            return false;
-        }
-	
-        if (ts >= next_update_ts) {
-            if ((buf != NULL) && (buf_len != NULL)) {
-                 *buf_len = toString(next_update_ts - bar_sz, buf, *buf_len);
-            }
-            if (reset_if_due) {
-                reset();
-                next_update_ts += bar_sz;
-            }
-            return true;
-        }
-        return false;
-    }
-
-    int toString(time_t ts, char* buf, int buf_len) const {
-        return snprintf(buf, buf_len, "%u %.6f %.6f %.6f %.6f", (unsigned int)ts,
-                open_px, max_px, min_px, close_px);
+    void update(const BookDepot& book,time_t this_sec) {
+    	Quantity bs=0, as=0;
+    	Price bp, ap;
+    	bp=book.getBid(&bs);
+    	ap=book.getAsk(&as);
+    	Quantity bv=0,sv=0;
+    	if (bvol*svol != 0) {
+    		bv=book.bvol_cum-bvol;
+    		sv=book.svol_cum-svol;
+    	}
+    	bvol=book.bvol_cum;
+    	svol=book.svol_cum;
+    	fprintf(bfp, "%d, %d, %.7lf, %.7lf, %d, %d, %d, %lld\n",
+    			(int) this_sec, bs,bp,ap,as,bv,sv,
+				(long long) utils::TimeUtil::cur_time_micro());
     }
 
     void reset() {
-        open_px = close_px;
-        max_px = close_px;
-        min_px = close_px;
+    	bvol=0;
+    	svol=0;
     }
 
+    void flush() const {
+    	fflush(bfp);
+    }
+
+    ~BarLineWriter() {
+    	if (bfp) {
+    		fclose(bfp);
+    		bfp=NULL;
+    	}
+    }
+
+private:
+    FILE* bfp;
+    Quantity bvol, svol;
+
+};
+
+
+template <template<int, int> class BufferType >
+class BarLine {
+public:
+	BarLine(const BookConfig& cfg, int bar_sec) :
+		bcfg(cfg), barsec(bar_sec),
+		bq(cfg,true), br(bq.newReader()),
+		bw(cfg.bfname(barsec).c_str()) {
+	}
+	void update(time_t this_sec) {
+		BookDepot book;
+		if (br->getLatestUpdate(book)) {
+			bw.update(book,this_sec);
+		}
+	}
+	void flush() const {
+		bw.flush();
+	}
+	~BarLine() { delete br ; br=NULL;};
+private:
+	const BookConfig bcfg;
+	const int barsec;
+	BookQ<BufferType> bq;
+	typename BookQ<BufferType>::Reader* br;
+	BarLineWriter bw;
 };
 
 }

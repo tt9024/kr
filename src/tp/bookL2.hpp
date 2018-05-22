@@ -128,6 +128,7 @@ struct BookDepot {
     int trade_attr;  // buy(0)/sell(1) possible implied
     Quantity bvol_cum; // the cumulative buy volume since tp up
     Quantity svol_cum; // the cummulative sell volume since tp up
+    //Price close_px;    // the close price of previous session.
 #pragma pack(pop)
 
     BookDepot() {
@@ -762,6 +763,9 @@ public:
     	if (bvol*svol != 0) {
     		bv=book.bvol_cum-bvol;
     		sv=book.svol_cum-svol;
+    		// guard against restart
+    		if (bv<0) bv=0;
+    		if (sv<0) sv=0;
     	}
     	bvol=book.bvol_cum;
     	svol=book.svol_cum;

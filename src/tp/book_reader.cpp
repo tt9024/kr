@@ -45,7 +45,10 @@ int main(int argc, char**argv) {
         if (book_reader->getNextUpdate(myBook))
         {
         	printf("%s\n", myBook.prettyPrint().c_str());
+        } else {
+        	usleep(100*1000);
         }
+
     }
     delete book_reader;
     printf("Done.\n");

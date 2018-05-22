@@ -68,7 +68,8 @@ private:
 
 public:
     static const int TickerStart = 2;
-    explicit TPIB (int client_id = 1) : _client_id(client_id),
+    explicit TPIB (int client_id = 0) :
+    		_client_id(client_id?client_id:plcc_getInt("TPIBClientId")),
     		_symL1(plcc_getStringArr("SubL1")),
 			_symL2(plcc_getStringArr("SubL2")),
 			_symTbT(plcc_getStringArr("SubTbT")),
@@ -175,6 +176,8 @@ public:
             //logInfo("TPIB tickPrice: %llu %d %d %.7lf\n",
             //        utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);
             break;
+        case CLOSE:
+        	// consider putting a close in booktap
         default:
             logError("TPIB unhandled tickPrice: %llu %d %d %.7lf",
                     utils::TimeUtil::cur_time_gmt_micro(), (int)(id), (int) field, price);

@@ -38,7 +38,7 @@ int main() {
             printf("\ncan't catch SIGINT\n");
             return -1;
     }
-    utils::PLCC::instance("tickrecord");
+    utils::PLCC::instance("tickrec");
     std::vector<std::string> symL1(plcc_getStringArr("SubL1"));
     if (symL1.size()<1) {
     	throw std::runtime_error("No L1 symbol in config");

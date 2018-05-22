@@ -14,7 +14,7 @@
 
 class ClientBaseImp : public EWrapper {
 public:
-	explicit ClientBaseImp(int to_milli = 1);
+	explicit ClientBaseImp(int to_milli = 0);
 	virtual ~ClientBaseImp();
 
 	bool connect(const char * host, unsigned int port, int clientId);

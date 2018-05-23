@@ -66,6 +66,41 @@ private:
         }
     }
 
+	void reqMDL2(const char* symbol, int ticker_id, int numLevel=BookLevel) {
+		if (isConnected())
+		{
+		    Contract con;
+		    RicContract::get().makeContract(con, symbol);
+		    m_pClient->reqMktDepth(ticker_id, con, numLevel,TagValueListSPtr());
+		} else {
+			logError("reqMDDoB error not connected!");
+		}
+	}
+
+	void reqMDL1(const char* symbol, int ticker_id) {
+		if (isConnected())
+		{
+		    Contract con;
+		    RicContract::get().makeContract(con,symbol);
+		    std::string generic_ticks="233"; // this is RT_VOLUME
+		    //std::string generic_ticks="";
+		    m_pClient->reqMktData(ticker_id, con, generic_ticks, false,false,TagValueListSPtr());
+		} else {
+			logError("reqMDBBO error not connected!");
+		}
+	}
+
+	void reqMDTbT(const char* symbol, int ticker_id) {
+		if (isConnected()) {
+		    Contract con;
+		    RicContract::get().makeContract(con,symbol);
+		    m_pClient->reqTickByTickData(ticker_id, con, "AllLast", 0, false);
+		    m_pClient->reqTickByTickData(ticker_id, con, "BidAsk", 0, true);
+		} else {
+			logError("req error not connected!");
+		}
+	}
+
 public:
     static const int TickerStart = 2;
     explicit TPIB (int client_id = 0) :

@@ -177,6 +177,19 @@ namespace utils {
                 return (m_pos - prev_pos)/DataLen;
             }
 
+            bool advanceToTop() {
+            	QPos pos = m_pos;
+            	seekToTop();
+            	if (pos > m_pos) {
+            		m_pos = pos;
+            		return false;
+            	}
+            	if (__builtin_expect(m_pos == 0, 0)) {
+            		return false;
+            	}
+            	return true;
+            }
+
             void seekToBottom() {
                 QPos pos = *m_ready_bytes;
                 m_pos = (pos > (QLen - DataLen))? (pos - QLen - DataLen) : 0;

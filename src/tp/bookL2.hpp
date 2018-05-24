@@ -22,6 +22,11 @@ typedef double Price;
 typedef int32_t Quantity;
 typedef uint64_t TSMicro;
 
+static inline
+bool  px_equal(Price x, Price y) {
+	const Price minpx(1e-10);
+	return ((x-y<minpx) && (x-y>-minpx));
+}
 struct PriceEntry {
 #pragma pack(push,1)
     Price price;  // price is integer - pip adjusted and side signed (bid+ ask-)
@@ -45,14 +50,14 @@ struct PriceEntry {
         price = 0; size = 0;ts_micro=0;count=0;
     }
 
-    Price getPrice(bool is_bid) const {
+    Price getPrice() const {
         //return is_bid? price:-price;
     	return price;
     }
 
-    std::string toString(bool is_bid = true) const {
+    std::string toString() const {
         char buf[64];
-        snprintf(buf, sizeof(buf), "%lld(%.7lf:%d)", (unsigned long long) ts_micro, getPrice(is_bid), size);
+        snprintf(buf, sizeof(buf), "%lld(%.7lf:%d)", (unsigned long long) ts_micro, getPrice(), size);
         return std::string(buf);
     }
 };
@@ -155,7 +160,7 @@ struct BookDepot {
             	if (size) {
             		*size=pe[i].size;
             	}
-                return pe[i].getPrice(true);
+                return pe[i].getPrice();
             }
         }
         return 0;
@@ -169,7 +174,7 @@ struct BookDepot {
 				if (size) {
 					*size=pe[i].size;
 				}
-				return pe[i].getPrice(false);
+				return pe[i].getPrice();
 			}
         }
         return 0;
@@ -182,7 +187,7 @@ struct BookDepot {
 
         for (int i = BookLevel*side; i<avail_level[side]+BookLevel*side; ++i) {
             if (pe[i].size > 0)
-                return pe[i].getPrice(isBid);
+                return pe[i].getPrice();
         }
         return 0;
     }
@@ -305,6 +310,19 @@ struct BookDepot {
     	return std::string(buf);
     }
 
+    // Use it to preserve the quote accounting
+    // for self trades (taking liquidity) before next update
+    // It's slower than a simple assignment
+    // use assignment if not trading too frequently and trading
+    // size is small compared with BBO size
+    void updateFrom(const BookDepot& book_) {
+    	PriceEntry pe[2*BookLevel];
+    	updateFromEntry(book_.pe, pe, book_.avail_level[0]);
+    	updateFromEntry(book_.pe+BookLevel, pe+BookLevel, book_.avail_level[1]);
+    	memcpy(this, &book_, sizeof(BookDepot));
+    	memcpy(this->pe, pe, sizeof(pe));
+    }
+
 private:
     bool addTrade() {
     	// this assumes that the price and size
@@ -324,6 +342,45 @@ private:
     	}
     	setUpdateType(true, false);
     	return true;
+     }
+
+     void updateFromEntry( const PriceEntry* from_pe,
+    		 PriceEntry* to_pe,
+			 int levels) const {
+    	 PriceEntry pe_store[BookLevel];
+    	 PriceEntry* pe_ = &(pe_store[0]);
+
+    	 const PriceEntry* const to_pe_end = to_pe + BookLevel;
+    	 const PriceEntry* const from_pe_end = from_pe + levels;
+    	 PriceEntry* to_pe_start = to_pe;
+    	 const PriceEntry* const from_pe_start = from_pe;
+    	 while(from_pe != from_pe_end)
+    	 {
+    		 // search from_pe's price in the remainder of to_pe up to levels
+    		 bool found = false;
+    		 PriceEntry* pe_ptr = to_pe_start;
+    		 while(pe_ptr != to_pe_end)
+    		 {
+    			 if (__builtin_expect(px_equal(from_pe->price, pe_ptr->price),1))
+    			 {
+    				 found = true;
+    				 to_pe_start = pe_ptr + 1;
+    				 break;
+    			 }
+    			 ++pe_ptr;
+    		 }
+    		 if (__builtin_expect(found && (from_pe->ts_micro <= pe_ptr->ts_micro),0)) {
+    			 logInfo("pe entry not updated from %s to %s",
+    					 from_pe->toString().c_str(),
+						 pe_ptr->toString().c_str());
+    			 memcpy(pe_,pe_ptr, sizeof(PriceEntry));
+    		 } else {
+    			 memcpy(pe_,from_pe, sizeof(PriceEntry));
+    		 }
+        	 ++pe_;
+        	 ++from_pe;
+    	 }
+    	 memcpy(to_pe, pe_store, sizeof(PriceEntry)*levels);
      }
 
 };
@@ -450,7 +507,7 @@ struct BookL2 {
         if (__builtin_expect((0 == _avail_level[side]), 0)) {
             return newPrice(0, size, 0, is_bid, ts_micro);
         }
-        Price price = getEntry(0, side)->getPrice(is_bid);
+        Price price = getEntry(0, side)->getPrice();
         return updPrice(price, size, 0, is_bid, ts_micro);
     }
 
@@ -722,6 +779,35 @@ public:
             logError("getLatestUpdate read queue %s unknown qstat %d, exiting..."
                     ,_bq._q_name.c_str(), (int) stat);
             throw std::runtime_error("BookQ Reader got unknown qstat.");
+        }
+
+        bool getLatestUpdateAndAdvance(BookDepot& book) {
+        	if (__builtin_expect(!_rq->advanceToTop(),0)) {
+        		return false;
+        	}
+        	utils::QStatus stat = _rq->copyNextIn((char*)&book);
+        	if (__builtin_expect(stat == utils::QStat_OK, 1)) {
+        		_rq->advance();
+        		return true;
+        	}
+        	switch (stat) {
+        	case utils::QStat_EAGAIN :
+        		return false;
+        	case utils::QStat_OVERFLOW :
+        	{
+        		// try again
+        		_rq->advanceToTop();
+        		stat = _rq->copyNextIn((char*)&book);
+        		if (stat != utils::QStat_OK) {
+        			return false;
+        		}
+        		return true;
+        	}
+        	default :
+        		logError("read queue %s unknown qstat %d, existing...", _bq._q_name.c_str(), (int) stat);
+        		throw std::runtime_error("BookQ Reader got unknown qstat!");
+        	}
+        	return false;
         }
 
         ~Reader() {

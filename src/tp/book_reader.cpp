@@ -42,7 +42,7 @@ int main(int argc, char**argv) {
     //uint64_t start_tm = utils::TimeUtil::cur_time_micro();
     user_stopped = false;
     while (!user_stopped) {
-        if (book_reader->getNextUpdate(myBook))
+        if (book_reader->getLatestUpdateAndAdvance(myBook))
         {
         	printf("%s\n", myBook.prettyPrint().c_str());
         } else {

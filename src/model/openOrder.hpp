@@ -17,6 +17,10 @@
 
 // favorite open order is here!
 namespace trader {
+
+#define _GETMIN_(a, b) ((a<b)?(a):(b))
+#define _GETABS_(a) ((a>0)?(a):(-a))
+
 enum OPEN_ORDER_STATE {
 	INIT = 0,
 	NEW_PENDING,
@@ -29,6 +33,7 @@ enum OPEN_ORDER_STATE {
 	NUMBER_STATES
 };
 
+// one FillStat means one execution instruction???
 struct FillStat {
 	// these three qty (sign significant) count
 	// position for a collection of open orders (OOM)
@@ -51,7 +56,7 @@ struct FillStat {
 		size_t bytes = snprintf(buf,sizeof(buf),
 				"FillStat: held_qty(%lld),open_qty(%lld),"
 				"pending_qty(%lld),next_update (%llu), %s",
-				(long long) _help_qty, (long long) _open_qty,
+				(long long) _held_qty, (long long) _open_qty,
 				(long long) _pending_qty, (unsigned long long) _next_update,
 				statString().c_str());
 		return std::string(buf);
@@ -174,7 +179,7 @@ template<class OpenOrderManager>
 struct OpenOrder {
 	const std::string _model_name;
 	const bool _is_buy;
-	const double _tgt_px;
+	const double _tgt_px;  // entering price
 	const int _side_mul;
 	const int _side_idx;
 	const bool _is_ioc;
@@ -195,13 +200,15 @@ struct OpenOrder {
 	OpenOrderManager& _mgr;
 	void *const _model;
 	FillStat& _mgr_fill_stat;
-	bool _is_passive;
+	bool _is_passive;  // if not passive, why open?
 
 	// Open order is created after a successful sending of a new
 	// order Equivalent to onNewSent()
 	OpenOrder(OpenOrderManager& mgr, const std::string& model_name,
 			  void* model, double target_price,
-			  bool is_buy, double px, int64_t sz, uint64_t reqid, uint64_t cur_micro, bool is_passive, bool is_ioc) :
+			  bool is_buy, double px, int64_t sz,
+			  uint64_t reqid, uint64_t cur_micro,
+			  bool is_passive, bool is_ioc) :
 				_model_name(model_name), _is_buy(is_buy),
 				_tgt_px(target_price), _side_mul(is_buy?1:-1),
 				_side_idx(is_buy?0:1),
@@ -457,24 +464,24 @@ private:
 // New open order was created after the successful new order sending,
 // deleted when it canceled, filled or rejected
 
-template<typename BookReader>
+template<typename BookReader, typename VenueConfig, typename InstrumentConfig>
 class OpenOrderMgr {
 public:
-	typedef OpenOrder<OpenOrderMgr<BookReader> >OOT;
+	typedef typename OpenOrder<OpenOrderMgr<BookReader, VenueConfig, InstrumentConfig> > OOT;
+	const VenueConfig& _vcfg;
+	const InstrumentConfig& _icfg;
 	explicit OpenOrderMgr(int inst_index, const VenueConfig& vcfg, const InstrumentConfig& icfg,
-			BookReader* br, utils::RateKeeper* venue_rate_keeper, FillStat* update_fill_stat=NULL) :
+			BookReader* br, FillStat* update_fill_stat=NULL) :
 			_inst_index(inst_index), _vcfg(vcfg), _icfg(icfg), _name((_icfg._ric+_icfg._venue+_icfg._profile)),
 			_breader(br), _fill_stat(update_fill_stat),
-			_venue_rate_keeper(venue_rate_keeper), _last_ioc_micro(0),
-			_tick_count(new utils::TickCount()), _tick_count_ref_cnt(0), _last_reset_gmt_hour(-1)
+			_last_ioc_micro(0),
+			_tick_count_ref_cnt(0), _last_reset_gmt_hour(-1)
 	{
 		_fill_stat_side[0]._next_update = &_fill_stat;
 		_fill_stat_side[1]._next_update = &_fill_stat;
 		// get an initial image of book
 		if (_breader)
-			if (read_book_stateless(_book) && _vcfg._is_L3) {
-				read_book_l3();
-			}
+			read_book_stateless(_book);
 	}
 
 	~OpenOrderMgr() {
@@ -536,7 +543,6 @@ public:
 			remove_own_quotes(book_);
 			const double bid_px = book_.getBestPrice(true);
 			const double ask_px = book_.getBestPrice(false);
-			_tick_count->add_mid_px( (bid_px+ask_px)/2);
 
 			// don't update size of an entry if the timestamp hasn't
 			// increased, this is that we have taken
@@ -637,6 +643,79 @@ public:
 		}
 	}
 
+	double getPxOffset(uint64_t this_micro) {
+		static const int max_ticks_offset = 5;
+
+		// get the IOC fill ratio and multiple this slippage
+		double px_offset = _fill_stat.getAvgSlippage();
+		int ticks = int(px_offset / _icfg._tick_size + 0.5);
+		int gmt_hour = ((this_micro/1000000ULL)%(3600*24))/3600;
+		if ( (_last_reset_gmt_hour ==-1)||((gmt_hour - _last_reset_gmt_hour)%24 >=1)) {
+			logInfo("resetting slippage counter");
+			_fill_stat.resetSlippage();
+			_last_reset_gmt_hour = gmt_hour;
+		}
+
+		if(ticks <=0) {
+			return 0;
+		} else if (ticks > max_ticks_offset) {
+			ticks = max_ticks_offset;
+		}
+		return ticks * _icfg._tick_size;
+	}
+
+	int64_t get_open_size(bool is_buy) {
+		const std::vector<OOT*>&oo_list = getOpenOrderList(is_buy);
+		size_t tot = oo_list.size();
+		int64_t sz=0;
+		for (size_t i=0;i<tot;++i) {
+			OOT*oo=oo_list[i];
+			if (oo->is_done()) {
+				continue;
+			}
+			sz+=oo->get_open_size_safe();
+		}
+		return sz;
+	}
+
+	const int _inst_index;
+	const std::string _name;
+
+private:
+	BookReader& _breader;
+	tp::BookDepot _book;
+	FillStat _fill_stat, _fill_stat_side[2];
+	std::vector<OOT*>_orders[2];
+	uint64_t _last_ioc_micro;
+	int _tick_count_ref_cnt;
+	int _last_reset_gmt_hour;
+
+	void remove_own_quotes(tp::BookDepot& depot,int remove_level=2) const {
+		if (_orders[0].size() + _orders[1].size() == 0){
+			return;
+		}
+		for (int side_idx = 0; side_idx<2;++side_idx) {
+			tp::PriceEntry* pe = &*depot.pe[side_idx*BookLevel];
+			int avail_l = depot.avail_level[side_idx];
+			int check_levels = _GETMIN_(remove_level, avail_l);
+			while (--check_levels >=0) {
+				double px = pe->price;
+				for (auto iter = _orders[side_idx].begin(); iter!=_orders[side_idx].end();++iter) {
+					const OOT*oo=(*iter);
+					if (oo->is_open()) {
+						double px_diff = oo->_open_px - px;
+						if (_GETABS_(px_diff) < _icfg._tick_size/2.0) {
+							pe->size -=oo->_open_size;
+							if (__builtin_expect((pe->size <0),0)) {
+								pe->size=0;
+							}
+						}
+					}
+				}
+				++pe;
+			}
+		}
+	}
 
 };
 

@@ -19,7 +19,7 @@
 namespace trader {
 
 #define _GETMIN_(a, b) ((a<b)?(a):(b))
-#define _GETABS_(a) ((a>0)?(a):(-a))
+#define _GETABS_(a) ((a>=0)?(a):(-a))
 
 enum OPEN_ORDER_STATE {
 	INIT = 0,
@@ -582,7 +582,7 @@ public:
 		}
 		if (removed) {
 			logInfo("OOM %s removed price %.7f, book:%s",
-					get_venue_name(), remove_px,_book.toString().c_str());
+					_name.c_str(), remove_px,_book.toString().c_str());
 		};
 	}
 

@@ -622,7 +622,7 @@ public:
 
     BookQ(const BookConfig config, bool readonly) :
         _cfg(config), _q_name(_cfg.qname()), _q(_q_name.c_str(), readonly, false),
-        _writer(readonly? NULL:new Writer(*this))
+        _writer(readonly? NULL:new Writer(*this), false)
     {
         logInfo("BookQ %s started %s configs (%s).",
         		_q_name.c_str(),

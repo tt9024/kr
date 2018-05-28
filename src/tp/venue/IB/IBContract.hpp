@@ -9,6 +9,7 @@
 #include <map>
 #include <memory.h>
 #include <string>
+#include <ctype.h>
 /*
  * This is a singleton object providing mapping of
  * IB Contract with the RIC (the Retuers thing from historical)
@@ -42,6 +43,19 @@ public:
 	    } else {
 	    	throw std::runtime_error(std::string("unknown contract: ") + std::string (symbol));
 	    }
+	}
+
+	bool isFuture(const std::string& symbol) const {
+		const size_t n = symbol.size();
+		const char m = symbol[n-2];
+		const char y = symbol[n-1];
+		if (ib_futmon.find(m) == ib_futmon.end()) {
+			return false;
+		}
+		if (!std::isdigit(y)) {
+			return false;
+		}
+		return true;
 	}
 
 private:

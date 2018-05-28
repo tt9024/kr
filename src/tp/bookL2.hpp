@@ -113,7 +113,11 @@ struct BookConfig {
 
     std::string bfname(int barsec) const {
     	return plcc_getString("BarPath")+"/"+
-    		   venue+"_"+symbol+"_B"+
+    		   venue+"_"+
+			   (RicContract::get().isFuture(symbol)?
+					   symbol.substr(0,symbol.size()-2):
+					   symbol)+
+			   "_B"+
 			   std::to_string(barsec)+"S.csv";
     }
 };

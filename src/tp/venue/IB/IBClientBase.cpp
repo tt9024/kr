@@ -29,7 +29,7 @@
 // The connectivity implementations
 
 ClientBaseImp::ClientBaseImp(int to_milli) :
-      m_osSignal(to_milli)//1 millisecond blocking
+      m_osSignal(to_milli)//millisecond blocking, 0 non-blocking
     , m_pClient(new EClientSocket(this, &m_osSignal))
     , m_pReader(0)
     , m_extraAuth(false)

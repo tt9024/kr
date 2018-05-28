@@ -33,7 +33,8 @@ void sleepApproxBefore(long long next_bar_micro, long long spin_micro=5*1000LL) 
 
 int main() {
 	// read all the l1 symbols and write to bar files
-    if (signal(SIGINT, sig_handler) == SIG_ERR)
+    if ((signal(SIGINT, sig_handler) == SIG_ERR) ||
+    	(signal(SIGTERM, sig_handler) == SIG_ERR) )
     {
             printf("\ncan't catch SIGINT\n");
             return -1;

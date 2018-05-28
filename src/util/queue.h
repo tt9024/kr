@@ -180,14 +180,19 @@ namespace utils {
             bool advanceToTop() {
             	QPos pos = m_pos;
             	seekToTop();
-            	if (pos > m_pos) {
-            		m_pos = pos;
+            	if (__builtin_expect(pos == 0, 0)) {
             		return false;
             	}
-            	if (__builtin_expect(m_pos == 0, 0)) {
-            		return false;
+            	if (__builtin_expect(pos <= m_pos,1)) {
+            		return true;
             	}
-            	return true;
+				if (__builtin_expect( pos == m_pos + DataLen, 0)) {
+					m_pos = pos;  // get back for next read
+				}
+				// note this accounts for loop back
+				// where m_pos could be much less than pos
+				// next read will reflect
+				return false;
             }
 
             void seekToBottom() {

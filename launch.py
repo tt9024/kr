@@ -13,11 +13,13 @@ _should_run = True
 def signal_handler(signal, frame) :
     print 'got signal ', signal
     _should_run = False
+    kill_all()
+    sys.exit(1)
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-procs=['bin/tpib','bin/tickrec']
+procs=['bin/tpib.exe','bin/tickrec.exe']
 cfg='config/main.cfg'
 proc_map={}
 
@@ -35,7 +37,7 @@ def is_in_daily_trading() :
 
 def is_weekend() :
     dt=datetime.datetime.now()
-    wd=dt.weedday()
+    wd=dt.weekday()
     if wd < 4 :
         return False
     if wd == 5 :
@@ -84,6 +86,7 @@ def kill_all() :
 
 def launch(p) :
     kill_p(p)
+    print 'launching ', p
     proc_map[p]=subprocess.Popen(p,shell=True)
 
 def launch_sustain() :

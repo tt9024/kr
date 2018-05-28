@@ -16,7 +16,6 @@
 #include <unordered_map>
 
 #include "bookL2.hpp"
-#include "order.hpp"
 
 #include "IBClientBase.hpp"
 #include "IBContract.hpp"

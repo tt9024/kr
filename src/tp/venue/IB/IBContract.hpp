@@ -45,19 +45,6 @@ public:
 	    }
 	}
 
-	bool isFuture(const std::string& symbol) const {
-		const size_t n = symbol.size();
-		const char m = symbol[n-2];
-		const char y = symbol[n-1];
-		if (ib_futmon.find(m) == ib_futmon.end()) {
-			return false;
-		}
-		if (!std::isdigit(y)) {
-			return false;
-		}
-		return true;
-	}
-
 private:
 	std::map<std::string, std::string> ib_cmefx;
 	std::map<char, std::string> ib_futmon;

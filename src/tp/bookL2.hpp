@@ -11,6 +11,7 @@
 #include "plcc/PLCC.hpp"
 #include "time_util.h"
 #include "queue.h"  // needed for SwQueue for BookQ
+#include <set>
 //#define MaxPriceLevels 8
 //there is really no need to
 //optimize this for now, just leave it for later
@@ -114,12 +115,29 @@ struct BookConfig {
     std::string bfname(int barsec) const {
     	return plcc_getString("BarPath")+"/"+
     		   venue+"_"+
-			   (RicContract::get().isFuture(symbol)?
+			   (isFuture(symbol)?
 					   symbol.substr(0,symbol.size()-2):
 					   symbol)+
 			   "_B"+
 			   std::to_string(barsec)+"S.csv";
     }
+
+    static inline
+	bool isFuture(const std::string& symbol) {
+		const size_t n = symbol.size();
+		const char m = symbol[n-2];
+		const char y = symbol[n-1];
+		const char ms[12]={'F','G','H','J','K','M','N','Q','U','V','X','Z'};
+		for (char c : ms ) {
+			if (c==m) {
+				if (std::isdigit(y)) {
+					return true;
+				}
+				break;
+			}
+		}
+		return false;
+	}
 };
 
 #define BookLevel 8
@@ -357,7 +375,7 @@ private:
     	 const PriceEntry* const to_pe_end = to_pe + BookLevel;
     	 const PriceEntry* const from_pe_end = from_pe + levels;
     	 PriceEntry* to_pe_start = to_pe;
-    	 const PriceEntry* const from_pe_start = from_pe;
+    	 //const PriceEntry* const from_pe_start = from_pe;
     	 while(from_pe != from_pe_end)
     	 {
     		 // search from_pe's price in the remainder of to_pe up to levels

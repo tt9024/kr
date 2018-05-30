@@ -9,9 +9,10 @@
 
 namespace trader {
 
+template<typename Floor>
 class Trader {
 public:
-	explicit Trader(OrderIB venue, const char* cfg);
+	explicit Trader(Floor& fl, const char* cfg);
 	bool subMD();  // L1 or L2
 	bool unSubMD();
 
@@ -31,9 +32,10 @@ public:
 	void start();
 	void stop();
 	void reload();
+	void onInst();  // getting an instruction
 
+	// MOVE to Floor
 	// signal interface
-	void setPosn();
 	void getPosn();
 	void listTrades();
 	void listOpen();

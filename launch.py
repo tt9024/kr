@@ -8,6 +8,7 @@ import sys
 import time
 import ibbar
 import l1
+import traceback
 
 _should_run = True
 def signal_handler(signal, frame) :
@@ -58,19 +59,24 @@ def is_proc_alive(proc) :
     return proc.poll() is None
 
 def kill_proc(proc) :
-    pid = proc.pid
-    while is_proc_alive(proc) :
-        print 'sending sigint'
-        proc.send_signal(signal.SIGINT)
-        time.sleep(1)
-        if is_pid_alive(pid) :
-            print 'sending sigterm'
-            proc.send_signal(signal.SIGTERM)
-            time.sleep(2)
+    try :
+        pid = proc.pid
+        while is_proc_alive(proc) :
+            print 'sending sigint'
+            proc.send_signal(signal.SIGINT)
+            time.sleep(1)
             if is_pid_alive(pid) :
-                print 'sending sigkill'
-                proc.send_signal(signal.SIGKILL)  #kill -9
-                time.sleep(5)
+                print 'sending sigterm'
+                proc.send_signal(signal.SIGTERM)
+                time.sleep(2)
+                if is_pid_alive(pid) :
+                    print 'sending sigkill'
+                    proc.send_signal(signal.SIGKILL)  #kill -9
+                    time.sleep(5)
+    except Exception as e :
+        print ('Exception in Kill: ' + str(e))
+        traceback.print_exc()
+        return 0
     return 1
 
 def kill_p(p) :

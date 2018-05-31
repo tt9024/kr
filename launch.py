@@ -100,7 +100,7 @@ def launch_sustain() :
     while should_run() : 
         if is_in_daily_trading() :
             if not alive :
-                print 'getting on-line, updating roll'
+                print 'getting on-line, updating roll ', datetime.datetime.now()
                 ibbar.update_ib_config(cfg_file=cfg)
                 alive = True
             # poll and sustain
@@ -109,12 +109,12 @@ def launch_sustain() :
                     launch(p)
         else :
             if alive :
-                print 'getting off-line, killing all'
+                print 'getting off-line, killing all ', datetime.datetime.now()
                 kill_all()
                 alive = False
         time.sleep(1)
     
-    print 'stopped ' 
+    print 'stopped ' , datetime.datetime.now()
     kill_all()
     #if is_weekend() :
     #    move_bars()

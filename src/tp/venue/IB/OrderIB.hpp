@@ -30,8 +30,6 @@
  * slow down everyone in the thread.  Consider move them out
  * as dedicated thread.
  *
- * At this initial stage, the
- *
  */
 namespace trader {
 typedef tp::BookQ<utils::ShmCircularBuffer> IBBookQType;
@@ -49,6 +47,11 @@ public :
 	_next_ord_id(1) {
 		m_pClient->reqIds(-1);  // get the next id;
 	};
+
+	~OrderIB() {
+		logInfo("OrderIB destructor disconnecting");
+		disconnect();
+	}
 
     // new and can/rep
 	int placeOrder(Trader* trader,
@@ -104,8 +107,7 @@ public :
 		return -1;
 	}
 
-	bool tryConnect() {
-		int max_try = 300;  // overnight restart usually < 5min
+	bool tryConnect(int max_try = 300) {
 		while (max_try > 0) {
 			logInfo("IBOrder(%d) connecting %s:%d",
 					_client_id, _host_ip, _port);

@@ -931,4 +931,12 @@ private:
 	BarLineWriter bw;
 };
 
+static inline
+bool LatestBook(const char* symbol, const char* levelStr, BookDepot& myBook) {
+    BookConfig bcfg(symbol, levelStr);
+    BookQ<utils::ShmCircularBuffer> bq(bcfg, true);
+    BookQ<utils::ShmCircularBuffer>::Reader* book_reader = bq.newReader();
+    return book_reader->getLatestUpdate(myBook);
 }
+
+}  // namespace tp

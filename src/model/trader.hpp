@@ -5,14 +5,14 @@
  *      Author: zfu
  */
 #pragma once
-#include "OrderIB.hpp"
+#include <string>
 
 namespace trader {
-
-template<typename Floor>
+template<typename FloorType>
 class Trader {
 public:
-	explicit Trader(Floor& fl, const char* cfg);
+	explicit Trader(FloorType& flr): _flr(flr) {} ;
+	/*
 	bool subMD();  // L1 or L2
 	bool unSubMD();
 
@@ -45,7 +45,9 @@ public:
 private:
 	// main loop
 	void run();
-
+	*/
+	const std::string _name;
+	FloorType& _flr;
 };
 
 }

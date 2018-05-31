@@ -25,7 +25,18 @@ void sig_handler(int signo)
 
 int main(int argc, char**argv) {
     if (argc != 3) {
-        printf("Usage: %s symbol type(L1|TbT|L2|Bar)\n", argv[0]);
+        printf("Usage: %s symbol type(L1|L2)\n", argv[0]);
+        std::vector<std::string> l1 = plcc_getStringArr("SubL1");
+        printf("L1 subscriptions: ");
+        for (auto s : l1) {
+        	printf(" %s ", s.c_str());
+        }
+        printf("\nL2 subscriptions: ");
+        std::vector<std::string> l2 = plcc_getStringArr("SubL2");
+        for (auto s : l2) {
+        	printf(" %s ", s.c_str());
+        }
+        printf("\n");
         return 0;
     }
     if (signal(SIGINT, sig_handler) == SIG_ERR)

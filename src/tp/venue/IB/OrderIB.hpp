@@ -6,6 +6,10 @@
  */
 #pragma once
 #include "tpib.hpp"
+#include "Order.h"
+#include "OrderState.h"
+#include "Execution.h"
+#include "Utils.h"
 #include <unordered_map>
 
 /*
@@ -38,10 +42,10 @@ typedef IBBookQType::Reader BookReaderType;
 template<typename Trader>
 class OrderIB : public ClientBaseImp {
 public :
-	explicit OrderIB(int client_id = 0,
+	explicit OrderIB(int client_id,
 			         const char* hostip,
 					 int port) :
-	_client_id(client_id),
+	_client_id(plcc_getInt("ordIBClientId")),
 	_host_ip(hostip),
 	_port(port),
 	_next_ord_id(1) {
@@ -84,6 +88,43 @@ public :
 				order.action.c_str(),
 				order.totalQuantity,
 				con.symbol.c_str(),
+				order.lmtPrice,
+				ordid);
+		_trader_map[ordid] = trader;
+		return ordid;
+	}
+
+    // new and can/rep
+	int Replace(int org_ordid,
+			    const char* symbol,
+			    tp::Quantity size = 0,
+				tp::Price price = 0,
+				Trader* trader=NULL) {
+	    Contract con;  // using the default contract
+	    Order order;
+	    RicContract::get().makeContract(con,symbol);
+	    auto iter = _trader_map.find(org_ordid);
+	    if (iter == _trader_map.end()) {
+	    	logError("Replace failure, org_ordid not found: %d",
+	    			org_ordid);
+	    	return 0;
+	    }
+	    if (trader == NULL) {
+	    	trader = iter->second;
+	    }
+	    order.orderId = org_ordid;
+	    if (size != 0) {
+	    	order.totalQuantity = size;
+	    }
+	    if (price != 0) {
+	    	order.lmtPrice = price;
+	    }
+		const int ordid = _next_ord_id++;
+		m_pClient->placeOrder(ordid, con, order);
+		logInfo("Replacing Order(%d): %s %ld %.7f oid(%d)",
+				org_ordid,
+				con.symbol.c_str(),
+				order.totalQuantity,
 				order.lmtPrice,
 				ordid);
 		_trader_map[ordid] = trader;

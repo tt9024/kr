@@ -11,7 +11,8 @@ BIN_DIR=${ROOT_DIR}/bin
 INCLUDES=-I${BASE_SRC_DIR}/tp -I${BASE_SRC_DIR}/util -I${BASE_SRC_DIR}/model -I. 
 
 # IB
-IB_SRC_DIR=${BASE_SRC_DIR}/tp/venue/IB
+TP_SRC_DIR=${BASE_SRC_DIR}/tp
+IB_SRC_DIR=${TP_SRC_DIR}/venue/IB
 IB_INCLUDE=-I${IB_SRC_DIR} -I${IB_SRC_DIR}/sdk -I${IB_SRC_DIR}/sdk/shared
 
 ibclient:
@@ -43,6 +44,11 @@ tpib:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/IBClientBase.o -c $(IB_SRC_DIR)/IBClientBase.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/tpib.o   -c $(IB_SRC_DIR)/tpib.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(OBJ_DIR)/IBClientBase.o $(OBJ_DIR)/tpib.o $(LIBS)
+
+ordtest:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/IBClientBase.o -c $(IB_SRC_DIR)/IBClientBase.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/OrderIB.o   -c $(IB_SRC_DIR)/OrderIB.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(OBJ_DIR)/IBClientBase.o $(OBJ_DIR)/OrderIB.o $(LIBS)
 
 clean:
 	rm -f $(OBJ_DIR)/*.o

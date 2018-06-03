@@ -34,7 +34,7 @@ namespace utils {
         // this is for multi-process environment using shm
         explicit SwQueue(const char* shm_name, bool read_only = true, bool init_to_zero = true) :
                 m_name(shm_name), m_buffer(shm_name, read_only, init_to_zero),
-                m_writer(read_only?NULL:new Writer(*this)) {};
+                m_writer(read_only?NULL:new Writer(*this, init_to_zero)) {};
 
         ~SwQueue() {
             if (m_writer) {

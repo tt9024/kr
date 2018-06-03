@@ -173,29 +173,47 @@ struct BookDepot {
     	memset(this, 0, sizeof(BookDepot));
     }
 
-    Price getBid(Quantity* size=NULL) const {
+    Price getBid(Quantity* size) const {
         if ((avail_level[0] < 1))
             return 0;
 
         for (int i = 0; i<avail_level[0]; ++i) {
             if (pe[i].size > 0) {
-            	if (size) {
-            		*size=pe[i].size;
-            	}
+            	*size=pe[i].size;
                 return pe[i].getPrice();
             }
         }
         return 0;
     }
 
-    Price getAsk(Quantity* size=NULL) const {
+    Price getAsk(Quantity* size) const {
         if ((avail_level[1] < 1))
             return 0;
         for (int i = BookLevel; i<BookLevel+avail_level[1]; ++i) {
 			if (pe[i].size > 0) {
-				if (size) {
-					*size=pe[i].size;
-				}
+				*size=pe[i].size;
+				return pe[i].getPrice();
+			}
+        }
+        return 0;
+    }
+
+    Price getBid() const {
+        if ((avail_level[0] < 1))
+            return 0;
+        for (int i = 0; i<avail_level[0]; ++i) {
+            if (pe[i].size > 0) {
+                return pe[i].getPrice();
+            }
+        }
+        return 0;
+    }
+
+    Price getAsk() const {
+        if ((avail_level[1] < 1))
+            return 0;
+        for (int i = BookLevel; i<BookLevel+avail_level[1]; ++i) {
+			if (pe[i].size > 0) {
 				return pe[i].getPrice();
 			}
         }
@@ -620,9 +638,9 @@ public:
     class Writer;
     class Reader;
 
-    BookQ(const BookConfig config, bool readonly) :
-        _cfg(config), _q_name(_cfg.qname()), _q(_q_name.c_str(), readonly, false),
-        _writer(readonly? NULL:new Writer(*this), false)
+    BookQ(const BookConfig config, bool readonly, bool init_to_zero=false) :
+        _cfg(config), _q_name(_cfg.qname()), _q(_q_name.c_str(), readonly, init_to_zero),
+        _writer(readonly? NULL:new Writer(*this))
     {
         logInfo("BookQ %s started %s configs (%s).",
         		_q_name.c_str(),
@@ -932,11 +950,17 @@ private:
 };
 
 static inline
-bool LatestBook(const char* symbol, const char* levelStr, BookDepot& myBook) {
+bool LatestBook(const std::string& symbol, const std::string& levelStr, BookDepot& myBook) {
     BookConfig bcfg(symbol, levelStr);
     BookQ<utils::ShmCircularBuffer> bq(bcfg, true);
     BookQ<utils::ShmCircularBuffer>::Reader* book_reader = bq.newReader();
-    return book_reader->getLatestUpdate(myBook);
+    if (!book_reader) {
+    	logError("Couldn't get book reader!");
+    	return false;
+    }
+    bool ret = book_reader->getLatestUpdate(myBook);
+    delete book_reader;
+    return ret;
 }
 
 }  // namespace tp

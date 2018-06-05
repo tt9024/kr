@@ -50,5 +50,9 @@ ordtest:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/OrderIB.o   -c $(IB_SRC_DIR)/OrderIB.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(OBJ_DIR)/IBClientBase.o $(OBJ_DIR)/OrderIB.o $(LIBS)
 
+floor:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/IBClientBase.o -c $(IB_SRC_DIR)/IBClientBase.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/floor.o   -c $(TP_SRC_DIR)/floor.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(OBJ_DIR)/IBClientBase.o $(OBJ_DIR)/floor.o $(LIBS)
 clean:
 	rm -f $(OBJ_DIR)/*.o

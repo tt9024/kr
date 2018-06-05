@@ -14,6 +14,9 @@
 #include <netinet/tcp.h>
 
 #include <sys/select.h>
+#include <string>
+#include <iostream>
+
 #define STDIN_FILENO 0
 
 namespace utils {
@@ -39,6 +42,19 @@ namespace utils {
         }
     };
 
+    void get_port_ip_sockaddr(const struct sockaddr& addr, int* port, int*ip) {
+		*port = ((const struct sockaddr_in*)&addr)->sin_port;
+		*ip = ((const struct sockaddr_in*)&addr)->sin_addr.s_addr;
+    }
+
+    std::string print_sockaddr(const struct sockaddr& addr) {
+    	int port, ip;
+    	get_port_ip_sockaddr(addr, &port, &ip);
+    	char buf[64];
+    	snprintf(buf,sizeof(buf),"port(%d) ip(%x)", port, ip);
+    	return std::string(buf);
+    }
+
     bool set_socket_non_blocking(int sockfd) {
         // get socket flags
         int flags = fcntl(sockfd, F_GETFL);
@@ -49,8 +65,17 @@ namespace utils {
         return ( fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == 0);
     };
 
+    bool set_socket_nodelay(int fd) {
+        int flag = 1;
+        int result = setsockopt(fd,            /* socket affected */
+                             IPPROTO_TCP,     /* set option at TCP level */
+                             TCP_NODELAY,     /* name of option */
+                             (char *) &flag,  /* the cast is historical cruft */
+                             sizeof(int));    /* length of option value */
+        return result;
+    }
 
-    int tcp_socket( const char *host, unsigned int port, bool blocking)
+    int tcp_socket( const char *host, unsigned int port, bool blocking, bool do_connect=true, bool do_bind = false)
     {
         // reset errno
         errno = 0;
@@ -78,25 +103,22 @@ namespace utils {
         sa.sin_addr.s_addr = inet_addr(host);
 
         // try to connect
-        if( (connect( fd, (struct sockaddr *) &sa, sizeof( sa))) < 0) {
-            char buf[256];
-            snprintf(buf, sizeof(buf), "tcp socket %d cannot connect to %s:%u", fd, host, port);
-            perror(buf);
-            return -1;
+        if (do_connect) {
+			if( (connect( fd, (struct sockaddr *) &sa, sizeof( sa))) < 0) {
+				char buf[256];
+				snprintf(buf, sizeof(buf), "tcp socket %d cannot connect to %s:%u", fd, host, port);
+				perror(buf);
+				return -1;
+			}
         }
 
-        int flag = 1;
-        int result = setsockopt(fd,            /* socket affected */
-                             IPPROTO_TCP,     /* set option at TCP level */
-                             TCP_NODELAY,     /* name of option */
-                             (char *) &flag,  /* the cast is historical cruft */
-                             sizeof(int));    /* length of option value */
-
+        int result = set_socket_nodelay(fd);
         if (result < 0) {
             char buf[256];
            snprintf(buf, sizeof(buf), "tcp socket %d cannot set TCP_NODELAY "
                     "(connected to %s:%u)", fd, host, port);
             perror(buf);
+			return -1;
         }
 
         if (!blocking) {
@@ -105,13 +127,29 @@ namespace utils {
                 snprintf(buf, sizeof(buf), "tcp socket %d cannot set non-blocking "
                         "(connected to %s:%u)", fd, host, port);
                 perror(buf);
+				return -1;
             }
         }
 
+        if ( (!do_connect) && do_bind) {
+    		char buf[256];
+        	int enable = 1;
+        	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        		snprintf(buf, sizeof(buf), "tcp socket %d cannot set SO Reuse %s:%u", fd, host, port);
+        		perror(buf);
+				return -1;
+        	}
+
+
+        	if (bind(fd,(struct sockaddr *) &sa, sizeof( sa))!=0) {
+        		snprintf(buf, sizeof(buf), "tcp socket %d cannot bind %s", fd, print_sockaddr(*(struct sockaddr*)&sa).c_str());
+        		perror(buf);
+				return -1;
+        	}
+        }
         // successfully connected
         return fd;
     }
-
 
     int tcp_send(int fd, const char* buf, size_t sz)
     {

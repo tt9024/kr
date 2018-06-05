@@ -1,6 +1,6 @@
 CXX=g++
 #CXXFLAGS=-std=c++0x -DIB_USE_STD_STRING -Wall -Wno-switch -g
-CXXFLAGS=-DIB_USE_STD_STRING -Wall -Wno-switch -O3
+CXXFLAGS=-DIB_USE_STD_STRING -Wall -Wno-switch -g
 ROOT_DIR=/cygdrive/e/ib/kisco
 BASE_SRC_DIR=${ROOT_DIR}/src
 LIBS=-lpthread -lrt -lc lib/libib.a

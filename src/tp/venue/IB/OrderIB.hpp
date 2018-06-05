@@ -39,21 +39,61 @@ namespace trader {
 typedef tp::BookQ<utils::ShmCircularBuffer> IBBookQType;
 typedef IBBookQType::Reader BookReaderType;
 
+struct OrderInfo {
+	int oid;
+	int prev_oid;
+	std::string sym;
+	std::string action;
+	int qty;
+	std::string type;
+	std::string tif;
+	double px;
+	void* trader;
+	std::string status;
+	OrderInfo() : oid(0), prev_oid(0), qty(0), px(0), trader(0){
+	}
+
+	OrderInfo(int this_oid, const char* symbol, const Order& ord, void* callback_trader):
+		oid(this_oid),prev_oid(ord.orderId),
+		sym(symbol), action(ord.action),
+		qty(ord.totalQuantity), type(ord.orderType),
+		tif(ord.tif), px(ord.lmtPrice),trader(callback_trader) {
+	}
+
+	void fill(Order& ord) const {
+		ord.action = action;
+		ord.totalQuantity = qty;
+		ord.orderType = type;
+		ord.tif = tif;
+		ord.lmtPrice = px;
+	}
+
+	void upd(int this_oid, int newQty, double newPx) {
+		prev_oid=oid;
+		oid=this_oid;
+		qty=newQty;
+		px=newPx;
+	}
+};
+
 template<typename Trader>
 class OrderIB : public ClientBaseImp {
 public :
 	explicit OrderIB(int client_id,
 			         const char* hostip,
 					 int port) :
-	_client_id(plcc_getInt("ordIBClientId")),
+	_client_id(client_id),
 	_host_ip(hostip),
 	_port(port),
-	_next_ord_id(1) {
-		m_pClient->reqIds(-1);  // get the next id;
+	_next_ord_id(1),
+	_got_next_id(false),
+	_should_cancel(false)  {
 	};
 
 	~OrderIB() {
 		logInfo("OrderIB destructor disconnecting");
+		// try cancel all open orders
+		cancelAllOpen();
 		disconnect();
 	}
 
@@ -78,56 +118,59 @@ public :
 		order.lmtPrice = price;
 		order.transmit = true;  // just to be sure
 
+		const int ordid = _next_ord_id++;
 		// replacing?
 		if (org_ordid>0) {
 			order.orderId = org_ordid;
+		} else {
+			order.orderId = ordid;
 		}
-		const int ordid = _next_ord_id++;
+
 		m_pClient->placeOrder(ordid, con, order);
-		logInfo("Placing Order: %s %ld %s at %f (id=%d)",
+
+		logInfo("Placing Order (orgid=%d): %s %f %s at %f (new id=%d)",
+				(int)order.orderId,
 				order.action.c_str(),
 				order.totalQuantity,
-				con.symbol.c_str(),
+				symbol,
 				order.lmtPrice,
 				ordid);
-		_trader_map[ordid] = trader;
+		_oid_map[ordid] = new OrderInfo(ordid, symbol, order, (void*) trader);
 		return ordid;
 	}
 
     // new and can/rep
+	// this doesn't quite work yet
+	// TODO - fix replace
 	int Replace(int org_ordid,
-			    const char* symbol,
-			    tp::Quantity size = 0,
-				tp::Price price = 0,
-				Trader* trader=NULL) {
+			    tp::Quantity size,
+				tp::Price price) {
 	    Contract con;  // using the default contract
 	    Order order;
-	    RicContract::get().makeContract(con,symbol);
-	    auto iter = _trader_map.find(org_ordid);
-	    if (iter == _trader_map.end()) {
+	    OrderInfo* oif = getByOid(org_ordid);
+	    if (__builtin_expect(!oif,0)) {
 	    	logError("Replace failure, org_ordid not found: %d",
 	    			org_ordid);
 	    	return 0;
 	    }
-	    if (trader == NULL) {
-	    	trader = iter->second;
-	    }
+
+	    oif->fill(order);
+	    RicContract::get().makeContract(con,oif->sym.c_str());
 	    order.orderId = org_ordid;
-	    if (size != 0) {
-	    	order.totalQuantity = size;
-	    }
-	    if (price != 0) {
-	    	order.lmtPrice = price;
-	    }
+		order.totalQuantity = size;
+		order.lmtPrice = price;
 		const int ordid = _next_ord_id++;
+
 		m_pClient->placeOrder(ordid, con, order);
-		logInfo("Replacing Order(%d): %s %ld %.7f oid(%d)",
+
+		logInfo("Replacing Order(%d): %s %d %.7f oid(%d)",
 				org_ordid,
 				con.symbol.c_str(),
-				order.totalQuantity,
+				(int)order.totalQuantity,
 				order.lmtPrice,
 				ordid);
-		_trader_map[ordid] = trader;
+		oif->upd(ordid, order.totalQuantity, order.lmtPrice);
+		_oid_map[ordid] = oif;
 		return ordid;
 	}
 
@@ -172,13 +215,26 @@ public :
 			return false;
 		}
 		logInfo("IBOrder(%d) connected", _client_id);
+		cancelAllOpen();
+		_got_next_id = false;
+		m_pClient->reqIds(-1);  // get the next id;
+		time_t t0 = time(NULL);
+		while ( (time(NULL) <= t0+1) && (!_got_next_id)) {
+			processMessages();
+			usleep(1000);
+		}
+		if (!_got_next_id) {
+			logError("Cannot get valid next id in 2 second, try again later!");
+			return false;
+		}
 		return true;
 	}
 
-	void nextValidId(int orderId) {
+	void nextValidId(OrderId orderId) {
 		_next_ord_id = orderId;
 		logInfo("got next orderid: %d", _next_ord_id);
-	}
+		_got_next_id = true;
+	};
 
 	// callbacks from IB
 	//! [orderstatus]
@@ -205,6 +261,7 @@ public :
 				order.orderType.c_str(),
 				order.tif.c_str(),
 				(int)order.totalQuantity,
+				order.lmtPrice,
 				(double)order.cashQty == UNSET_DOUBLE ? 0 : order.cashQty,
 				ostate.status.c_str(),
 				ostate.warningText.c_str());
@@ -213,6 +270,10 @@ public :
 				orderId, Utils::formatDoubleString(ostate.initMarginBefore).c_str(), Utils::formatDoubleString(ostate.maintMarginBefore).c_str(), Utils::formatDoubleString(ostate.equityWithLoanBefore).c_str(),
 				Utils::formatDoubleString(ostate.initMarginChange).c_str(), Utils::formatDoubleString(ostate.maintMarginChange).c_str(), Utils::formatDoubleString(ostate.equityWithLoanChange).c_str(),
 				Utils::formatDoubleString(ostate.initMarginAfter).c_str(), Utils::formatDoubleString(ostate.maintMarginAfter).c_str(), Utils::formatDoubleString(ostate.equityWithLoanAfter).c_str());
+		}
+
+		if (__builtin_expect(_should_cancel, 0)) {
+			cancelOrder(orderId);
 		}
 
 		/*
@@ -226,6 +287,24 @@ public :
 		*/
 	}
 	//! [openorder]
+
+	//! [openorderend]
+	void openOrderEnd() {
+		logInfo( "OpenOrderEnd");
+		_should_cancel = false;
+	}
+
+	void cancelAllOpen() {
+		logInfo("canceling all open orders!");
+		_should_cancel = true;
+		m_pClient->reqAllOpenOrders();
+		while (_should_cancel) {
+			processMessages();
+			usleep(1000);
+		}
+	}
+
+	//! [openorderend]
 
 	//! [execdetails]
 	void execDetails( int reqId, const Contract& contract, const Execution& execution) {
@@ -280,12 +359,35 @@ public :
         }
     }
 
+    const OrderInfo* getOrdInfo(int oid) const {
+    	auto iter = _oid_map.find(oid);
+    	if (__builtin_expect(iter != _oid_map.end(),1)) {
+    		return iter->second;
+    	}
+    	logError("OID not found: %d", oid);
+    	return NULL;
+    }
+
 private:
 	const int _client_id;
 	const char* _host_ip;
 	int _port;
 	int _next_ord_id;
-	std::unordered_map<int, Trader*> _trader_map;
+	std::unordered_map<int, OrderInfo*> _oid_map;
+	bool _got_next_id;
+	bool _should_cancel;
+
+    OrderInfo* getByOid(int oid) {
+    	auto iter = _oid_map.find(oid);
+    	if (__builtin_expect( iter != _oid_map.end(), 1)) {
+    		return iter->second;
+    	}
+    	logError("OID not found: %d", oid);
+    	return NULL;
+    }
+
+
+
 };
 
 }

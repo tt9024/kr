@@ -26,9 +26,7 @@ public:
 	}
 
 	void makeContract(Contract &con, const char* symbol, const char* curDate=NULL) const {
-	    if (strncmp(symbol, "XAU", 3) == 0) {
-	        makeMetalContract(con, symbol);
-	    } else if (strncmp(symbol, "NYM", 3) == 0) {
+	    if (strncmp(symbol, "NYM", 3) == 0) {
 	        makeNymContract(con, symbol);
 	    } else if (strncmp(symbol, "VIX", 3) == 0) {
 	        makeVixContract(con, symbol, curDate);
@@ -39,7 +37,12 @@ public:
 	    }  else if (strncmp(symbol, "EUX", 3)==0) {
 	    	makeEuxContract(con, symbol);
 	    }  else if (strncmp(symbol, "FX/", 3) == 0) {
-	        makeFxContract(con, symbol+3);
+		    if ( (strncmp(symbol, "XAU", 3) == 0) ||
+		    	 (strncmp(symbol, "XAG", 3) == 0)) {
+		        makeMetalContract(con, symbol);
+		    } else {
+		    	makeFxContract(con, symbol+3);
+		    }
 	    } else {
 	    	throw std::runtime_error(std::string("unknown contract: ") + std::string (symbol));
 	    }

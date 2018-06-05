@@ -87,14 +87,15 @@ tp::Price parsePx(const std::string& sym, const char* px) {
 		break;
 	};
 	};
-	// normalize the p
-	const double mintick=1e-10;
-	p = int(p/mintick + 0.5)*mintick;
+	// normalize the p? not necessary for now
+	//const double mintick=1e-10;
+	//p = static_cast<int>(p/mintick + 0.5)*mintick;
 	return p;
 };
 
 
 int run_cmd(const char* cmd, OrderType* _order) {
+	logInfo("got command %s", cmd);
 	std::stringstream ss(cmd);
 	std::string token;
 	if (!(ss >> token)) {
@@ -129,19 +130,33 @@ int run_cmd(const char* cmd, OrderType* _order) {
 	{
 		// replace an order
 		// look for oid
-		std::string oid, sym, tk;
+		std::string oid, tk;
 		if (!(ss >> oid) ||
-			!(ss >> sym) ||
 			!(ss >> tk) ) {
 			logError("Cannot parse replace order: %s",cmd);
 			return -1;
 		}
+		int oid_ = atoi(oid.c_str());
+		const OrderInfo* oif = _order->getOrdInfo(oid_);
+		if (__builtin_expect(!oif, 0)) {
+			logError("error parsing replace: oid not found %d", oid_);
+			return -1;
+		}
+		// the cancel replace doesn't quite work, do
+		// cancel old order for now
+		int new_oid=-1;
 		if (c1 == 'R') {
 			// replace sz
-			return _order->Replace(atoi(oid.c_str()), sym.c_str(), atoi(tk.c_str()) );
+			new_oid = _order->Replace(oid_, atoi(tk.c_str()), oif->px);
 		} else {
-			return _order->Replace(atoi(oid.c_str()), sym.c_str(), 0, strtod(tk.c_str(),NULL));
+			// replace px, get the price
+			const std::string& sym(oif->sym);
+			tp::Price p = parsePx(sym, tk.c_str());
+			new_oid = _order->Replace(oid_, oif->qty, p);
 		}
+		// don't know why I have to cancel the oid_ ???
+		_order->cancelOrder(oid_);
+		return new_oid;
 	}
 	case 'C':
 	{
@@ -165,21 +180,68 @@ int run_cmd(const char* cmd, OrderType* _order) {
 std::string help() {
 	char buf[1024];
 	size_t n = snprintf(buf, sizeof(buf), "New Order: [B|S] SYM SZ PX([a|b][+|-][s spdcnt|price])\n");
-	n+=snprintf(buf+n, sizeof(buf)-n,"Replace OrderSize:  R SYM #OID SZ\n");
-	n+=snprintf(buf+n, sizeof(buf)-n,"Replace OrderPrice: U SYM #OID PX([a|b][+|-]price)\n");
+	n+=snprintf(buf+n, sizeof(buf)-n,"Replace OrderSize:  R #OID SZ\n");
+	n+=snprintf(buf+n, sizeof(buf)-n,"Replace OrderPrice: U #OID PX\n");
 	n+=snprintf(buf+n, sizeof(buf)-n,"Cancel Order: C #OID\n");
 	n+=snprintf(buf+n, sizeof(buf)-n,"Help: H\n");
 	return std::string(buf);
 }
 
-
+// testings
 int main(int argc, char** argv) {
     utils::PLCC::instance("ordertest");
-	OrderType* _order = new OrderType(10, "127.0.0.1", plcc_getInt("IBClientPort"));
-	const char* cmd1="B NYM/CLN8 1 b-s6";
+    //int clid = plcc_getInt("OrdIBClientId");
+	OrderType* _order = new OrderType(plcc_getInt("OrdIBClientId"), "127.0.0.1", plcc_getInt("IBClientPort"));
+	_order->tryConnect();
+
+	// make an order
+
+	const char* cmd1="B NYM/CLN8 2 b-s20";
 	int oid = run_cmd(cmd1, _order);
-	sleep (5);
-	std::string cmd2= std::string("C ") + std::to_string(oid);
+	time_t t0 = time(NULL);
+	while (time(NULL) < t0 + 3) {
+		_order->processMessages();
+		usleep (1000);
+	}
+
+
+	// replace sz
+	std::string cmd2= std::string("R ") + std::to_string(oid) + std::string(" 1");
+	oid = run_cmd(cmd2.c_str(), _order);
+	t0 = time(NULL);
+	while (time(NULL) < t0 + 10) {
+		_order->processMessages();
+		usleep (1000);
+	}
+
+	// replace px
+	std::string cmd3= std::string("U ") + std::to_string(oid) + std::string(" b-s15");
+	oid = run_cmd(cmd3.c_str(), _order);
+	t0 = time(NULL);
+	while (time(NULL) < t0 + 10) {
+		_order->processMessages();
+		usleep (1000);
+	}
+
+	// replace sz
+	cmd3= std::string("U ") + std::to_string(oid) + std::string(" b-s20");
+	oid = run_cmd(cmd3.c_str(), _order);
+	t0 = time(NULL);
+	while (time(NULL) < t0 + 10) {
+		_order->processMessages();
+		usleep (1000);
+	}
+
+
+	// cancel the last one
+	std::string cmd4= std::string("C ") + std::to_string(oid);
+	run_cmd(cmd4.c_str(), _order);
+	t0 = time(NULL);
+	while (time(NULL) < t0 + 10) {
+		_order->processMessages();
+		usleep (1000);
+	}
+
 	delete _order;
 	return 0;
 }

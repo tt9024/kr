@@ -37,11 +37,12 @@ public:
 	    }  else if (strncmp(symbol, "EUX", 3)==0) {
 	    	makeEuxContract(con, symbol);
 	    }  else if (strncmp(symbol, "FX/", 3) == 0) {
-		    if ( (strncmp(symbol, "XAU", 3) == 0) ||
-		    	 (strncmp(symbol, "XAG", 3) == 0)) {
-		        makeMetalContract(con, symbol);
+	    	const char* sym0 = symbol+3;
+		    if ( (strncmp(sym0, "XAU", 3) == 0) ||
+		    	 (strncmp(sym0, "XAG", 3) == 0)) {
+		        makeMetalContract(con, sym0);
 		    } else {
-		    	makeFxContract(con, symbol+3);
+		    	makeFxContract(con, sym0);
 		    }
 	    } else {
 	    	throw std::runtime_error(std::string("unknown contract: ") + std::string (symbol));

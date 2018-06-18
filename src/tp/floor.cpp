@@ -39,15 +39,18 @@ Floor::~Floor() {
 	_server = NULL;
 }
 
-bool Floor::start(int max_try) {
+bool Floor::start(int max_try, bool cancel_all_open) {
+	/*
 	if (_order) {
 		logError("Floor Starting Order with existing instance, killing!");
 		delete _order;
 		sleep (1);
 	}
+	*/
 	logInfo("Floor starting order");
-	_order=new OrderType(_client_id, _ipAddr.c_str(), _port);
-	if (!_order->tryConnect(max_try)) {
+	if (!_order)
+		_order=new OrderType(_client_id, _ipAddr.c_str(), _port);
+	if (!_order->tryConnect(max_try, cancel_all_open)) {
 		logError("Floor Order connection failed!");
 		delete _order;
 		return false;
@@ -55,35 +58,42 @@ bool Floor::start(int max_try) {
 	return true;
 }
 void Floor::stop() {
+	// calling stop will delete all open orders
 	delete _order;
 	_order = NULL;
 	logInfo("Floor stopped");
 } ;
 
 bool Floor::bounce(bool bounceServer, int max_try) {
+	// bounce does not delete open orders
 	if(bounceServer) {
+		logInfo("Deleting server");
 		delete _server;
 	}
-	stop();
+	_order->disconnect();
 	if (bounceServer) {
+		logInfo("creating server");
 		int cnt = max_try;
 		while (--cnt > 0) {
-			sleep(1);
 			_server = new FloorServer<Floor>(*this);
 			if (_server) {
 				break;
 			}
+			sleep(1);
 			logError("cannot create server in bouncing, retrying...");
 		}
 	}
 	sleep(1);
-	return start(max_try);
+	return start(max_try, false);
 }
 
 void Floor::run() {
 	_should_run = true;
-	start();
+	start(300, false);
 	while(_should_run) {
+		if (__builtin_expect(!_order->isConnected(),0)) {
+			start(30, false);
+		}
 		if (__builtin_expect(!_server->poll(), 0)) {
 			bounce(true);
 		}

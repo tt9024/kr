@@ -49,15 +49,16 @@ struct OrderInfo {
 	std::string tif;
 	double px;
 	void* trader;
-	std::string status;
-	OrderInfo() : oid(0), prev_oid(0), qty(0), px(0), trader(0){
+	bool isOpen;
+	OrderInfo() : oid(0), prev_oid(0), qty(0), px(0), trader(0), isOpen(true){
 	}
 
 	OrderInfo(int this_oid, const char* symbol, const Order& ord, void* callback_trader):
 		oid(this_oid),prev_oid(ord.orderId),
 		sym(symbol), action(ord.action),
 		qty(ord.totalQuantity), type(ord.orderType),
-		tif(ord.tif), px(ord.lmtPrice),trader(callback_trader) {
+		tif(ord.tif), px(ord.lmtPrice),trader(callback_trader),
+	    isOpen(true) {
 	}
 
 	void fill(Order& ord) const {
@@ -148,11 +149,12 @@ public :
 	    Contract con;  // using the default contract
 	    Order order;
 	    OrderInfo* oif = getByOid(org_ordid);
-	    if (__builtin_expect(!oif,0)) {
-	    	logError("Replace failure, org_ordid not found: %d",
+	    if (__builtin_expect( !oif || !oif->isOpen   ,0)) {
+	    	logError("Replace failure, org_ordid not found or not open: %d",
 	    			org_ordid);
 	    	return 0;
 	    }
+		cancelOrder(org_ordid);
 
 	    oif->fill(order);
 	    RicContract::get().makeContract(con,oif->sym.c_str());
@@ -160,8 +162,8 @@ public :
 		order.totalQuantity = size;
 		order.lmtPrice = price;
 		const int ordid = _next_ord_id++;
-
 		m_pClient->placeOrder(ordid, con, order);
+		_oid_map[ordid] = new OrderInfo(ordid, oif->sym, order, (void*) oif->trader);
 
 		logInfo("Replacing Order(%d): %s %d %.7f oid(%d)",
 				org_ordid,
@@ -169,13 +171,15 @@ public :
 				(int)order.totalQuantity,
 				order.lmtPrice,
 				ordid);
-		oif->upd(ordid, order.totalQuantity, order.lmtPrice);
-		_oid_map[ordid] = oif;
 		return ordid;
 	}
 
 	void cancelOrder(int ordid) {
 		m_pClient->cancelOrder(ordid);
+	    OrderInfo* oif = getByOid(ordid);
+	    if (oif) {
+	    	oif->isOpen = false;
+	    }
 		logInfo("Cancel sent (%d)", ordid);
 	}
 
@@ -191,7 +195,7 @@ public :
 		return -1;
 	}
 
-	bool tryConnect(int max_try = 300) {
+	bool tryConnect(int max_try = 300, bool cancel_all_open=false) {
 		while (max_try > 0) {
 			logInfo("IBOrder(%d) connecting %s:%d",
 					_client_id, _host_ip, _port);
@@ -215,7 +219,8 @@ public :
 			return false;
 		}
 		logInfo("IBOrder(%d) connected", _client_id);
-		cancelAllOpen();
+		if (cancel_all_open)
+			cancelAllOpen();
 		_got_next_id = false;
 		m_pClient->reqIds(-1);  // get the next id;
 		time_t t0 = time(NULL);
@@ -295,12 +300,14 @@ public :
 	}
 
 	void cancelAllOpen() {
-		logInfo("canceling all open orders!");
-		_should_cancel = true;
-		m_pClient->reqAllOpenOrders();
-		while (_should_cancel) {
-			processMessages();
-			usleep(1000);
+		if (isConnected()) {
+			logInfo("canceling all open orders!");
+			_should_cancel = true;
+			m_pClient->reqAllOpenOrders();
+			while (_should_cancel && isConnected()) {
+				processMessages();
+				usleep(1000);
+			}
 		}
 	}
 

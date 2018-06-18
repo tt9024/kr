@@ -52,7 +52,7 @@ class Floor {
 public:
 	Floor();
 	~Floor();
-	bool start(int max_try = 30);
+	bool start(int max_try = 30, bool cancel_all_open=false);
 	void stop();
 	bool bounce(bool bounceServer = false, int max_try = 30);
 	void run();
@@ -198,8 +198,9 @@ int FloorServer<FLOOR>::run_cmd(const char* cmd) {
 		}
 		int oid_ = atoi(oid.c_str());
 		const OrderInfo* oif = _order->getOrdInfo(oid_);
-		if (__builtin_expect(!oif, 0)) {
-			logError("error parsing replace: oid not found %d", oid_);
+		if (__builtin_expect(!oif || !oif->isOpen, 0)) {
+			logError("error parsing replace: oid not found "
+					"or not open %d", oid_);
 			return -1;
 		}
 		// the cancel replace doesn't quite work, do
@@ -215,7 +216,7 @@ int FloorServer<FLOOR>::run_cmd(const char* cmd) {
 			new_oid = _order->Replace(oid_, oif->qty, p);
 		}
 		// don't know why I have to cancel the oid_ ???
-		_order->cancelOrder(oid_);
+		//_order->cancelOrder(oid_);
 		return new_oid;
 	}
 	case 'C':

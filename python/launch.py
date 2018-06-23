@@ -92,7 +92,7 @@ def kill_all() :
 
 def launch(p) :
     kill_p(p)
-    print 'launching ', p
+    print 'launching ', p, ' ', datetime.datetime.now()
     proc_map[p]=subprocess.Popen(p,shell=True)
 
 def launch_sustain() :

@@ -713,6 +713,7 @@ struct BookL2 {
 
     // this is used by reading from L2 delta file
     bool updFromDelta(const L2Delta* delta, uint64_t ts_micro) {
+    	_book.update_ts_micro = ts_micro;
     	switch(delta->type) {
     	case 1: // new_level
     		this->newPrice(delta->px, delta->qty, delta->level, delta->side==0, ts_micro);
@@ -1064,12 +1065,12 @@ private:
  */
 
 static const uint64_t SnapshotPreamble = 0xf0f0f0f0f0f0f0f0ULL;
+static const int SnapCount  = 1024;
 
 template <template<int, int> class BufferType >
 class L2DeltaWriter {
 public:
-	static const int FlushCount = 16;
-	static const int SnapCount  = 1024;
+	static const int FlushCount = 1;
 	static const uint64_t MaxSnapMicro = 300ULL * 1000000ULL;
 
 	L2DeltaWriter(const BookConfig& bcfg) :
@@ -1149,7 +1150,7 @@ private:
 
 class L2DeltaReader {
 public:
-	L2DeltaReader(const BookConfig& bcfg) :
+	explicit L2DeltaReader(const BookConfig& bcfg, bool tail = true) :
 		_bcfg(bcfg),
 		_fname(bcfg.L2fname()),
 		_book(bcfg),
@@ -1164,6 +1165,9 @@ public:
 			throw std::runtime_error(
 					std::string("cannot open file for L2 delta reader: ")
 			        + _bcfg.toString());
+		}
+		if (tail) {
+			sync();
 		}
 
 	}
@@ -1201,6 +1205,22 @@ private:
 
 	bool _has_header;
 	uint64_t _header;
+
+	void sync() {
+		_file_size = updFileSize();
+		uint64_t seek_point = SnapCount*(sizeof(L2Delta)+sizeof(uint64_t)) + sizeof(uint64_t);
+		if (seek_point < _file_size) {
+			_last_pos = _file_size - seek_point;
+			fseek(_fp, _last_pos, SEEK_SET);
+		}
+		while(true) {
+			_has_header = false;
+			if (readHeader()) {
+				if (_header == SnapshotPreamble)
+					break;
+			}
+		}
+	}
 
 	bool readHeader() {
 		if (!_has_header) {

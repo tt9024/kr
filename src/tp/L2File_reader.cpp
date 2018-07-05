@@ -22,8 +22,8 @@ void sig_handler(int signo)
 }
 
 int main(int argc, char**argv) {
-    if (argc != 2) {
-        printf("Usage: %s symbol \n", argv[0]);
+    if (argc < 2) {
+        printf("Usage: %s symbol [tail]\n", argv[0]);
         printf("\nL2 subscriptions: ");
         std::vector<std::string> l2 = plcc_getStringArr("SubL2");
         for (auto s : l2) {
@@ -32,6 +32,10 @@ int main(int argc, char**argv) {
         printf("\n");
         return 0;
     }
+    bool tail = false;
+    if (argc>2 && strcmp(argv[2], "tail")==0) {
+    	tail = true;
+    }
     if (signal(SIGINT, sig_handler) == SIG_ERR)
     {
             printf("\ncan't catch SIGINT\n");
@@ -39,7 +43,7 @@ int main(int argc, char**argv) {
     }
     utils::PLCC::instance("L2Reader");
     BookConfig bcfg(argv[1],"L2");
-    L2DeltaReader reader(bcfg);
+    L2DeltaReader reader(bcfg, tail);
     user_stopped = false;
     const BookDepot* book;
     while (!user_stopped) {

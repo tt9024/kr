@@ -12,10 +12,18 @@
 #include "time_util.h"
 #include "queue.h"  // needed for SwQueue for BookQ
 #include <set>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 //#define MaxPriceLevels 8
 //there is really no need to
 //optimize this for now, just leave it for later
 //#define PriceMult 1000000
+
+#define getMax(x, y) ((x)>(y)?(x):(y))
+#define getMin(x, y) ((x)<(y)?(x):(y))
 
 namespace tp {
 
@@ -28,6 +36,7 @@ bool  px_equal(Price x, Price y) {
 	const Price minpx(1e-10);
 	return ((x-y<minpx) && (x-y>-minpx));
 }
+
 struct PriceEntry {
 #pragma pack(push,1)
     Price price;  // price is integer - pip adjusted and side signed (bid+ ask-)
@@ -122,6 +131,15 @@ struct BookConfig {
 			   std::to_string(barsec)+"S.csv";
     }
 
+    std::string L2fname() const {
+    	return plcc_getString("BarPath")+"/"+
+    		   venue+"_"+
+			   (isFuture(symbol)?
+					   symbol.substr(0,symbol.size()-2):
+					   symbol)+
+			   "_L2.bin";
+    }
+
     static inline
 	bool isFuture(const std::string& symbol) {
 		const size_t n = symbol.size();
@@ -140,7 +158,61 @@ struct BookConfig {
 	}
 };
 
-#define BookLevel 8
+struct L2Delta {
+#pragma pack(push, 1)
+	char type; // 0: snapshot, 1: new_level, 2: del_level, 3: upd_level, 4: trade
+	char side; // 0: bid 1: ask
+	short level;
+	Quantity qty;
+	Price px;
+#pragma pack(pop)
+	L2Delta() {
+		reset();
+	}
+	void reset() {
+		memset(this, 0, sizeof(L2Delta));
+	}
+
+    void newPrice(Price price, Quantity size, unsigned int lvl, bool is_bid) {
+    	reset();
+    	type=1; // new_level
+    	side=is_bid?0:1;
+    	level=lvl;
+    	qty=size;
+    	px=price;
+    }
+
+    void delPrice(unsigned int lvl, bool is_bid) {
+    	reset();
+    	type=2; // del_level
+    	side=is_bid?0:1;
+    	level=lvl;
+    }
+
+    void updPrice(Price price, Quantity size, unsigned int lvl, bool is_bid) {
+    	reset();
+    	type=3; // upd_level
+    	side=is_bid?0:1;
+    	level=lvl;
+    	qty=size;
+    	px=price;
+    }
+
+    void snapshot() {
+    	reset();
+    	type=0;  // snapshot, get from the bookdepot
+    }
+
+    void addTrade(Price price, Quantity size) {
+    	reset();
+    	type=4;  // trade
+    	px=price;
+    	qty=size;
+    }
+
+};
+
+#define BookLevel 10
 struct BookDepot {
 #pragma pack(push,1)
     // this structure needs to be aligned
@@ -156,6 +228,7 @@ struct BookDepot {
     Quantity bvol_cum; // the cumulative buy volume since tp up
     Quantity svol_cum; // the cummulative sell volume since tp up
     //Price close_px;    // the close price of previous session.
+    L2Delta l2_delta;
 #pragma pack(pop)
 
     BookDepot() {
@@ -171,6 +244,30 @@ struct BookDepot {
 
     void reset() {
     	memset(this, 0, sizeof(BookDepot));
+    }
+
+    Price getVWAP(int level, bool isBid, Quantity* q=NULL) const {
+    	const int side=isBid?0:1;
+    	int lvl = getMin(level, avail_level[side]);
+    	Quantity qty = 0;
+    	Price px = 0;
+    	const PriceEntry* p = pe + side*BookLevel;
+    	const PriceEntry* p0 = p + lvl;
+    	while (p < p0) {
+    		px += p->price * p->size;
+    		qty += p->size;
+    		++p;
+    	}
+    	if (q) *q = qty;
+    	return px/qty;
+    }
+
+    Price getISM(int level) const {
+    	Quantity bq, aq;
+    	Price bp, ap;
+    	bp=getVWAP(level, true, &bq);
+    	ap=getVWAP(level, false, &aq);
+    	return (bp*aq + ap*bq)/(aq+bq);
     }
 
     Price getBid(Quantity* size) const {
@@ -438,13 +535,14 @@ struct BookL2 {
     BookDepot _book;
     int* const _avail_level;
     // filters for duplicate trade size updates
-    static const unsigned long long MaxMicroSizeFilter=40ULL;
-    uint64_t _last_size_micro;
-    Quantity _last_size;
+    //static const unsigned long long MaxMicroSizeFilter=40ULL;
+    //uint64_t _last_size_micro;
+    //Quantity _last_size;
 
     explicit BookL2(const BookConfig& cfg):
-            _cfg(cfg), _book(), _avail_level(_book.avail_level),
-			_last_size_micro(0), _last_size(0) {
+            _cfg(cfg), _book(), _avail_level(_book.avail_level)
+			//_last_size_micro(0), _last_size(0)
+    {
         reset();
     }
 
@@ -481,6 +579,7 @@ struct BookL2 {
 
         pe->set(price, size, ts_micro);
         ++(_avail_level[side]);
+        _book.l2_delta.newPrice(price, size, level, is_bid);
         return true;
     }
 
@@ -501,6 +600,7 @@ struct BookL2 {
             memmove(pe, pe+1, (levels-level-1)*sizeof(PriceEntry));
         };
         --(_avail_level[side]);
+        _book.l2_delta.delPrice(level, is_bid);
         return true;
     }
 
@@ -519,6 +619,7 @@ struct BookL2 {
         _book.update_level = level;
         _book.setUpdateType(false, side==0);
         pe->set(price, size, ts_micro);
+        _book.l2_delta.updPrice(price, size, level, is_bid);
         return true;
     }
 
@@ -551,6 +652,7 @@ struct BookL2 {
         return updPrice(price, size, 0, is_bid, ts_micro);
     }
 
+    /*
     void updTrdPrice(Price px) {
     	_last_size=0;
     	_book.trade_price=px;
@@ -583,19 +685,21 @@ struct BookL2 {
     	_last_size_micro=cur_micro;
     	return true;
     }
+    */
 
     void updTrdSizeNoCheck(Quantity size) {
     	_book.trade_size=size;
     }
 
     bool addTrade(Price px, Quantity sz) {
+    	_book.l2_delta.addTrade(px,sz);
     	return _book.addTrade(px, sz);
      }
 
     void reset() {
         _book.reset();
-        _last_size_micro = 0;
-        _last_size = 0;
+        //_last_size_micro = 0;
+        //_last_size = 0;
     }
 
     void plccLogError(const char* msg, int number) {
@@ -606,25 +710,26 @@ struct BookL2 {
     PriceEntry* getEntry(unsigned int level, int side) const {
         return (PriceEntry*) &(_book.pe[side*BookLevel+level]);
     }
+
+    // this is used by reading from L2 delta file
+    bool updFromDelta(const L2Delta* delta, uint64_t ts_micro) {
+    	switch(delta->type) {
+    	case 1: // new_level
+    		this->newPrice(delta->px, delta->qty, delta->level, delta->side==0, ts_micro);
+    		return true;
+    	case 2: // del_level
+    		this->delPrice(delta->level, delta->side==0);
+    		return true;
+    	case 3: // upd_level
+    		this->updPrice(delta->px, delta->qty, delta->level, delta->side==0, ts_micro);
+    		return true;
+    	case 4: // trade
+    		this->addTrade(delta->px, delta->qty);
+    	}
+    	return false;
+    }
 };
 
-
-// TODO - an even better way is to use
-// seqlock to always provide the latest
-// market data (skipping all the previous)
-// writer and reader share one memory location
-struct BookL2_SeqLock {
-};
-
-// TODO : Add Last Trade queue and add add writer/reader functions
-//        just add a last Trade SwQueue, writer implements a function
-//        that write a LastTrade structure to the queue.  Reader will
-//        add a LastTrade reference to the getUpdate() to also check that.
-// could be shm queue, or heap queue
-// this is defined per-venue basis, i.e. each venue
-// has one BookQ, covering all securities from that venue
-// It always uses normalized level 2 format
-// The writer and the readers has their own Books and Queues
 template <template<int, int> class BufferType >
 class BookQ {
 public:
@@ -947,6 +1052,191 @@ private:
 	BookQ<BufferType> bq;
 	typename BookQ<BufferType>::Reader* br;
 	BarLineWriter bw;
+};
+
+/*
+ * Format of L2 Delta writer:
+ * PREAMBLE bookdepot [TS_MICRO L2DELTA]
+ *
+ * Where PREAMBLE is a unique 8-bytes sequence to detect start of a snapshot
+ * [TS_MICRO L2DELTA] is repeated and is supposed to be applied to the
+ * snapshot until the next snapshot
+ */
+
+static const uint64_t SnapshotPreamble = 0xf0f0f0f0f0f0f0f0ULL;
+
+template <template<int, int> class BufferType >
+class L2DeltaWriter {
+public:
+	static const int FlushCount = 16;
+	static const int SnapCount  = 1024;
+	static const uint64_t MaxSnapMicro = 300ULL * 1000000ULL;
+
+	L2DeltaWriter(const BookConfig& bcfg) :
+		_bcfg(bcfg),
+		_fp(fopen(bcfg.L2fname().c_str(), "ab+")), // barsec=0 -> L2Delta
+		_flushCount(0),
+		_snapCount(0),
+		_nextSnapSec(0),
+		_bq(_bcfg,true), _br(_bq.newReader())
+	{
+		if (!_fp) {
+			throw std::runtime_error(
+					std::string("cannot open file for L2 delta writer")
+			        + bcfg.toString());
+		}
+		if (!_br) {
+			throw std::runtime_error(
+					std::string("cannot open shm queue for L2 delta writer ")
+			        + bcfg.toString());
+		}
+	};
+	~L2DeltaWriter() {
+		if (_fp)
+			fclose(_fp);
+		_fp=NULL;
+		delete _br;
+		_br = NULL;
+	}
+
+	bool update() {
+		BookDepot book;
+		if (_br->getNextUpdate(book)) {
+			write(book);
+			return true;
+		}
+		return false;
+	}
+private:
+	const BookConfig& _bcfg;
+	FILE* _fp;
+	int _flushCount;
+	int _snapCount;
+	uint64_t _nextSnapSec;
+	BookQ<BufferType> _bq;
+	typename BookQ<BufferType>::Reader* _br;
+
+	void writeSnap(const BookDepot& book) {
+		fwrite(&SnapshotPreamble, sizeof(uint64_t), 1, _fp);
+		fwrite(&book, sizeof(BookDepot), 1, _fp);
+	}
+	void writeDelta(const BookDepot& book) {
+		fwrite(&book.update_ts_micro, sizeof(uint64_t), 1, _fp);
+		fwrite(&book.l2_delta, sizeof(book.l2_delta), 1, _fp);
+	}
+
+	void write(const BookDepot& book) {
+		// just write a timestamp and book.l2detal
+		// if a snapshot or _nextSnapSec, write a book
+		// with a 8 byte preamble
+		if (book.l2_delta.type == 0 || _snapCount == 0 || book.update_ts_micro > _nextSnapSec) {
+			// write a snap, reset count
+			writeSnap(book);
+			_snapCount = SnapCount;
+			_nextSnapSec = book.update_ts_micro + MaxSnapMicro;
+		} else {
+			--_snapCount;
+			writeDelta(book);
+		}
+		if (_flushCount == 0) {
+			fflush(_fp);
+			_flushCount = FlushCount;
+		} else {
+			--_flushCount;
+		}
+	}
+};
+
+class L2DeltaReader {
+public:
+	L2DeltaReader(const BookConfig& bcfg) :
+		_bcfg(bcfg),
+		_fname(bcfg.L2fname()),
+		_book(bcfg),
+		_fp(fopen(_fname.c_str(), "rb")),
+		_latest_micro(0),
+		_last_pos(0),
+		_file_size(0),
+		_has_header(false),
+		_header(0)
+	{
+		if (!_fp) {
+			throw std::runtime_error(
+					std::string("cannot open file for L2 delta reader: ")
+			        + _bcfg.toString());
+		}
+
+	}
+	~L2DeltaReader() {
+		if(_fp)
+			fclose(_fp);
+		_fp = NULL;
+	}
+	const BookDepot* readNext() {
+		if (!readHeader()) {
+			return NULL;
+		}
+		if (_header == SnapshotPreamble) {
+			fread(&_book._book, sizeof(BookDepot), 1, _fp);
+			_last_pos += sizeof(BookDepot);
+		} else {
+			L2Delta* delta = &(_book._book.l2_delta);
+			fread(delta, sizeof(L2Delta), 1, _fp);
+			_book.updFromDelta(delta, _header);
+			_last_pos += sizeof(L2Delta);
+		}
+		// ready for the next
+		_has_header = false;
+		return &(_book._book);
+	}
+
+private:
+	const BookConfig& _bcfg;
+	const std::string _fname;
+	BookL2 _book;
+	FILE* _fp;
+	uint64_t _latest_micro;
+	uint64_t _last_pos;
+	uint64_t _file_size;
+
+	bool _has_header;
+	uint64_t _header;
+
+	bool readHeader() {
+		if (!_has_header) {
+			if (_file_size-_last_pos < sizeof(uint64_t)) {
+				_file_size = updFileSize();
+				if (_file_size-_last_pos < sizeof(uint64_t)) {
+					return false;
+				}
+			}
+			fread(&_header, sizeof(uint64_t), 1, _fp);
+			_has_header = true;
+			_last_pos += sizeof(uint64_t);
+		}
+		// make sure we have the content (delta or snapshot)
+		if (_header == SnapshotPreamble) {
+			if (_file_size-_last_pos >= sizeof(BookDepot)) {
+				return true;
+			}
+		}
+		if (_file_size-_last_pos >= sizeof(L2Delta)) {
+			return true;
+		}
+		_file_size = updFileSize();
+		return false;
+	}
+
+	uint64_t updFileSize() const {
+		struct stat fs;
+		if (stat(_fname.c_str(), &fs) != 0) {
+			logError("error getting file size");
+			return 0;
+		}
+		return fs.st_size;
+	}
+
+
 };
 
 static inline

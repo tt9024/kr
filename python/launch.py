@@ -20,7 +20,7 @@ def signal_handler(signal, frame) :
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-procs=['bin/tpib.exe','bin/tickrec.exe']
+procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe']
 cfg='config/main.cfg'
 proc_map={}
 

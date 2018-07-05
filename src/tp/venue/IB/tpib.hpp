@@ -294,8 +294,10 @@ public:
         logError( "Error id=%d, errorCode=%d, msg=%s", id, errorCode, errorString.c_str());
         switch (errorCode) {
         case 1100:
-            if( id == -1) // if "Connectivity between IB and TWS has been lost"
+            if( id == -1) { // if "Connectivity between IB and TWS has been lost"
                 disconnect();
+                stop();
+            }
             break;
         case 317:  // reset depth of book
         {
@@ -305,6 +307,7 @@ public:
         }
         case 1102:
             disconnect();
+            stop();
             break;
 
         case 2110:  //Connectivity between Trader

@@ -51,6 +51,19 @@ def is_weekend() :
 def should_run() :
     return (not is_weekend()) and _should_run
 
+def move_bars(bar_path) :
+    print 'moving bar files to bar/' + bar_path
+    os.system('mkdir -p bar/' + bar_path)
+    os.system('mv *.csv bar/' + bar_path)
+    os.system('mv *.bin bar/' + bar_path)
+
+def remove_logs() :
+    print 'removing log files in ./log/'
+    os.system('rm -fR log/*')
+    print 'removing log files in /cygdrive/c/Jts/*.20*.log'
+    os.system('rm -fR /cygdrive/c/Jts/*.20*.log')
+    os.system('rm -fR /cygdrive/c/Jts/dhmeniwux/*.20*.log')
+
 def is_pid_alive(pid) :
     pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
     return pid in pids
@@ -97,6 +110,9 @@ def launch(p) :
 
 def launch_sustain() :
     alive = False
+    if not should_run() :
+        print 'launched in a bad time with should_run() false, doing nothing'
+        return
     while should_run() : 
         if is_in_daily_trading() :
             if not alive :
@@ -116,9 +132,15 @@ def launch_sustain() :
     
     print 'stopped ' , datetime.datetime.now()
     kill_all()
-    #if is_weekend() :
-    #    move_bars()
+    if is_weekend() :
+        # only do it on friday close
+        dt=datetime.datetime.now()
+        wd=dt.weekday()
+        if wd == 4 :
+            bar_path = dt.strfile('%Y%m%d')
+            print 'moving bar files to ', bar_path
+            move_bars(bar_path)
+            remove_logs()
 
 if __name__ == "__main__":
     launch_sustain()
-

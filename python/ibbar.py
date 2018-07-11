@@ -1,6 +1,7 @@
 import l1
 import os
 import datetime
+import numpy as np
 
 ven_sym_map={'NYM':['CL','NG','HO','RB','GC','SI','HG'],'CME':['ES','6A','6C','6E','6B','6J','6N','6R','6Z','6M'],'CBT':['ZB','ZN','ZF','ZC'],'EUX':['FDX','STXE','FGBX','FGBL','FGBS','FGBM'],'FX':['AUD.CAD','AUD.JPY','AUD.NZD','CAD.JPY','EUR.AUD','EUR.CAD','EUR.CHF','EUR.GBP','EUR.JPY','EUR.NOK','EUR.SEK','EUR.TRY','EUR.ZAR','GBP,CHF','GBP.JPY','NOK.SEK','NZD.JPY','EUR.USD','USD.ZAR','USD.TRY','USD.MXN','USD.CNH','XAU.USD','XAG.USD']}
 sym_priority_list=['CL','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM']
@@ -145,3 +146,107 @@ def ib_bar_by_file(fn, skip_header) :
     """
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
+
+#################################
+# Just because getting IB history bars
+# has so many problem!
+##################################
+def matchts(fromfn, tofn, is_head=True) :
+    """
+    fromfn is the qt that has either before or afterwards needs to be cut
+    against the tofn
+    if is_head is True, then trim fromfn for head
+    if is_head is False, then trim fromfn for tail
+    """
+    f0 = np.genfromtxt(fromfn, delimiter=',')
+    f1 = np.genfromtxt(tofn, delimiter=',')
+    # check head
+    if is_head :
+        ts0 = f0[0,0]
+        ts1 = f1[0,0]
+        ix = 0
+        if ts0 < ts1 :
+            ix = np.searchsorted(f0[:,0], ts1)
+        return ix+1
+
+    if not is_head:
+        ts0 = f0[-1,0]
+        ts1 = f1[-1,0]
+        ix = len(f0)
+        if ts0 > ts1 :
+            ix = np.searchsorted(f0[:,0], ts1)
+            if f0[ix,0] == ts1 :
+                ix += 1
+        return ix
+
+def bar_file_cleanup(sym, hist_dir='hist') :
+    """
+    clean up the crap of qt/trd mismatch
+    This is just one time thing, won't 
+    expect to happen. 
+    for each sym_dir
+    1. move the *_20180125_*_qt.csv to *_20180201_*_qt.csv 
+       cut the qt to match the timestamps of trd
+    2. move the *_2018*_20180507_1S_qt.csv to *_2018*_20180502_1S_qt.csv
+       cut the qt to match the timestamps of trd
+    3. move all the 2017 stuffs to kdb_verify
+    And hopefully it's only need for once
+    """
+    import glob
+    import subprocess
+
+    sym_dir = hist_dir + '/' + sym
+    f2017 = glob.glob(sym_dir+'/*2017*')
+    if len(f2017) > 0 :
+        os.system('mkdir -p '+sym_dir+'/kdb_verify')
+        os.system('mv ' + sym_dir + '/*2017* ' + sym_dir + '/kdb_verify')
+
+    f0125qt = glob.glob(sym_dir+'/*_2018012?_*_qt.csv')
+    if len(f0125qt) == 1 :
+        f0201trd = glob.glob(sym_dir+'/*_20180201_*_trd.csv')[0]
+        f0125qt = f0125qt[0]
+        # get the first timestamp and match with the line number
+        ts_trd = subprocess.check_output("head -n 1 " + f0201trd + " | cut -d ',' -f 1",shell=True)[:-1]
+        qt_ln = subprocess.check_output("grep -n " + ts_trd + " " + f0125qt + " | cut -d ':' -f1 | tail -n 1",shell=True)[:-1]
+        if len(qt_ln) == 0 :
+            print 'manually get the line number  '
+            qt_ln = str(matchts(f0125qt, f0201trd,is_head=True))
+        print 'trim ', f0125qt, ' got line number ', qt_ln
+
+        # take the qt context on and after the line
+        os.system('tail -n +' + qt_ln + ' ' + f0125qt + ' > ' + sym_dir + '/0125qt_tmp')
+        os.system('mv ' + f0125qt + ' ' + f0125qt + '.sav')
+        os.system('mv ' + sym_dir + '/0125qt_tmp' + ' ' + f0201trd[:-7]+'qt.csv')
+
+        #print 'tail -n +' + qt_ln + ' ' + f0125qt + ' > ' + sym_dir + '/0125qt_tmp'
+        #print 'mv ' + f0125qt + ' ' + f0125qt + '.sav'
+        #print 'mv ' + sym_dir + '/0125qt_tmp' + ' ' + f0201trd[:-7]+'qt.csv'
+
+    else :
+        print sym_dir+'/*_2018012?_*_qt.csv not found', f0125qt
+
+    f0507qt = glob.glob(sym_dir+'/*_20180507_?S_qt.csv')
+    if len(f0507qt) == 2 :
+        for f in f0507qt :
+            if '20180502' in f :
+                continue
+            else :
+                break
+        print 'got ', f
+        # need 0502 trade
+        f0507qt = f
+        f0502trd = glob.glob(sym_dir+'/*_20180502_*_trd.csv')[0]
+        ts_trd = subprocess.check_output("tail -n 1 " + f0502trd + " | cut -d ',' -f 1",shell=True)[:-1]
+        qt_ln = subprocess.check_output("grep -n " + ts_trd + " " + f0507qt + " | cut -d ':' -f1 | head -n 1",shell=True)[:-1]
+        if len(qt_ln) == 0 :
+            print 'manually get the line number'
+            qt_ln = str(matchts(f0507qt, f0502trd,is_head=False))
+        print 'trim ', f0507qt, ' got line number ', qt_ln
+
+        # take the qt contend on and before the line
+        os.system('head -n ' + qt_ln + ' ' + f0507qt + ' > ' + sym_dir + '/0507qt_tmp')
+        os.system('mv ' + f0507qt + ' ' + f0507qt + '.sav')
+        os.system('mv ' + sym_dir + '/0507qt_tmp' + ' ' + f0502trd[:-7]+'qt.csv')
+    else :
+        print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
+

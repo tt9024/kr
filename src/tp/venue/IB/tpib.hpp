@@ -181,15 +181,15 @@ public:
         bool is_bid = (side == 1?true:false);
         switch (operation) {
         case 0: // new
-    		logInfo("new %s %d %f\n", is_bid?"Bid":"Offer",(int)position, price);
+    		logDebug("new %s %d %f\n", is_bid?"Bid":"Offer",(int)position, price);
             _book_queue[id-TickerStart]->theWriter().newPrice(price, size, position, is_bid, tm);
             break;
         case 1: // update
-    		logInfo("upd %s %d %f %d\n", is_bid?"Bid":"Offer",(int)position, price, size);
+    		logDebug("upd %s %d %f %d\n", is_bid?"Bid":"Offer",(int)position, price, size);
         	_book_queue[id-TickerStart]->theWriter().updPrice(price, size, position, is_bid, tm);
             break;
         case 2: // del
-    		logInfo("del %s %d\n", is_bid?"Bid":"Offer",(int)position);
+    		logDebug("del %s %d\n", is_bid?"Bid":"Offer",(int)position);
         	_book_queue[id-TickerStart]->theWriter().delPrice(position, is_bid, tm);
             break;
         default:

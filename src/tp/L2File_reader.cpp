@@ -46,10 +46,14 @@ int main(int argc, char**argv) {
     L2DeltaReader reader(bcfg, tail);
     user_stopped = false;
     const BookDepot* book;
+    uint64_t last_micro = 0;
     while (!user_stopped) {
         book = reader.readNext();
         if (book) {
-        	printf("%s\n", book->prettyPrint().c_str());
+        	if (book->update_ts_micro - last_micro > 250000) {
+        		printf("%s\n", book->prettyPrint().c_str());
+        		last_micro = book->update_ts_micro;
+        	}
         } else {
         	usleep(1000);
         }

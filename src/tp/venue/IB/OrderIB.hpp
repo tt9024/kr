@@ -163,7 +163,7 @@ public :
 		order.lmtPrice = price;
 		const int ordid = _next_ord_id++;
 		m_pClient->placeOrder(ordid, con, order);
-		_oid_map[ordid] = new OrderInfo(ordid, oif->sym, order, (void*) oif->trader);
+		_oid_map[ordid] = new OrderInfo(ordid, oif->sym.c_str(), order, (void*) oif->trader);
 
 		logInfo("Replacing Order(%d): %s %d %.7f oid(%d)",
 				org_ordid,

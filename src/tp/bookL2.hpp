@@ -470,18 +470,28 @@ private:
     bool addTrade() {
     	// this assumes that the price and size
     	// has been set before this call
-    	if (__builtin_expect( (!isValidQuote()) ||
-    			              (!isValidTrade()) ,0)) {
+    	if (__builtin_expect(!isValidTrade() ,0)) {
     		return false;
     	}
-    	const Price bd=std::abs(getBid()-trade_price);
-    	const Price ad=std::abs(getAsk()-trade_price);
-    	if (ad>bd) {
-    		trade_attr=1;  // sell close to best bid
-    		svol_cum+=trade_size;
+    	if (__builtin_expect(!isValidQuote() ,0)) {
+    		// keep the previous trade_attr
+    		if (trade_attr == 0) {
+    			// take as buy
+    			bvol_cum+=trade_size;
+    		} else if (trade_attr == 1) {
+    			// take as sell
+    			svol_cum+=trade_size;
+    		}
     	} else {
-    		trade_attr=0;
-    		bvol_cum+=trade_size;
+			const Price bd=std::abs(getBid()-trade_price);
+			const Price ad=std::abs(getAsk()-trade_price);
+			if (ad>bd) {
+				trade_attr=1;  // sell close to best bid
+				svol_cum+=trade_size;
+			} else {
+				trade_attr=0;
+				bvol_cum+=trade_size;
+			}
     	}
     	setUpdateType(true, false);
     	return true;
@@ -865,11 +875,11 @@ public:
         */
 
         bool updTrade(double price, Quantity size) {
-        	if(__builtin_expect(!_bookL2.addTrade(price,size),0)) {
-        		return false;
+        	if(__builtin_expect(_bookL2.addTrade(price,size),1)) {
+            	updateQ(utils::TimeUtil::cur_time_gmt_micro());
+            	return true;
         	}
-        	updateQ(utils::TimeUtil::cur_time_gmt_micro());
-        	return true;
+        	return false;
         };
 
         void resetBook() {

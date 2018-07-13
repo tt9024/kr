@@ -50,7 +50,7 @@ int main(int argc, char**argv) {
     while (!user_stopped) {
         book = reader.readNext();
         if (book) {
-        	if (book->update_ts_micro - last_micro > 250000) {
+        	if (book->update_ts_micro - last_micro > 250000 || book->update_type == 2) {
         		printf("%s\n", book->prettyPrint().c_str());
         		last_micro = book->update_ts_micro;
         	}

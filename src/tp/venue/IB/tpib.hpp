@@ -31,14 +31,13 @@ private:
     int _client_id;
     const std::vector<std::string> _symL1;
     const std::vector<std::string> _symL2;
-    const std::vector<std::string> _symTbT;
     int _next_tickerid;
     std::string _ipAddr;
     int _port;
     std::vector<IBBookQType*> _book_queue;
+    std::vector<IBBookQType*> _book_queue_l1_to_l2;
     volatile bool _should_run;
     void md_subscribe(const std::vector<std::string>&symL1,
-    		          const std::vector<std::string>&symTbT,
 					  const std::vector<std::string>&symL2) {
     	// want live data
     	m_pClient->reqMarketDataType(1);
@@ -50,18 +49,30 @@ private:
             reqMDL1(s.c_str(), _next_tickerid++);
         }
 
-    	// TbT
-        for (const auto& s : symTbT) {
-        	auto bp = new IBBookQType(BookConfig(s,"TbT"),false);
-        	_book_queue.push_back(bp);
-            reqMDTbT(s.c_str(), _next_tickerid++);
-        }
-
         // L2
         for (const auto& s : symL2) {
         	auto bp = new IBBookQType(BookConfig(s,"L2"),false);
         	_book_queue.push_back(bp);
             reqMDL2(s.c_str(), _next_tickerid++);
+        }
+
+        // for L1 to L2 queue
+        // indexed by L1 symbol, with the pointer to L2 book queue
+        // used for updating trades from L1 to L2 book queues
+        // this is needed as L2 subscription doesn't have trade from IB
+        for (size_t l1 = 0; l1<symL1.size(); ++l1) {
+        	const auto& s = symL1[l1];
+        	size_t l2 = 0;
+        	for (; l2<symL2.size(); ++l2) {
+        		const auto& s2 = symL2[l2];
+        		if (s == s2) {
+        			_book_queue_l1_to_l2.push_back(_book_queue[symL1.size()+l2]);
+        			break;
+        		}
+        	}
+        	if (l2 >= _symL2.size()) {
+        		_book_queue_l1_to_l2.push_back(NULL);
+        	}
         }
     }
 
@@ -89,6 +100,7 @@ private:
 		}
 	}
 
+	/* useless
 	void reqMDTbT(const char* symbol, int ticker_id) {
 		if (isConnected()) {
 		    Contract con;
@@ -99,14 +111,14 @@ private:
 			logError("req error not connected!");
 		}
 	}
+	*/
 
 public:
-    static const int TickerStart = 2;
+    static const int TickerStart = 2;  // this is the tickerid starts
     explicit TPIB (int client_id = 0) :
     		_client_id(client_id?client_id:plcc_getInt("TPIBClientId")),
     		_symL1(plcc_getStringArr("SubL1")),
 			_symL2(plcc_getStringArr("SubL2")),
-			_symTbT(plcc_getStringArr("SubTbT")),
 			_next_tickerid(TickerStart),
 			_ipAddr("127.0.0.1"), _port(0), _should_run(false) {
         bool found1, found2;
@@ -119,7 +131,7 @@ public:
             throw std::runtime_error("TPIB failed to run - required config setting not found.");
         }
 
-        if (!_symL1.size() && !_symL2.size() && !_symTbT.size()) {
+        if (!_symL1.size() && !_symL2.size()) {
         	logError("TPIB started without subscription found!");
         }
 
@@ -127,7 +139,7 @@ public:
     }
 
     void md_subscribe() {
-    	md_subscribe(_symL1,_symTbT,_symL2);
+    	md_subscribe(_symL1,_symL2);
     }
 
     // connect to venue
@@ -274,6 +286,11 @@ public:
             //    multi_fill = (buf[0] == 't');
             //}
             logDebug("RT_VOLUME: %.7lf %d",price, size);
+            IBBookQType* q = _book_queue_l1_to_l2[id-TickerStart];
+            if(q!=NULL){
+            	// update the L2 trade queue
+            	q->theWriter().updTrade(price, size);
+            }
             if(__builtin_expect(!_book_queue[id-TickerStart]->theWriter().updTrade(price, size),0)) {
             	logError("TPIB update trade error: %s",
             			_book_queue[id-TickerStart]->theWriter().getBook()->toString().c_str());

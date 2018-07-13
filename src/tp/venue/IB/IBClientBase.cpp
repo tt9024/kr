@@ -29,7 +29,7 @@
 // The connectivity implementations
 
 ClientBaseImp::ClientBaseImp(int to_milli) :
-      m_osSignal(to_milli)//1 millisecond blocking
+      m_osSignal(to_milli)//millisecond blocking, 0 non-blocking
     , m_pClient(new EClientSocket(this, &m_osSignal))
     , m_pReader(0)
     , m_extraAuth(false)
@@ -69,43 +69,6 @@ bool ClientBaseImp::isConnected() const
 {
 	return m_pClient->isConnected();
 }
-
-
-void ClientBaseImp::reqMDL2(const char* symbol, int ticker_id, int numLevel) {
-	if (isConnected())
-	{
-	    Contract con;
-	    RicContract::get().makeContract(con, symbol);
-	    m_pClient->reqMktDepth(ticker_id, con, numLevel,TagValueListSPtr());
-	} else {
-		logError("reqMDDoB error not connected!");
-	}
-}
-
-void ClientBaseImp::reqMDL1(const char* symbol, int ticker_id) {
-	if (isConnected())
-	{
-	    Contract con;
-	    RicContract::get().makeContract(con,symbol);
-	    std::string generic_ticks="233"; // this is RT_VOLUME
-	    //std::string generic_ticks="";
-	    m_pClient->reqMktData(ticker_id, con, generic_ticks, false,false,TagValueListSPtr());
-	} else {
-		logError("reqMDBBO error not connected!");
-	}
-}
-
-void ClientBaseImp::reqMDTbT(const char* symbol, int ticker_id) {
-	if (isConnected()) {
-	    Contract con;
-	    RicContract::get().makeContract(con,symbol);
-	    m_pClient->reqTickByTickData(ticker_id, con, "AllLast", 0, false);
-	    m_pClient->reqTickByTickData(ticker_id, con, "BidAsk", 0, true);
-	} else {
-		logError("req error not connected!");
-	}
-}
-
 
 int ClientBaseImp::processMessages()
 {

@@ -118,6 +118,19 @@ namespace utils {
             CopyBytes<ifInbound>((char*) (m_buffer + s_pos), (char*) content, bytes);
         }
 
+        inline void CopyBytesFromBuffer(QPos start_pos, const char* content, int bytes) volatile const {
+        	int s_pos = start_pos % QLen;
+        	int e_pos = (start_pos + bytes) % QLen;
+        	if (__builtin_expect((e_pos < s_pos),0)) {
+        		int len1 = QLen - s_pos;
+        		CopyBytes<false>((char*) (m_buffer+s_pos),(char*) content, len1);
+        		content += len1;
+        		bytes -=len1;
+        		s_pos = 0;
+        	}
+        	CopyBytes<false>((char*) (m_buffer + s_pos),(char*)content,bytes);
+        }
+
         // check if the contents of bytes starting from start_pos would
         // cross the boundary.  If not, buffer will be the starting pointer
         bool wouldCrossBoundary(const QPos start_pos, int bytes, char*& buffer) const volatile {
@@ -152,6 +165,10 @@ namespace utils {
         CircularBuffer<QLen, HeaderBytes>(NULL), m_shm_name(shm_name), m_is_read(is_read), m_shm_size(QLen + HeaderBytes),
         m_shm_ptr(NULL), m_shm_fd(-1)
         {
+        	if (!shm_name)
+        		// this is the case where an empty buffer is created
+        		return;
+
             if (is_read) {
                 m_shm_fd = shm_open(m_shm_name.c_str(), O_RDONLY, S_IRUSR);
                 if (m_shm_fd == -1) {

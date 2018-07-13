@@ -81,13 +81,13 @@ namespace tp {
     // trader should poll corresponding queues to read their events
     struct OrderInput {
 #pragma pack(push,1)
+        char _symbol[16];
         uint64_t _ts_micro;
+        uint64_t _traderid; // could be pointer
+        OrderID _oid;       // id of this order (0 for unknown)
+        OrderID _ref_oid;   // id for can/rep
         Price _px;
         Quantity _sz;
-        OrderID _oid;
-        OrderID _ref_oid;
-        uint16_t _secid;
-        uint16_t _traderid;
         uint8_t _ot;
         uint8_t _tif;
         uint8_t _op;
@@ -98,8 +98,13 @@ namespace tp {
         }
         std::string toString() const {
             char buf[256];
-            snprintf(buf, sizeof(buf), "Order Input [OID(%d) OP(%d) SIDE(%d) PX(%d) SZ(%d) OID2(%d) SEC(%d) OT(%d) TIF(%d)",
-                    (int) _oid, (int) _op, (int) _side, (int) _px, (int) _sz, (int) _ref_oid, (int) _secid, (int) _ot, (int) _tif);
+            snprintf(buf, sizeof(buf),
+            		"Order Input [OID(%d) OP(%d) "
+            		"SIDE(%d) PX(%d) SZ(%d) OID2(%d) SYM(%s) "
+            		"OT(%d) TIF(%d) TRDER(%llu)",
+                    (int) _oid, (int) _op, (int) _side, (int)
+					_px, (int) _sz, (int) _ref_oid, (int) _symbol,
+					(int) _ot, (int) _tif, (unsigned long long)_traderid);
             return std::string(buf);
         }
     };

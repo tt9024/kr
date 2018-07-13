@@ -21,7 +21,10 @@ typedef FillQ<ShmCircularBuffer> FillQType;
 void help() {
     printf("New Order: [B|S] SYM SZ PX([a|b][+|-]price)\n");
     printf("Cancel Order: C #OID\n");
-    printf("Get Price: [P] SYM\n");
+    printf("Get Position: [P] SYM\n");
+    printf("Get Book: [B] SYM\n");
+    printf("List Trades: [L] SYM \n");
+    printf("List OpenOrders: [O]\n");
     printf("Exit: [X]\n");
 }
 

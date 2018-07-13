@@ -1,6 +1,6 @@
 CXX=g++
 #CXXFLAGS=-std=c++0x -DIB_USE_STD_STRING -Wall -Wno-switch -g
-CXXFLAGS=-DIB_USE_STD_STRING -Wall -Wno-switch -O3
+CXXFLAGS=-DIB_USE_STD_STRING -Wall -Wno-switch -g -O3
 ROOT_DIR=/cygdrive/e/ib/kisco
 BASE_SRC_DIR=${ROOT_DIR}/src
 LIBS=-lpthread -lrt -lc lib/libib.a
@@ -11,7 +11,8 @@ BIN_DIR=${ROOT_DIR}/bin
 INCLUDES=-I${BASE_SRC_DIR}/tp -I${BASE_SRC_DIR}/util -I${BASE_SRC_DIR}/model -I. 
 
 # IB
-IB_SRC_DIR=${BASE_SRC_DIR}/tp/venue/IB
+TP_SRC_DIR=${BASE_SRC_DIR}/tp
+IB_SRC_DIR=${TP_SRC_DIR}/venue/IB
 IB_INCLUDE=-I${IB_SRC_DIR} -I${IB_SRC_DIR}/sdk -I${IB_SRC_DIR}/sdk/shared
 
 ibclient:
@@ -29,9 +30,16 @@ modeltrader:
 
 booktap:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/book_reader.cpp $(LIBS)
+	
+l2filetap:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/L2File_reader.cpp $(LIBS)
 
 tickrec:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/tick_recorder.cpp $(LIBS)
+
+tickrecL2:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/tick_recorder_l2.cpp $(LIBS)
+
 
 ### new stuffs
 histclient:
@@ -44,7 +52,14 @@ tpib:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/tpib.o   -c $(IB_SRC_DIR)/tpib.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(OBJ_DIR)/IBClientBase.o $(OBJ_DIR)/tpib.o $(LIBS)
 
-booktap:
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/book_reader.cpp $(LIBS)
+ordtest:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/IBClientBase.o -c $(IB_SRC_DIR)/IBClientBase.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/OrderIB.o   -c $(IB_SRC_DIR)/OrderIB.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(OBJ_DIR)/IBClientBase.o $(OBJ_DIR)/OrderIB.o $(LIBS)
+
+floor:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/IBClientBase.o -c $(IB_SRC_DIR)/IBClientBase.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(IB_INCLUDE) -o $(OBJ_DIR)/floor.o   -c $(TP_SRC_DIR)/floor.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(OBJ_DIR)/IBClientBase.o $(OBJ_DIR)/floor.o $(LIBS)
 clean:
 	rm -f $(OBJ_DIR)/*.o

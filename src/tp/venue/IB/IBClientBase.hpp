@@ -14,16 +14,12 @@
 
 class ClientBaseImp : public EWrapper {
 public:
-	explicit ClientBaseImp(int to_milli = 1);
+	explicit ClientBaseImp(int to_milli = 0);
 	virtual ~ClientBaseImp();
 
 	bool connect(const char * host, unsigned int port, int clientId);
 	void disconnect() const;
 	bool isConnected() const;
-	void reqMDL1(const char* symbol, int ticker_id);
-	void reqMDL2(const char* symbol, int ticker_id, int numLevel=8);
-	void reqMDTbT(const char* symbol, int ticker_id);
-
 	virtual int processMessages();
 public:
 	// events, replace all

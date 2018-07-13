@@ -9,6 +9,7 @@
 #include <map>
 #include <memory.h>
 #include <string>
+#include <ctype.h>
 /*
  * This is a singleton object providing mapping of
  * IB Contract with the RIC (the Retuers thing from historical)
@@ -25,9 +26,7 @@ public:
 	}
 
 	void makeContract(Contract &con, const char* symbol, const char* curDate=NULL) const {
-	    if (strncmp(symbol, "XAU", 3) == 0) {
-	        makeMetalContract(con, symbol);
-	    } else if (strncmp(symbol, "NYM", 3) == 0) {
+	    if (strncmp(symbol, "NYM", 3) == 0) {
 	        makeNymContract(con, symbol);
 	    } else if (strncmp(symbol, "VIX", 3) == 0) {
 	        makeVixContract(con, symbol, curDate);
@@ -38,7 +37,13 @@ public:
 	    }  else if (strncmp(symbol, "EUX", 3)==0) {
 	    	makeEuxContract(con, symbol);
 	    }  else if (strncmp(symbol, "FX/", 3) == 0) {
-	        makeFxContract(con, symbol+3);
+	    	const char* sym0 = symbol+3;
+		    if ( (strncmp(sym0, "XAU", 3) == 0) ||
+		    	 (strncmp(sym0, "XAG", 3) == 0)) {
+		        makeMetalContract(con, sym0);
+		    } else {
+		    	makeFxContract(con, sym0);
+		    }
 	    } else {
 	    	throw std::runtime_error(std::string("unknown contract: ") + std::string (symbol));
 	    }

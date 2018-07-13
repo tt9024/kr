@@ -21,8 +21,8 @@ def getFday(cl_bar_file, fday = None) :
         fday = datetime.datetime.now().strftime('%Y%m%d')
 
     ti = l1.TradingDayIterator(fday)
-    if ti.weekday() != 4 :
-        print 'not a friday ', fday
+    assert ti.weekday() == 4, 'not a friday '+ fday
+
     ti.prev()
     thuday = ti.yyyymmdd()
     cl=np.genfromtxt(cl_bar_file,delimiter=',')

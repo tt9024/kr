@@ -9,6 +9,7 @@ sym_priority_list_L2=['CL','ES','6E']
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
 future_venues=['NYM','CME','CBT','EUX']
+fx_venues=['FX']
 
 def ibvenue(symbol) :
     for k,v in ven_sym_map.items() :
@@ -81,13 +82,21 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
         while day <= end_date :
             fc=l1fc(symbol, day)
             sday=day
-            while day <= end_date :
+            while day < end_date :
                 ti.next()
                 day=ti.yyyymmdd()
                 fc0=l1fc(symbol, day)
                 if fc != fc0 :
                     break
             eday=day
+            # make sure eday is not more than end_date
+            # if end_date was given as a weekend dates
+            if (eday > end_date) :
+                print 'end_date ', end_date, ' got a weekend date, adjust to ',
+                ti0=l1.TradingDayIterator(eday)
+                eday = ti0.prev().yyyymmdd()
+                print eday
+
             fn=bar_dir+'/'+ibfn(fc,barsec,sday,eday)
             if symbol in ib_sym_special :
                 fc = symbol+fc[-2:]
@@ -146,6 +155,13 @@ def ib_bar_by_file(fn, skip_header) :
     """
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
+
+def get_ib_fx(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=101) :
+    sym = []
+    for v in fx_venues :
+        sym += ven_sym_map[v]
+    get_ib_future(sym, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, bar_path=bar_path,getqt=True,gettrd=False, cid=cid)
+
 
 #################################
 # Just because getting IB history bars

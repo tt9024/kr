@@ -174,7 +174,12 @@ public:
 
     ~TPIB() {
         for (auto q : _book_queue) {
-        	delete(q);
+        	if (q)
+        		delete(q);
+        }
+        for (auto q : _book_queue_l1_to_l2) {
+        	if (q)
+        		delete(q);
         }
     }
 

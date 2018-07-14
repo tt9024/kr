@@ -140,7 +140,7 @@ def launch_sustain() :
             bar_path = dt.strftime('%Y%m%d')
             print 'moving bar files to ', bar_path
             move_bars(bar_path)
-            remove_logs()
+            #remove_logs()
 
 if __name__ == "__main__":
     launch_sustain()

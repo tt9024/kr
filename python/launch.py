@@ -54,8 +54,8 @@ def should_run() :
 def move_bars(bar_path) :
     print 'moving bar files to bar/' + bar_path
     os.system('mkdir -p bar/' + bar_path)
-    os.system('mv *.csv bar/' + bar_path)
-    os.system('mv *.bin bar/' + bar_path)
+    os.system('mv bar/*.csv bar/' + bar_path)
+    os.system('mv bar/*.bin bar/' + bar_path)
 
 def remove_logs() :
     print 'removing log files in ./log/'
@@ -137,7 +137,7 @@ def launch_sustain() :
         dt=datetime.datetime.now()
         wd=dt.weekday()
         if wd == 4 :
-            bar_path = dt.strfile('%Y%m%d')
+            bar_path = dt.strftime('%Y%m%d')
             print 'moving bar files to ', bar_path
             move_bars(bar_path)
             remove_logs()

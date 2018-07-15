@@ -1015,10 +1015,15 @@ public:
 
 class BarLineWriter {
 public:
+    const int bar_micro;
     const std::string bfname;
 
-    explicit BarLineWriter(const char* barfile_name):
-    		bfname(barfile_name), bfp(0), bvol(0),svol(0) {
+    explicit BarLineWriter(const char* barfile_name, int bar_sec=1):
+    		bar_micro((unsigned long long)bar_sec*1000000ULL),
+    		bfname(barfile_name), bfp(0), bvol(0),svol(0),
+			cur_micro(0), bqcnt(0), aqcnt(0), btcnt(0), stcnt(0),
+			ism(0), ism_cum(0), bp(0),ap(0),bsz(0),asz(0),bv(0),sv(0),
+			prev_ism_micro(0) {
     	bfp=fopen(bfname.c_str(), "at+");
     	if (!bfp) {
     		throw std::runtime_error(std::string("fopen error")+bfname);
@@ -1026,7 +1031,7 @@ public:
     }
 
     // new price update
-    void update(const BookDepot& book,time_t this_sec) {
+    void update_old(const BookDepot& book,time_t this_sec) {
     	Quantity bs=0, as=0;
     	Price bp, ap;
     	bp=book.getBid(&bs);
@@ -1046,10 +1051,78 @@ public:
 				(long long) utils::TimeUtil::cur_time_micro());
     }
 
-    void reset() {
-    	bvol=0;
-    	svol=0;
+    // new price update
+    void update(const BookDepot& book,uint64_t this_micro) {
+    	switch (book.update_type) {
+    	case 2 : {
+    		// trade update
+        	bv=0,sv=0;
+        	if (bvol*svol != 0) {
+        		bv=book.bvol_cum-bvol;
+        		sv=book.svol_cum-svol;
+        		// guard against restart
+        		if (bv<0) bv=0;
+        		if (sv<0) sv=0;
+        	}
+        	bvol=book.bvol_cum;
+        	svol=book.svol_cum;
+        	if (bv > 0) {
+        		++btcnt;
+        	}
+        	if (sv > 0) {
+        		++stcnt;
+        	}
+        	break;
+    	};
+    	case 0 : {
+			bp=book.getBid(&bsz);
+			++bqcnt;
+			break;
+    	}
+    	case 1 : {
+			ap=book.getBid(&asz);
+			++aqcnt;
+			break;
+    	}
+    	default :
+    		logError("unknown book update type %d!", (int)book.update_type);
+    	}
+    	if (__builtin_expect(cur_micro == 0, 0)) {
+    		if ( bp*ap*bsz*asz == 0 ) {
+    			return;
+    		}
+    		// first update, initialize the states
+    		cur_micro = ((this_micro/bar_micro)+1)*bar_micro;
+    		ism = getISM();
+    		prev_ism_micro = cur_micro - bar_micro;
+    	}
+    	checkin(this_micro);
+    	if (book.update_type != 2) {
+			// since this is a new ism
+			// account for previous ism into ism_cum
+			uint64_t ism_micro = 0;
+			ism_micro = this_micro - prev_ism_micro;
+			ism_cum += ism*ism_micro;
+			prev_ism_micro += ism_micro;
+			ism = getISM();
+    	}
     }
+
+    void checkin(uint64_t this_micro) {
+    	if (__builtin_expect(cur_micro > 0, 1)) {
+    		// check for the second boundary
+    		uint64_t ism_micro = 0;
+    		while (__builtin_expect(this_micro - cur_micro >= 0, 0)) {
+    			ism_micro = cur_micro - prev_ism_micro;
+    			prev_ism_micro = cur_micro;
+    			cur_micro += bar_micro;
+        		ism_cum += ism*ism_micro;
+        		writeBarLine();
+        		reset();
+    		}
+    	}
+    }
+
 
     void flush() const {
     	fflush(bfp);
@@ -1065,6 +1138,34 @@ public:
 private:
     FILE* bfp;
     Quantity bvol, svol;
+    uint64_t cur_micro;
+    int bqcnt, aqcnt, btcnt, stcnt;
+    Price ism, ism_cum;
+    // state of previous book
+    Price bp,ap;
+    Quantity bsz,asz,bv,sv;
+    uint64_t prev_ism_micro;
+
+	// in the format of
+    // bar_sec,bsz,bp,asz,ap,buyVol,sellVol,updMicro,bqcnt,aqcnt,btcnt,stcnt,ismTwap
+    void writeBarLine() {
+		fprintf(bfp, "%d, %d, %.7lf, %.7lf, %d, %d, %d, %lld, %d, %d, %d, %d, %.7lf\n",
+				(int) (cur_micro/1000000ULL), bsz,bp,ap,asz,bv,sv,
+				(long long) utils::TimeUtil::cur_time_micro(),
+				bqcnt,aqcnt,btcnt,stcnt,ism_cum/bar_micro);
+    };
+
+    void reset() {
+    	bqcnt=0;
+    	aqcnt=0;
+    	btcnt=0;
+    	stcnt=0;
+    	ism_cum=0;
+    }
+
+    Price getISM() {
+    	return (bp*asz + ap*bsz)/(bsz + asz);
+    }
 
 };
 
@@ -1075,13 +1176,22 @@ public:
 	BarLine(const BookConfig& cfg, int bar_sec) :
 		bcfg(cfg), barsec(bar_sec),
 		bq(cfg,true), br(bq.newReader()),
-		bw(cfg.bfname(barsec).c_str()) {
+		bw(cfg.bfname(barsec).c_str(), bar_sec) {
 	}
-	void update(time_t this_sec) {
+	void update_on_bar(time_t this_sec) {
 		BookDepot book;
 		if (br->getLatestUpdate(book)) {
-			bw.update(book,this_sec);
+			bw.update_old(book,this_sec);
 		}
+	}
+	bool update_continous() {
+		BookDepot book;
+		if (br->getNextUpdate(book)) {
+			bw.update(book,book.update_ts_micro);
+			return true;
+		}
+		bw.checkin(utils::TimeUtil::cur_time_micro());
+		return false;
 	}
 	void flush() const {
 		bw.flush();

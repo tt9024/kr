@@ -37,6 +37,9 @@ l2filetap:
 tickrec:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/tick_recorder.cpp $(LIBS)
 
+tickrec_ext:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/tick_recorder_ext.cpp -lpthread -lrt -lc
+
 tickrecL2:
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(BIN_DIR)/$@ $(BASE_SRC_DIR)/tp/tick_recorder_l2.cpp $(LIBS)
 

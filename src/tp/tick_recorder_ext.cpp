@@ -31,6 +31,7 @@ void sleepApproxBefore(long long next_bar_micro, long long spin_micro=5*1000LL) 
 	}
 }
 
+
 int main() {
 	// read all the l1 symbols and write to bar files
     if ((signal(SIGINT, sig_handler) == SIG_ERR) ||
@@ -47,58 +48,7 @@ int main() {
     // create BookConfig, Book Reader and Bar Writers
     std::vector<BARType*> bws;
     int bsec = plcc_getInt("BarSec");
-    long long next_bar_micro= ((long long)time(NULL)+1)*1000000LL;
 
-    for (const auto& sym : symL1 ) {
-        BookConfig bcfg(sym,"L1");
-        BARType*bw(new BARType(bcfg,bsec));
-        bws.push_back(bw);
-    }
-    BookDepot myBook;
-    //uint64_t start_tm = utils::TimeUtil::cur_time_micro();
-    user_stopped = false;
-    long long fcnt=0;
-    while (!user_stopped) {
-    	sleepApproxBefore(next_bar_micro);
-        while ((long long)utils::TimeUtil::cur_time_micro() < next_bar_micro) {
-            // spin
-        }
-    	for (auto bw : bws) {
-    		bw->update_on_bar((time_t) (next_bar_micro/1000000LL));
-    	}
-    	next_bar_micro+=((long long)bsec*1000000LL);
-    	long long i = fcnt;
-    	for (; i<fcnt+(long long)bws.size(); ++i) {
-    		if ((long long)utils::TimeUtil::cur_time_micro() < next_bar_micro - 10*1000LL)
-    			bws[(i%(long long)bws.size())]->flush();
-    		else
-    			break;
-    	}
-    	fcnt=i;
-    }
-    for (auto bw : bws) {
-    	delete bw;
-    }
-    printf("Done.\n");
-    return 0;
-}
-
-int main_continuous() {
-	// read all the l1 symbols and write to bar files
-    if ((signal(SIGINT, sig_handler) == SIG_ERR) ||
-    	(signal(SIGTERM, sig_handler) == SIG_ERR) )
-    {
-            printf("\ncan't catch SIGINT\n");
-            return -1;
-    }
-    utils::PLCC::instance("tickrec");
-    std::vector<std::string> symL1(plcc_getStringArr("SubL1"));
-    if (symL1.size()<1) {
-    	throw std::runtime_error("No L1 symbol in config");
-    }
-    // create BookConfig, Book Reader and Bar Writers
-    std::vector<BARType*> bws;
-    int bsec = plcc_getInt("BarSec");
     for (const auto& sym : symL1 ) {
         BookConfig bcfg(sym,"L1");
         BARType*bw(new BARType(bcfg,bsec));
@@ -109,6 +59,7 @@ int main_continuous() {
     user_stopped = false;
     long long fcnt=0;
     int idle_cnt = 0;
+
     while (!user_stopped) {
     	bool has_update = false;
     	for (auto bw : bws) {
@@ -121,11 +72,11 @@ int main_continuous() {
     		continue;
     	}
         long long next_bar_micro= (long long)utils::TimeUtil::cur_time_micro();
-    	if (idle_cnt > 40) {
-    		next_bar_micro += 100000ULL;
+    	if (idle_cnt > 10) {
+    		next_bar_micro += 200000ULL;
     	}  else {
-    		if (idle_cnt > 10) {
-    			next_bar_micro += 20000ULL;
+    		if (idle_cnt > 3) {
+    			next_bar_micro += 50000ULL;
     		}
     	}
     	long long i = fcnt;

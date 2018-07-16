@@ -1052,35 +1052,37 @@ public:
     }
 
     // new price update
-    void update(const BookDepot& book,uint64_t this_micro) {
+    void update(const BookDepot& book,int64_t this_micro) {
+    	bp=book.getBid(&bsz);
+    	ap=book.getAsk(&asz);
     	switch (book.update_type) {
     	case 2 : {
     		// trade update
-        	bv=0,sv=0;
+        	Quantity bv0=0,sv0=0;
         	if (bvol*svol != 0) {
-        		bv=book.bvol_cum-bvol;
-        		sv=book.svol_cum-svol;
+        		bv0=book.bvol_cum-bvol;
+        		sv0=book.svol_cum-svol;
         		// guard against restart
-        		if (bv<0) bv=0;
-        		if (sv<0) sv=0;
+        		if (bv0<0) bv0=0;
+        		if (sv0<0) sv0=0;
         	}
         	bvol=book.bvol_cum;
         	svol=book.svol_cum;
-        	if (bv > 0) {
+        	if (bv0 > 0) {
         		++btcnt;
+        		bv+=bv0;
         	}
-        	if (sv > 0) {
+        	if (sv0 > 0) {
         		++stcnt;
+        		sv+=sv0;
         	}
         	break;
     	};
     	case 0 : {
-			bp=book.getBid(&bsz);
 			++bqcnt;
 			break;
     	}
     	case 1 : {
-			ap=book.getBid(&asz);
 			++aqcnt;
 			break;
     	}
@@ -1088,6 +1090,7 @@ public:
     		logError("unknown book update type %d!", (int)book.update_type);
     	}
     	if (__builtin_expect(cur_micro == 0, 0)) {
+    		initFromBook(book);
     		if ( bp*ap*bsz*asz == 0 ) {
     			return;
     		}
@@ -1108,18 +1111,20 @@ public:
     	}
     }
 
-    void checkin(uint64_t this_micro) {
+    void checkin(int64_t this_micro) {
     	if (__builtin_expect(cur_micro > 0, 1)) {
     		// check for the second boundary
     		uint64_t ism_micro = 0;
-    		while (__builtin_expect(this_micro - cur_micro >= 0, 0)) {
-    			ism_micro = cur_micro - prev_ism_micro;
-    			prev_ism_micro = cur_micro;
-    			cur_micro += bar_micro;
-        		ism_cum += ism*ism_micro;
-        		writeBarLine();
-        		reset();
-    		}
+			if (__builtin_expect(this_micro - cur_micro >= 0, 0)) {
+				while (this_micro - cur_micro >= 0) {
+					ism_micro = cur_micro - prev_ism_micro;
+					ism_cum += ism*ism_micro;
+					writeBarLine();
+					prev_ism_micro = cur_micro;
+					cur_micro += bar_micro;
+					reset();
+				}
+			};
     	}
     }
 
@@ -1138,13 +1143,13 @@ public:
 private:
     FILE* bfp;
     Quantity bvol, svol;
-    uint64_t cur_micro;
+    int64_t cur_micro;
     int bqcnt, aqcnt, btcnt, stcnt;
     Price ism, ism_cum;
     // state of previous book
     Price bp,ap;
     Quantity bsz,asz,bv,sv;
-    uint64_t prev_ism_micro;
+    int64_t prev_ism_micro;
 
 	// in the format of
     // bar_sec,bsz,bp,asz,ap,buyVol,sellVol,updMicro,bqcnt,aqcnt,btcnt,stcnt,ismTwap
@@ -1161,6 +1166,15 @@ private:
     	btcnt=0;
     	stcnt=0;
     	ism_cum=0;
+    	bv=0;
+    	sv=0;
+    }
+
+    void initFromBook(const BookDepot& book) {
+    	bvol=book.bvol_cum;
+    	svol=book.svol_cum;
+    	bp=book.getBid(&bsz);
+    	ap=book.getAsk(&asz);
     }
 
     Price getISM() {
@@ -1177,6 +1191,11 @@ public:
 		bcfg(cfg), barsec(bar_sec),
 		bq(cfg,true), br(bq.newReader()),
 		bw(cfg.bfname(barsec).c_str(), bar_sec) {
+
+		// refresh the book queue to only
+		// cares about the latest
+		BookDepot book;
+		br->getLatestUpdateAndAdvance(book);
 	}
 	void update_on_bar(time_t this_sec) {
 		BookDepot book;

@@ -1037,12 +1037,14 @@ public:
     	bp=book.getBid(&bs);
     	ap=book.getAsk(&as);
     	Quantity bv=0,sv=0;
-    	if (bvol*svol != 0) {
+    	if (bvol+svol != 0) {
     		bv=book.bvol_cum-bvol;
     		sv=book.svol_cum-svol;
     		// guard against restart
-    		if (bv<0) bv=0;
-    		if (sv<0) sv=0;
+    		if (bv<0||sv<0) {
+    			bv=0;
+    			sv=0;
+    		}
     	}
     	bvol=book.bvol_cum;
     	svol=book.svol_cum;
@@ -1059,12 +1061,14 @@ public:
     	case 2 : {
     		// trade update
         	Quantity bv0=0,sv0=0;
-        	if (bvol*svol != 0) {
+        	if (__builtin_expect(bvol+svol != 0, 1)) {
         		bv0=book.bvol_cum-bvol;
         		sv0=book.svol_cum-svol;
         		// guard against restart
-        		if (bv0<0) bv0=0;
-        		if (sv0<0) sv0=0;
+        		if (__builtin_expect(bv0<0||sv0<0, 0)) {
+        			bv0=0;
+            		sv0=0;
+        		}
         	}
         	bvol=book.bvol_cum;
         	svol=book.svol_cum;

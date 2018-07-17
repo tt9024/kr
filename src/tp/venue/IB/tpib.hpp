@@ -25,6 +25,7 @@
 namespace tp {
 typedef BookQ<utils::ShmCircularBuffer> IBBookQType;
 typedef IBBookQType::Writer BookWriter;
+typedef IBBookQType::Reader BookReader;
 
 class TPIB : public ClientBaseImp {
 private:
@@ -36,7 +37,15 @@ private:
     int _port;
     std::vector<IBBookQType*> _book_queue;
     std::vector<IBBookQType*> _book_queue_l1_to_l2;
+    BookReader* _book_reader;  // the first L2 (or L1 if no L2) symbol
+                               // for health check.  IB have problem with
+                               // L2 subscription after mid night restart.
+                               // No error can be detected so far.
+    std::string _book_reader_sym; // the symbol for logging purpose
     volatile bool _should_run;
+    int64_t _last_check_micro;  // this is used to guard against no any update
+                                // and therefore cannot get the upd_micro
+                                // initialized to start up micro
     void md_subscribe(const std::vector<std::string>&symL1,
 					  const std::vector<std::string>&symL2) {
     	// want live data
@@ -53,7 +62,19 @@ private:
         for (const auto& s : symL2) {
         	auto bp = new IBBookQType(BookConfig(s,"L2"),false);
         	_book_queue.push_back(bp);
+        	if (!_book_reader) {
+        		// get the first L2 symbol, usually CL, ES or 6E
+        		// should be liquid enough to be able to tell
+        		_book_reader = bp->newReader();
+        		_book_reader_sym = symL2[0];
+        	}
             reqMDL2(s.c_str(), _next_tickerid++);
+        }
+
+        if ((!_book_reader) && (_book_queue.size() > 0)) {
+        	// no L2, use L1
+        	_book_reader = _book_queue[0]->newReader();
+        	_book_reader_sym = symL1[0];
         }
 
         // for L1 to L2 queue
@@ -74,6 +95,41 @@ private:
         		_book_queue_l1_to_l2.push_back(NULL);
         	}
         }
+    }
+
+    bool checkL2(int64_t stale_micro = 60*1000*1000LL) {
+
+    	// check if the first L2 queue has
+    	// any quote update for the last 1 minutes
+    	// this is necessary since IB's mid-night restart
+    	// usually throws L2 subscriptions off, no error logs...
+
+    	if (__builtin_expect(!_book_reader, 0))
+    		return true;
+
+    	int64_t cur_micro =  utils::TimeUtil::cur_time_gmt_micro();
+    	BookDepot book;
+    	// be careful here:
+    	// since the L2 will be updated by the L1 trade, so
+    	// the book update micro is not reliable to tell
+    	// if the L2 quote has been updated for the previous stale period.
+    	// So the quote update time at bid[0] and ask[0] is used instead.
+    	// One more catch: upon starting, the latest update may be from
+    	// previous run, so it will make it stale right way.
+    	// So the very first read shouldn't be from quote. And subsequent
+    	// checks cannot the time to go back.
+    	if (__builtin_expect(_book_reader->getLatestUpdate(book),1)) {
+    		int64_t upd_micro = getMax(book.pe[0].ts_micro, book.pe[BookLevel].ts_micro);
+    		_last_check_micro = getMax(upd_micro, _last_check_micro);
+    	}
+
+    	if (__builtin_expect(_last_check_micro < cur_micro-stale_micro, 0)) {
+    		logError("IBTP book %s not updated for %d seconds. Last updated at %d",
+    				_book_reader_sym.c_str(),
+    				(int)(stale_micro/1000000LL), (int)(_last_check_micro/1000000LL));
+    		return false;
+    	}
+    	return true;
     }
 
 	void reqMDL2(const char* symbol, int ticker_id, int numLevel=BookLevel) {
@@ -120,7 +176,9 @@ public:
     		_symL1(plcc_getStringArr("SubL1")),
 			_symL2(plcc_getStringArr("SubL2")),
 			_next_tickerid(TickerStart),
-			_ipAddr("127.0.0.1"), _port(0), _should_run(false) {
+			_ipAddr("127.0.0.1"), _port(0),
+			_book_reader(NULL), _should_run(false),
+			_last_check_micro(0) {
         bool found1, found2;
         _ipAddr = plcc_getString("IBClientIP", &found1, "127.0.0.1");
         _port = plcc_getInt("IBClientPort", &found2, 0);
@@ -159,8 +217,19 @@ public:
             }
             md_subscribe();
             // enter into the main loop
+            const int64_t stale_micro = 30*1000*1000LL;
+            _last_check_micro = utils::TimeUtil::cur_time_gmt_micro();
+            uint64_t check_micro =  _last_check_micro + stale_micro/2;
             while (isConnected() && _should_run) {
             	processMessages();
+            	if (utils::TimeUtil::cur_time_gmt_micro() > check_micro) {
+            		if (__builtin_expect(!checkL2(stale_micro), 0)) {
+            			disconnect();
+            			_should_run = false;
+            			break;
+            		}
+            		check_micro += stale_micro/2;
+            	}
             }
             logInfo("TPIB disconnected.");
         }

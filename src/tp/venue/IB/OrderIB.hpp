@@ -345,7 +345,7 @@ public :
 				"OrdId(%ld), lastLiq(%d), time(%s)",
 				execution.price,
 				execution.shares,
-				reqId, contract.symbol.c_str(),
+				contract.symbol.c_str(),
 				reqId,
 				execution.execId.c_str(),
 				execution.orderId,

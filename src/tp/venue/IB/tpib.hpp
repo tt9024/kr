@@ -48,9 +48,9 @@ private:
                                 // initialized to start up micro
     void md_subscribe(const std::vector<std::string>&symL1,
 					  const std::vector<std::string>&symL2) {
+    	clearBookQueue();
     	// want live data
     	m_pClient->reqMarketDataType(1);
-
     	// L1
         for (const auto& s : symL1) {
         	auto bp = new IBBookQType(BookConfig(s,"L1"),false);
@@ -241,15 +241,26 @@ public:
         _should_run = false;
     }
 
-    ~TPIB() {
+    void clearBookQueue() {
         for (auto q : _book_queue) {
         	if (q)
         		delete(q);
         }
+        _book_queue.clear();
         for (auto q : _book_queue_l1_to_l2) {
         	if (q)
         		delete(q);
         }
+        _book_queue_l1_to_l2.clear();
+        if (_book_reader) {
+        	delete _book_reader;
+        	_book_reader = NULL;
+        }
+        _book_reader_sym = "";
+    }
+
+    ~TPIB() {
+    	clearBookQueue();
     }
 
     // Market Data Stuff

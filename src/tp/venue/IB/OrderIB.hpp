@@ -298,6 +298,7 @@ public :
 		logInfo( "OpenOrderEnd");
 		_should_cancel = false;
 	}
+	//! [openorderend]
 
 	void cancelAllOpen() {
 		if (isConnected()) {
@@ -311,18 +312,44 @@ public :
 		}
 	}
 
-	//! [openorderend]
+	void ListOpen() {
+		_should_cancel = false;
+		m_pClient->reqAllOpenOrders();
+		logInfo("OpenOrderStart");
+	}
+
+	void reqPositions() {
+		// this will initiates position reporting on existing positions
+		// and then continue as it changes
+		if(isConnected()) {
+			logInfo("requesting positions ");
+			m_pClient->reqPositions();
+		}
+	}
+
+	//! [position]
+	void position( const std::string& account, const Contract& contract, double position, double avgCost) {
+		logInfo( "Position. %s - Symbol: %s, Position: %d, SecType: %s, Currency: %s, Avg Cost: %g",
+				account.c_str(), contract.symbol.c_str(), (int)position, contract.secType.c_str(), contract.currency.c_str(), avgCost);
+	}
+	//! [position]
+
+	//! [positionend]
+	void positionEnd() {
+		logInfo( "PositionEnd");
+	}
 
 	//! [execdetails]
 	void execDetails( int reqId, const Contract& contract, const Execution& execution) {
-		logInfo( "ExecDetails. ReqId(%d) symbol(%s) execid(%s), "
-				"Ord(%ld), shares(%f), lastLiq(%d), px(%.7f), time(%s)",
+		logInfo( "ExecDetails. px(%.7f), shares(%f), symbol(%s), ReqId(%d), execid(%s), "
+				"OrdId(%ld), lastLiq(%d), time(%s)",
+				execution.price,
+				execution.shares,
 				reqId, contract.symbol.c_str(),
+				reqId,
 				execution.execId.c_str(),
 				execution.orderId,
-				execution.shares,
 				execution.lastLiquidity,
-				execution.price,
 				execution.time.c_str());
 	}
 	//! [execdetails]

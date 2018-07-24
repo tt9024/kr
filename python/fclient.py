@@ -25,7 +25,7 @@ def getFday(cl_bar_file, fday = None) :
 
     ti.prev()
     thuday = ti.yyyymmdd()
-    cl=np.genfromtxt(cl_bar_file,delimiter=',')
+    cl=np.genfromtxt(cl_bar_file,delimiter=',',usecols=[0,1,2,3,4])
     t0=l1.TradingDayIterator.local_ymd_to_utc(thuday,4,45)
     t1=l1.TradingDayIterator.local_ymd_to_utc(thuday,6,15)
     t2=l1.TradingDayIterator.local_ymd_to_utc(thuday,16,55)

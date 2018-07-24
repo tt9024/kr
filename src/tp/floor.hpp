@@ -239,6 +239,15 @@ int FloorServer<FLOOR>::run_cmd(const char* cmd) {
 		_flr.stop();
 		_flr._should_run = false;
 		return 0;
+	case 'X':
+		_order->cancelAllOpen();
+		return 0;
+	case 'O':
+		_order->ListOpen();
+		return 0;
+	case 'P':
+		_order->reqPositions();
+		return 0;
 	default:
 		logError("unknown command: %s", cmd);
 		return -1;

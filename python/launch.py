@@ -110,9 +110,24 @@ def launch(p) :
 
 def launch_sustain() :
     alive = False
-    if not should_run() :
+    dtnow = datetime.datetime.now()
+    if not should_run() and dtnow.weekday() != 6 :
         print 'launched in a bad time with should_run() false, doing nothing'
         return
+    while dtnow.weekday() == 6 and not should_run() :
+        utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
+        utcstart=l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
+                '%Y%m%d'), 17, 59, 59)
+        print 'wait for Sunday open...', utcnow, utcstart, utcstart-utcnow
+        time.sleep(utcstart-utcnow)
+        dtnow = datetime.datetime.now()
+        utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
+        print 'spining for start', utcnow
+        while utcnow <= utcstart :
+            dtnow = datetime.datetime.now()
+            utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
+            #time.sleep( float((1000000-utcnow.microsecond)/1000)/1000.0 )
+        print 'starting on', utcnow
     while should_run() : 
         if is_in_daily_trading() :
             if not alive :

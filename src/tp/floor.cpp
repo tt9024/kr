@@ -33,9 +33,11 @@ Floor::Floor() :  _order(0), _server(0) {
 Floor::~Floor() {
 	logInfo("Floor Destructor stop()");
 	stop();
-	delete _order;
+	if (_order)
+		delete _order;
 	_order = NULL;
-	delete _server;
+	if (_server)
+		delete _server;
 	_server = NULL;
 }
 
@@ -48,11 +50,15 @@ bool Floor::start(int max_try, bool cancel_all_open) {
 	}
 	*/
 	logInfo("Floor starting order");
-	if (!_order)
-		_order=new OrderType(_client_id, _ipAddr.c_str(), _port);
+	if (_order) {
+		logInfo("deleting existing order instance");
+		delete _order;
+		sleep(2);
+		_order = NULL;
+	}
+	_order=new OrderType(_client_id, _ipAddr.c_str(), _port);
 	if (!_order->tryConnect(max_try, cancel_all_open)) {
 		logError("Floor Order connection failed!");
-		delete _order;
 		return false;
 	}
 	return true;
@@ -92,7 +98,11 @@ void Floor::run() {
 	start(300, false);
 	while(_should_run) {
 		if (__builtin_expect(!_order->isConnected(),0)) {
-			start(30, false);
+			if (!start(30, false)) {
+				logInfo("wait for 1 second and retry ");
+				sleep(1);
+				continue;
+			}
 		}
 		if (__builtin_expect(!_server->poll(), 0)) {
 			bounce(true);

@@ -272,3 +272,18 @@ def bar_file_cleanup(sym, hist_dir='hist') :
     else :
         print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
 
+def get_l1_bar(fn) :
+    """
+    1532408276, 24, 67.6100000, 67.6200000, 11, 0, 0, 1532408276000000, 1, 1, 0, 0, 67.6166726 
+    parse such bars into a l1/l2 repo ...
+    """
+    pass
+
+def get_l2_bar(fn) :
+    """
+    The file is a binary dump of bookdepot object.
+    Read the huge object in with timeseries of 20 levels + trade
+    extract some intermediate features for study.
+    """
+    pass
+

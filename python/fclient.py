@@ -15,6 +15,43 @@ class FloorClient :
         self.cl.send(cmdline)
         return self.cl.recv(1024);
 
+    def p(self) :
+        return self.run('P')
+
+    def x(self) :
+        return self.run('X')
+
+    def o(self) :
+        return self.run('O')
+
+class AssetTrader :
+    def __init__(self, fc, symbol) :
+        self.fc = fc
+        self.symbol=symbol
+
+    def b0(self, v=1) :
+        return self.fc.run('B ' + self.symbol + ' ' + str(v) + ' b+s0')
+
+    def b1(self, v=1) :
+        return self.fc.run('B ' + self.symbol + ' ' + str(v) + ' b+s1')
+
+    def s0(self, v=1) :
+        return self.fc.run('S ' + self.symbol + ' ' + str(v) + ' a-s0')
+
+    def s1(self, v=1) :
+        return self.fc.run('S ' + self.symbol + ' ' + str(v) + ' a-s1')
+
+    def r(self, cmd) :
+        return self.fc.run(cmd)
+
+    def p(self) :
+        return self.fc.run('P')
+
+    def x(self) :
+        return self.fc.run('X')
+
+    def o(self) :
+        return self.fc.run('O')
 
 def getFday(cl_bar_file, fday = None) :
     if fday is None :

@@ -3,12 +3,21 @@ import os
 import datetime
 import numpy as np
 
-ven_sym_map={'NYM':['CL','NG','HO','RB','GC','SI','HG'],'CME':['ES','6A','6C','6E','6B','6J','6N','6R','6Z','6M'],'CBT':['ZB','ZN','ZF','ZC'],'EUX':['FDX','STXE','FGBX','FGBL','FGBS','FGBM'],'FX':['AUD.CAD','AUD.JPY','AUD.NZD','CAD.JPY','EUR.AUD','EUR.CAD','EUR.CHF','EUR.GBP','EUR.JPY','EUR.NOK','EUR.SEK','EUR.TRY','EUR.ZAR','GBP.CHF','GBP.JPY','NOK.SEK','NZD.JPY','EUR.USD','USD.ZAR','USD.TRY','USD.MXN','USD.CNH','XAU.USD','XAG.USD']}
+ven_sym_map={'NYM':['CL','NG','HO','RB','GC','SI','HG'], \
+             'CME':['ES','6A','6C','6E','6B','6J','6N','6R','6Z','6M'],\
+             'CBT':['ZB','ZN','ZF','ZC'],\
+             'EUX':['FDX','STXE','FGBX','FGBL','FGBS','FGBM'],\
+             'FX' :['AUD.CAD','AUD.JPY','AUD.NZD','CAD.JPY','EUR.AUD',\
+                    'EUR.CAD','EUR.CHF','EUR.GBP','EUR.JPY','EUR.NOK',\
+                    'EUR.SEK','EUR.TRY','EUR.ZAR','GBP.CHF','GBP.JPY',\
+                    'NOK.SEK','NZD.JPY','EUR.USD','USD.ZAR','USD.TRY',\
+                    'USD.MXN','USD.CNH','XAU.USD','XAG.USD'],\
+             'ICE':['LCO']};
 sym_priority_list=['CL','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM']
 sym_priority_list_L2=['CL','ES','6E']
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
-future_venues=['NYM','CME','CBT','EUX']
+future_venues=['NYM','CME','CBT','EUX','ICE']
 fx_venues=['FX']
 
 def ibvenue(symbol) :

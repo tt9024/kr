@@ -44,7 +44,10 @@ public:
 		    } else {
 		    	makeFxContract(con, sym0);
 		    }
-	    } else {
+	    } else if (strncmp(symbol, "ICE", 3) == 0) {
+	    	makeIceContract(con, symbol);
+	    }
+	    else {
 	    	throw std::runtime_error(std::string("unknown contract: ") + std::string (symbol));
 	    }
 	}
@@ -100,6 +103,20 @@ private:
 	    con.exchange = "NYMEX";
 	    con.secType = "FUT";
 	    con.localSymbol = std::string(symbol+4, 4);
+	    con.includeExpired = true;
+	}
+
+	// ICE/LCOU8
+	void makeIceContract(Contract &con, const char* symbol) const {
+		if (strncmp(symbol+4,"LCO", 3) == 0) {
+			con.symbol = "COIL";
+		} else {
+			throw std::runtime_error("unknown symbol for ICE");
+		}
+	    con.currency = "USD";
+	    con.exchange = "IPE";
+	    con.secType = "FUT";
+	    con.localSymbol = std::string("COIL") + std::string(symbol+7, 2);
 	    con.includeExpired = true;
 	}
 

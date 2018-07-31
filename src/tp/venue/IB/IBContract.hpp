@@ -110,13 +110,17 @@ private:
 	void makeIceContract(Contract &con, const char* symbol) const {
 		if (strncmp(symbol+4,"LCO", 3) == 0) {
 			con.symbol = "COIL";
+		} else if (strncmp(symbol+4,"LFU", 3) == 0) {
+			con.symbol = "GOIL";
+		} else if (strncmp(symbol+4,"LOU", 3) == 0) {
+			con.symbol = "HOIL";
 		} else {
 			throw std::runtime_error("unknown symbol for ICE");
 		}
 	    con.currency = "USD";
 	    con.exchange = "IPE";
 	    con.secType = "FUT";
-	    con.localSymbol = std::string("COIL") + std::string(symbol+7, 2);
+	    con.localSymbol = con.symbol + std::string(symbol+7, 2);
 	    con.includeExpired = true;
 	}
 

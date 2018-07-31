@@ -29,9 +29,9 @@ def is_in_daily_trading() :
     wd=dt.weekday()
     if wd < 4:
         #return l1.tradinghour(dt) 
-        return dt.hour != 17
+        return dt.hour != 17 or dt.minute < 55
     if wd == 4 :
-        return dt.hour < 17
+        return dt.hour <= 17
     if wd == 5 :
         return False
     if wd == 6 :

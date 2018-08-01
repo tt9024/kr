@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
+#include <algorithm>
 
 typedef tp::L2DeltaWriter<utils::ShmCircularBuffer> L2Type;
 volatile bool user_stopped = false;
@@ -39,6 +40,18 @@ int main() {
         L2Type* dw(new L2Type(bcfg));
         dws.push_back(dw);
     }
+
+    // adding the L1 queues to write
+    std::vector<std::string> symL1(plcc_getStringArr("SubL1"));
+    for (const auto& sym : symL1 ) {
+    	if (std::find(symL2.begin(), symL2.end(), sym) != symL2.end()) {
+    		continue;
+    	}
+        tp::BookConfig bcfg(sym,"L1");
+        L2Type* dw(new L2Type(bcfg));
+        dws.push_back(dw);
+    }
+
     //uint64_t start_tm = utils::TimeUtil::cur_time_micro();
     user_stopped = false;
 	unsigned int runCnt = 0;

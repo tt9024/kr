@@ -77,7 +77,7 @@ def update_ib_config(symlistL1=sym_priority_list,symlistL2=sym_priority_list_L2,
             f.writelines(txt)
     return symL1, symL2
 
-def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist',getqt=True,gettrd=False, cid=100) :
+def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist',getqt=True,gettrd=False, cid=100, start_hour = -6, end_hour = 17) :
     step_sec=barsec_dur[barsec]
     for symbol in symbol_list :
         venue=ibvenue(symbol)
@@ -134,8 +134,8 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
             try :
                 while d0 <= eday and d0 <= end_date :
                     # get for day d0
-                    utc0=tic.to_local_utc(-6,0,0)
-                    utc1=tic.to_local_utc(17,0,0)
+                    utc0=tic.to_local_utc(start_hour,0,0)
+                    utc1=tic.to_local_utc(end_hour,0,0)
                     while utc0 < utc1 :
                         # get for quote and trade for end_time as utc
                         utc0+=step_sec

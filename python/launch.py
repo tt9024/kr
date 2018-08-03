@@ -57,6 +57,8 @@ def move_bars(bar_path) :
     os.system('mkdir -p bar/' + bar_path)
     os.system('mv bar/*.csv bar/' + bar_path)
     os.system('mv bar/*.bin bar/' + bar_path)
+    # gzip 
+    os.system('gzip bar/'+bar_path+'/*')
 
 def remove_logs() :
     print 'removing log files in ./log/'

@@ -22,18 +22,38 @@ void sig_handler(int signo)
 }
 
 int main(int argc, char**argv) {
-    if (argc < 2) {
-        printf("Usage: %s symbol [tail]\n", argv[0]);
+    if (argc != 4) {
+        printf("Usage: %s symbol [L2|L1|L1n] [full|tail]\n", argv[0]);
         printf("\nL2 subscriptions: ");
         std::vector<std::string> l2 = plcc_getStringArr("SubL2");
         for (auto s : l2) {
         	printf(" %s ", s.c_str());
         }
+        printf("\nL1 subscriptions: ");
+        std::vector<std::string> l1 = plcc_getStringArr("SubL1");
+        for (auto s : l1) {
+        	printf(" %s ", s.c_str());
+        }
+        printf("\nL1n subscriptions: ");
+        std::vector<std::string> l1n = plcc_getStringArr("SubL1n");
+        for (auto s : l1n) {
+        	printf(" %s ", s.c_str());
+        }
         printf("\n");
         return 0;
     }
+    std::string bt;
+    bool next_contract = false;
+    if (strcmp(argv[2], "L2") == 0) {
+    	bt = "L2";
+    } else if (strcmp(argv[2], "L1") == 0) {
+    	bt = "L1";
+    } else if (strcmp(argv[2], "L1n") == 0) {
+    	bt = "L1";
+    	next_contract = true;
+    }
     bool tail = false;
-    if (argc>2 && strcmp(argv[2], "tail")==0) {
+    if (argc>2 && strcmp(argv[3], "tail")==0) {
     	tail = true;
     }
     if (signal(SIGINT, sig_handler) == SIG_ERR)
@@ -42,7 +62,7 @@ int main(int argc, char**argv) {
             return -1;
     }
     utils::PLCC::instance("L2Reader");
-    BookConfig bcfg(argv[1],"L2");
+    BookConfig bcfg(argv[1],bt,next_contract);
     L2DeltaReader reader(bcfg, tail);
     user_stopped = false;
     const BookDepot* book;

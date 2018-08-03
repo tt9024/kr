@@ -204,6 +204,22 @@ public:
        gettimeofday(&tv, NULL);
        return (unsigned long long)tv.tv_sec*1000000ULL + (unsigned long long) tv.tv_usec;
    }
+
+   static int utc_to_local_ymdh(time_t utc, int*day=NULL, int*month=NULL, int*year=NULL)
+   {
+	   struct tm t;
+	   if (localtime_r(&utc, &t)) {
+		   if (day)
+			   *day = t.tm_mday;
+		   if (month)
+			   *month = t.tm_mon;
+		   if (year)
+			   *year = t.tm_year;
+		   return t.tm_hour;
+	   }
+	   throw std::runtime_error("invalid utc");
+   }
+
 };
 
 }

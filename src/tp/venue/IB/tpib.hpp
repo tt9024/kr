@@ -30,7 +30,8 @@ typedef IBBookQType::Reader BookReader;
 class TPIB : public ClientBaseImp {
 private:
     int _client_id;
-    const std::vector<std::string> _symL1;
+    const std::vector<std::string> _symL1; // the front contract l1 symbols
+    const std::vector<std::string> _symL1n;// the back contract l1 symbols
     const std::vector<std::string> _symL2;
     int _next_tickerid;
     std::string _ipAddr;
@@ -46,12 +47,12 @@ private:
     int64_t _last_check_micro;  // this is used to guard against no any update
                                 // and therefore cannot get the upd_micro
                                 // initialized to start up micro
-    void md_subscribe(const std::vector<std::string>&symL1,
+    void md_subscribe(const std::vector<std::string>&symL1,  // includes both l1 front and back contracts
 					  const std::vector<std::string>&symL2) {
     	clearBookQueue();
     	// want live data
     	m_pClient->reqMarketDataType(1);
-    	// L1
+    	// L1, including the front and back contracts
         for (const auto& s : symL1) {
         	auto bp = new IBBookQType(BookConfig(s,"L1"),false);
         	_book_queue.push_back(bp);
@@ -81,6 +82,7 @@ private:
         // indexed by L1 symbol, with the pointer to L2 book queue
         // used for updating trades from L1 to L2 book queues
         // this is needed as L2 subscription doesn't have trade from IB
+        // it is indexed as the same as the L1 queue
         for (size_t l1 = 0; l1<symL1.size(); ++l1) {
         	const auto& s = symL1[l1];
         	size_t l2 = 0;
@@ -108,6 +110,13 @@ private:
     		return true;
 
     	int64_t cur_micro =  utils::TimeUtil::cur_time_gmt_micro();
+
+    	// disable checking on hours of 17, 18
+    	int hour = utils::TimeUtil::utc_to_local_ymdh(cur_micro/1000000);
+    	if (hour == 17 || hour == 18) {
+    		return true;
+    	}
+
     	BookDepot book;
     	// be careful here:
     	// since the L2 will be updated by the L1 trade, so
@@ -174,6 +183,7 @@ public:
     explicit TPIB (int client_id = 0) :
     		_client_id(client_id?client_id:plcc_getInt("TPIBClientId")),
     		_symL1(plcc_getStringArr("SubL1")),
+    		_symL1n(plcc_getStringArr("SubL1n")),
 			_symL2(plcc_getStringArr("SubL2")),
 			_next_tickerid(TickerStart),
 			_ipAddr("127.0.0.1"), _port(0),
@@ -197,7 +207,11 @@ public:
     }
 
     void md_subscribe() {
-    	md_subscribe(_symL1,_symL2);
+    	std::vector<std::string> syml1 = _symL1;
+    	for (const auto& s : _symL1n) {
+    		syml1.push_back(s);
+    	}
+    	md_subscribe(syml1,_symL2);
     }
 
     // connect to venue

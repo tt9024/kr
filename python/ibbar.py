@@ -14,7 +14,9 @@ ven_sym_map={'NYM':['CL','NG','HO','RB','GC','SI','HG'], \
                     'USD.MXN','USD.CNH','XAU.USD','XAG.USD'],\
              'ICE':['LCO','LFU','LOU']};
 sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM','LFU','LOU']
+#sym_priority_list_L2=['CL','LCO','ES']
 sym_priority_list_L2=['CL','LCO','ES','6E','ZN','GC']
+sym_priority_list_l1_next=['CL', 'LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB']
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
 future_venues=['NYM','CME','CBT','EUX','ICE']
@@ -29,20 +31,30 @@ def ibvenue(symbol) :
 def ibfn(symbol,barsec,sday,eday) :
     return symbol+'_'+sday+'_'+eday+'_'+str(barsec)+'S'
 
-def l1fc(sym,day) :
+def l1fc(sym,day,next_contract=False) :
     if ibvenue(sym) in future_venues :
-        fc=l1.FC(sym,day)
+        if not next_contract :
+            fc=l1.FC(sym,day)
+        else :
+            fc=l1.FC_next(sym,day)[0]
     else :
         fc = sym
     return fc
 
-def ibfc(sym,day) :
-    fc = l1fc(sym,day)
+def ibfc(sym,day,next_contract=False) :
+    fc = l1fc(sym,day,next_contract=next_contract)
     if sym in ib_sym_special :
         fc=sym+fc[-2:]
     return ibvenue(sym)+'/'+fc
 
-def update_ib_config(symlistL1=sym_priority_list,symlistL2=sym_priority_list_L2,day=None, cfg_file=None) :
+def get_start_end_hour(venue) :
+    # start on previous day's 18, end on 17, 
+    # except ICE, starts from 20 to 18
+    if venue == 'ICE' :
+        return -4, 18
+    return -6, 17
+
+def update_ib_config(symlistL1=sym_priority_list,symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2,day=None, cfg_file=None) :
     if symlistL1 is None :
         # everything in ven_sym_map
         symlistL1 = []
@@ -52,9 +64,13 @@ def update_ib_config(symlistL1=sym_priority_list,symlistL2=sym_priority_list_L2,
     if day is None :
         day=datetime.datetime.now().strftime('%Y%m%d')
     symL1=[]
+    symL1n=[]
     symL2=[]
     for s in symlistL1 :
         symL1.append(ibfc(s,day))
+    # the next contracts
+    for s in symlistL1next :
+        symL1n.append(ibfc(s,day,next_contract=True))
     for s in symlistL2 :
         symL2.append(ibfc(s,day))
 
@@ -66,7 +82,13 @@ def update_ib_config(symlistL1=sym_priority_list,symlistL2=sym_priority_list_L2,
             f.seek(0)
             txt=f.read(sz).split('\n')
             for i,t in enumerate(txt) :
-                if t[:5]=='SubL1':
+                ####
+                ## This is very tricky as SubL1 is a substring of SubL1n
+                ## So the sequence is important!
+                ####
+                if t[:6]=='SubL1n' :
+                    txt[i]=('SubL1n = ' + '%s'%(symL1n)).replace('\'','')
+                elif t[:5]=='SubL1':
                     txt[i]=('SubL1 = ' + '%s'%(symL1)).replace('\'','')
                 elif t[:5]=='SubL2' :
                     txt[i]=('SubL2 = ' + '%s'%(symL2)).replace('\'','')
@@ -75,9 +97,9 @@ def update_ib_config(symlistL1=sym_priority_list,symlistL2=sym_priority_list_L2,
 
         with open(cfg_file,'w') as f :
             f.writelines(txt)
-    return symL1, symL2
+    return symL1, symL2, symL1n
 
-def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist',getqt=True,gettrd=False, cid=100, start_hour = -6, end_hour = 17) :
+def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist',getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False) :
     step_sec=barsec_dur[barsec]
     for symbol in symbol_list :
         venue=ibvenue(symbol)
@@ -85,11 +107,20 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
             bar_dir = bar_path+'/FX'
         else :
             bar_dir = bar_path+'/'+symbol
+        if next_contract :
+            bar_dir += '/nc'
         os.system(' mkdir -p ' + bar_dir)
+
+        if len(start_end_hour) != 2 :
+            start_hour, end_hour = get_start_end_hour(venue)
+        else :
+            start_hour, end_hour = start_end_hour
+
         ti = l1.TradingDayIterator(start_date)
         day=ti.yyyymmdd()
         while day <= end_date :
             fc=l1fc(symbol, day)
+            fcn=l1fc(symbol,day,next_contract=True)
             sday=day
             while day <= end_date :
                 ti.next()
@@ -106,6 +137,8 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
                 eday = ti0.prev().yyyymmdd()
                 print eday
 
+            if next_contract :
+                fc=fcn
             fn=bar_dir+'/'+ibfn(fc,barsec,sday,eday)
             if symbol in ib_sym_special :
                 fc = symbol+fc[-2:]

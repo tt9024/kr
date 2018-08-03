@@ -31,6 +31,11 @@ int main(int argc, char**argv) {
         for (auto s : l1) {
         	printf(" %s ", s.c_str());
         }
+        std::vector<std::string> l1n = plcc_getStringArr("SubL1n");
+        printf("\nL1 back contract subscriptions: ");
+        for (auto s : l1n) {
+        	printf(" %s ", s.c_str());
+        }
         printf("\nL2 subscriptions: ");
         std::vector<std::string> l2 = plcc_getStringArr("SubL2");
         for (auto s : l2) {

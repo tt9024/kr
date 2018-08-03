@@ -95,14 +95,16 @@ struct BookConfig {
     std::string venue;
     std::string symbol;
     std::string type; // "L1, L2, TbT"
+    bool isbc;  // future back contract.  used in tickrec/tickrec2 for names of bar/bin files
 
-    BookConfig(const std::string& v, const std::string& s, const std::string& bt) :
-        venue(v), symbol(s), type(bt) {
+    BookConfig(const std::string& v, const std::string& s, const std::string& bt, bool is_future_back_contract=false) :
+        venue(v), symbol(s), type(bt), isbc(is_future_back_contract) {
     	logInfo("BookConfig %s", toString().c_str());
     };
 
     // construct by venue/symbol
-    BookConfig(const std::string& venu_symbol, const std::string& bt) : type(bt) {
+    BookConfig(const std::string& venu_symbol, const std::string& bt, bool is_future_back_contract=false) :
+    	type(bt), isbc(is_future_back_contract) {
     	size_t n = strlen(venu_symbol.c_str());
     	auto pos = venu_symbol.find("/");
     	if (pos == std::string::npos) {
@@ -127,8 +129,9 @@ struct BookConfig {
 			   (isFuture(symbol)?
 					   symbol.substr(0,symbol.size()-2):
 					   symbol)+
-			   "_B"+
-			   std::to_string(barsec)+"S.csv";
+			   "_B"+std::to_string(barsec)+"S"+
+			   (isbc? "_bc":"") +
+			   ".csv";
     }
 
     std::string L2fname() const {
@@ -137,7 +140,9 @@ struct BookConfig {
 			   (isFuture(symbol)?
 					   symbol.substr(0,symbol.size()-2):
 					   symbol)+
-			   "_L2.bin";
+			   "_" + type +
+			   (isbc? "_bc":"") +
+			   ".bin";
     }
 
     static inline

@@ -256,7 +256,9 @@ void ClientBaseImp::updateMktDepthL2(TickerId id, int position, const std::strin
 
 //! [updatenewsbulletin]
 void ClientBaseImp::updateNewsBulletin(int msgId, int msgType, const std::string& newsMessage, const std::string& originExch) {
-	logInfo( "News Bulletins. %d - Type: %d, Message: %s, Exchange of Origin: %s", msgId, msgType, newsMessage.c_str(), originExch.c_str());
+//	logInfo( "News Bulletins. %d - Type: %d, Message: %s, Exchange of Origin: %s", msgId, msgType, newsMessage.c_str(), originExch.c_str());
+//	the message has problem
+	logInfo( "News Bulletins. %d - Type: %d", msgId, msgType);
 }
 //! [updatenewsbulletin]
 

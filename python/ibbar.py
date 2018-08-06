@@ -3,36 +3,21 @@ import os
 import datetime
 import numpy as np
 
-ven_sym_map={'NYM':['CL','NG','HO','RB','GC','SI','HG'], \
-             'CME':['ES','6A','6C','6E','6B','6J','6N','6R','6Z','6M'],\
-             'CBT':['ZB','ZN','ZF','ZC'],\
-             'EUX':['FDX','STXE','FGBX','FGBL','FGBS','FGBM'],\
-             'FX' :['AUD.CAD','AUD.JPY','AUD.NZD','CAD.JPY','EUR.AUD',\
-                    'EUR.CAD','EUR.CHF','EUR.GBP','EUR.JPY','EUR.NOK',\
-                    'EUR.SEK','EUR.TRY','EUR.ZAR','GBP.CHF','GBP.JPY',\
-                    'NOK.SEK','NZD.JPY','EUR.USD','USD.ZAR','USD.TRY',\
-                    'USD.MXN','USD.CNH','XAU.USD','XAG.USD'],\
-             'ICE':['LCO','LFU','LOU']};
 sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM','LFU','LOU']
 #sym_priority_list_L2=['CL','LCO','ES']
 sym_priority_list_L2=['CL','LCO','ES','6E','ZN','GC']
 sym_priority_list_l1_next=['CL', 'LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB']
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
-future_venues=['NYM','CME','CBT','EUX','ICE']
-fx_venues=['FX']
 
 def ibvenue(symbol) :
-    for k,v in ven_sym_map.items() :
-        if symbol in v :
-            return k
-    raise ValueError('venue not found for ' + symbol)
+    return l1.venue_by_symbol(symbol)
 
 def ibfn(symbol,barsec,sday,eday) :
     return symbol+'_'+sday+'_'+eday+'_'+str(barsec)+'S'
 
 def l1fc(sym,day,next_contract=False) :
-    if ibvenue(sym) in future_venues :
+    if ibvenue(sym) in l1.future_venues :
         if not next_contract :
             fc=l1.FC(sym,day)
         else :
@@ -47,19 +32,9 @@ def ibfc(sym,day,next_contract=False) :
         fc=sym+fc[-2:]
     return ibvenue(sym)+'/'+fc
 
-def get_start_end_hour(venue) :
-    # start on previous day's 18, end on 17, 
-    # except ICE, starts from 20 to 18
-    if venue == 'ICE' :
-        return -4, 18
-    return -6, 17
-
 def update_ib_config(symlistL1=sym_priority_list,symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2,day=None, cfg_file=None) :
     if symlistL1 is None :
-        # everything in ven_sym_map
-        symlistL1 = []
-        for k in ven_sym_map.keys() :
-            symlistL1+=ven_sym_map[k]
+        raise ValueError('symlistL1 cannot be None!')
 
     if day is None :
         day=datetime.datetime.now().strftime('%Y%m%d')
@@ -112,7 +87,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
         os.system(' mkdir -p ' + bar_dir)
 
         if len(start_end_hour) != 2 :
-            start_hour, end_hour = get_start_end_hour(venue)
+            start_hour, end_hour = l1.get_start_end_hour(venue)
         else :
             start_hour, end_hour = start_end_hour
 
@@ -198,10 +173,10 @@ def ib_bar_by_file(fn, skip_header) :
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
 
-def get_ib_fx(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=101, exclude_list=[]) :
+def get_ib_fx(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=107, exclude_list=[]) :
     sym = []
-    for v in fx_venues :
-        sym += ven_sym_map[v]
+    for v in l1.fx_venues :
+        sym += l1.ven_sym_map[v]
 
     sym0=[]
     for s in sym :

@@ -2,6 +2,7 @@ import l1
 import os
 import datetime
 import numpy as np
+import traceback
 
 sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM','LFU','LOU']
 #sym_priority_list_L2=['CL','LCO','ES']
@@ -76,6 +77,7 @@ def update_ib_config(symlistL1=sym_priority_list,symlistL1next=sym_priority_list
 
 def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist',getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False) :
     step_sec=barsec_dur[barsec]
+    fnarr=[]
     for symbol in symbol_list :
         venue=ibvenue(symbol)
         if venue == 'FX' :
@@ -115,6 +117,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
             if next_contract :
                 fc=fcn
             fn=bar_dir+'/'+ibfn(fc,barsec,sday,eday)
+            fnarr.append(fn)
             if symbol in ib_sym_special :
                 fc = symbol+fc[-2:]
             sym=venue+'/'+fc
@@ -142,8 +145,8 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
             try :
                 while d0 <= eday and d0 <= end_date :
                     # get for day d0
-                    utc0=tic.to_local_utc(start_hour,0,0)
                     utc1=tic.to_local_utc(end_hour,0,0)
+                    utc0=utc1-(end_hour-start_hour)*3600
                     while utc0 < utc1 :
                         # get for quote and trade for end_time as utc
                         utc0+=step_sec
@@ -155,7 +158,6 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
                             print 'running ', cmdline
                             if not mock_run :
                                 os.system( cmdline )
-                                #os.system ('gzip ' + fn0)
                                 os.system( 'sleep 2' )
                     tic.next()
                     d0=tic.yyyymmdd()
@@ -164,6 +166,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
                 return
             except :
                 traceback.print_exc()
+    return fnarr
 
 def ib_bar_by_file(fn, skip_header) :
     """
@@ -173,17 +176,19 @@ def ib_bar_by_file(fn, skip_header) :
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
 
-def get_ib_fx(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=107, exclude_list=[]) :
-    sym = []
-    for v in l1.fx_venues :
-        sym += l1.ven_sym_map[v]
+def get_ib_fx(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=107, exclude_list=[], sym_list=None) :
+    sym = sym_list
+    if sym is None :
+        sym = []
+        for v in l1.fx_venues :
+            sym += l1.ven_sym_map[v]
 
     sym0=[]
     for s in sym :
         if s not in exclude_list :
             sym0.append(s)
 
-    get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, bar_path=bar_path,getqt=True,gettrd=False, cid=cid)
+    return get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, bar_path=bar_path,getqt=True,gettrd=False, cid=cid)
 
 
 #################################
@@ -288,6 +293,33 @@ def bar_file_cleanup(sym, hist_dir='hist') :
         os.system('mv ' + sym_dir + '/0507qt_tmp' + ' ' + f0502trd[:-7]+'qt.csv')
     else :
         print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
+
+
+def get_all_hist(start_day, end_day, bar_sec = 1, cid = None) :
+    if cid  is None :
+        dt = datetime.datetime.now()
+        cid = dt.month * 31 + dt.day + 300 + dt.second
+
+    # consider putting it to multiple processes
+    get_ib_future(ibbar.sym_priority_list, start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False)
+    get_ib_future(ibbar.sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=True)
+    get_ib_fx(start_day, end_day, cid=cid+3)
+
+def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
+    if cid  is None :
+        dt = datetime.datetime.now()
+        cid = dt.month * 31 + dt.day + 300 + dt.second 
+
+    fnarr = []
+    for day in trd_day_arr :
+        if is_fx :
+            fnarr += get_ib_fx(day, day, cid=cid+3,sym_list=[symbol])
+        else :
+            if is_front :
+                fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False)
+            else :
+                fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=True)
+    return fnarr
 
 def get_l1_bar(fn) :
     """

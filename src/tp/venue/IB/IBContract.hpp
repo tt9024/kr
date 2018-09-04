@@ -46,7 +46,10 @@ public:
 		    }
 	    } else if (strncmp(symbol, "ICE", 3) == 0) {
 	    	makeIceContract(con, symbol);
+	    } else if (strncmp(symbol, "ETF", 3) == 0) {
+	    	makeETFContract(con, symbol);
 	    }
+
 	    else {
 	    	throw std::runtime_error(std::string("unknown contract: ") + std::string (symbol));
 	    }
@@ -79,6 +82,15 @@ private:
 		ib_futmon['X']="11";
 		ib_futmon['Z']="12";
 	}
+
+	// ETF prices, symbol is assumed to be ETF/EEM
+	void makeETFContract(Contract &con, const char* symbol) const {
+		con.symbol=std::string(symbol+4);
+		con.currency = "USD";
+		con.exchange = "ARCA";
+		con.secType = "STK";
+	}
+
 	// FX Spot, symbol is assumed to be FX/EUR/USD
 	void makeFxContract(Contract &con, const char* symbol) const {
 	    con.symbol = std::string(symbol, 3);

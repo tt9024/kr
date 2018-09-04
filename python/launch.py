@@ -45,7 +45,7 @@ def is_weekend() :
     if wd == 5 :
         return True
     if wd==4 :
-        return dt.hour>=17
+        return dt.hour>17
     if wd==6 :
         return dt.hour<18
 

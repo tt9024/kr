@@ -4,12 +4,14 @@ import datetime
 import numpy as np
 import traceback
 
-sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM','LFU','LOU']
+sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM','LFU','LOU','ZW','ZS','ZM','ZL','HE','LE','PA']
 #sym_priority_list_L2=['CL','LCO','ES']
 sym_priority_list_L2=['CL','LCO','ES','6E','ZN','GC']
-sym_priority_list_l1_next=['CL', 'LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB']
+sym_priority_list_l1_next=['CL', 'LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB', 'ZW','ZS','ZM','ZL','GE']
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
+ib_sym_etf=['EEM','EPI','EWJ','EWZ','EZU','FXI','GDX','ITB','KRE','QQQ','RSX','SPY','UGAZ','USO','VEA','VXX','XLE','XLF','XLK','XLU','XOP']
+ib_sym_fut2=['ZS']
 
 def ibvenue(symbol) :
     return l1.venue_by_symbol(symbol)
@@ -82,6 +84,8 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
         venue=ibvenue(symbol)
         if venue == 'FX' :
             bar_dir = bar_path+'/FX'
+        elif venue == 'ETF' :
+            bar_dir = bar_path+'/ETF'
         else :
             bar_dir = bar_path+'/'+symbol
         if next_contract :
@@ -176,11 +180,15 @@ def ib_bar_by_file(fn, skip_header) :
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
 
-def get_ib_fx(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=213, exclude_list=[], sym_list=None) :
+def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=213, exclude_list=[], sym_list=None) :
+    """
+    This gets non-future history files, such as FX and ETF
+    """
     sym = sym_list
     if sym is None :
+        all_venues = ['ETF'] + l1.fx_venues
         sym = []
-        for v in l1.fx_venues :
+        for v in all_venues :
             sym += l1.ven_sym_map[v]
 
     sym0=[]
@@ -303,7 +311,7 @@ def get_all_hist(start_day, end_day, bar_sec = 1, cid = None) :
     # consider putting it to multiple processes
     get_ib_future(ibbar.sym_priority_list, start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False)
     get_ib_future(ibbar.sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=True)
-    get_ib_fx(start_day, end_day, cid=cid+3)
+    get_ib(start_day, end_day, cid=cid+3)
 
 def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
     if cid  is None :
@@ -313,7 +321,7 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
     fnarr = []
     for day in trd_day_arr :
         if is_fx :
-            fnarr += get_ib_fx(day, day, cid=cid+3,sym_list=[symbol])
+            fnarr += get_ib(day, day, cid=cid+3,sym_list=[symbol])
         else :
             if is_front :
                 fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False)

@@ -93,7 +93,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
         os.system(' mkdir -p ' + bar_dir)
 
         if len(start_end_hour) != 2 :
-            start_hour, end_hour = l1.get_start_end_hour(venue)
+            start_hour, end_hour = l1.get_start_end_hour(symbol)
         else :
             start_hour, end_hour = start_end_hour
 

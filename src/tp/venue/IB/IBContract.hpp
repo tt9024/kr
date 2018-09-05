@@ -48,6 +48,8 @@ public:
 	    	makeIceContract(con, symbol);
 	    } else if (strncmp(symbol, "ETF", 3) == 0) {
 	    	makeETFContract(con, symbol);
+	    } else if (strncmp(symbol, "NYBOT", 5) == 0) {
+	    	makeNybotContract(con, symbol);
 	    }
 
 	    else {
@@ -133,6 +135,16 @@ private:
 	    con.exchange = "IPE";
 	    con.secType = "FUT";
 	    con.localSymbol = con.symbol + std::string(symbol+7, 2);
+	    con.includeExpired = true;
+	}
+
+	// NYBOT/CCZ8  ICE's cocoa future
+	void makeNybotContract(Contract &con, const char* symbol) const {
+		con.symbol = std::string(symbol+6, 2);
+	    con.currency = "USD";
+	    con.exchange = "NYBOT";
+	    con.secType = "FUT";
+	    con.localSymbol = std::string(symbol+6, 4);
 	    con.includeExpired = true;
 	}
 

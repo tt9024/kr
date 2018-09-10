@@ -46,7 +46,8 @@ public:
 		  dur_str(str_by_barsize(bsize, DURSTR)),
 		  type_str(is_trade? "TRADES":"MIDPOINT"),
 		  historyFile(histFile), client_id(clientid),
-		  received(0), fp(fopen(histFile,"a+"))
+		  received(0), fp(fopen(histFile,"a+")),
+		  inactive(true)
 	{
 		RicContract::get().makeContract(con, symbol,NULL);
 		if (!fp) {
@@ -148,7 +149,7 @@ public:
 	{
 		logInfo( "Error. Id: %d, Code: %d, Msg: %s", id, errorCode, errorString.c_str());
 		m_errorCode=errorCode;
-		if (m_errorCode==162) { // no historical data returned
+		if (m_errorCode==162 || ((m_errorCode==200) && isConnected() && (!inactive))) { // no historical data returned
 			if (errorString.find("definition")!=std::string::npos || errorString.find("found")!=std::string::npos) {
 				logInfo("received definition error, mark received");
 				received += 1;
@@ -160,6 +161,12 @@ public:
 			//if ( errorString.find("pacing")!=std::string::npos || errorString.find("violation")!=std::string::npos) {
 				// logError("pacing violation!");
 			//}
+		}
+		if (m_errorCode==2110) {
+			inactive=true;
+		}
+		if (m_errorCode==2106) {
+			inactive=false;
 		}
 	}
 
@@ -175,6 +182,7 @@ private:
 	const int client_id;
 	volatile int received;
 	FILE *fp;
+	bool inactive;
 };
 
 HistoryDataClient *client;

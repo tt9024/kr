@@ -7,11 +7,10 @@ import traceback
 sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM','LFU','LOU','ZW','ZS','ZM','ZL','HE','LE','PA']
 #sym_priority_list_L2=['CL','LCO','ES']
 sym_priority_list_L2=['CL','LCO','ES','6E','ZN','GC']
-sym_priority_list_l1_next=['CL', 'LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB', 'ZW','ZS','ZM','ZL','GE']
+sym_priority_list_l1_next=['CL', 'LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB', 'ZW','ZS','ZM','ZL']
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
 ib_sym_etf=['EEM','EPI','EWJ','EWZ','EZU','FXI','GDX','ITB','KRE','QQQ','RSX','SPY','UGAZ','USO','VEA','VXX','XLE','XLF','XLK','XLU','XOP']
-ib_sym_fut2=['ZS']
 
 def ibvenue(symbol) :
     return l1.venue_by_symbol(symbol)
@@ -35,7 +34,7 @@ def ibfc(sym,day,next_contract=False) :
         fc=sym+fc[-2:]
     return ibvenue(sym)+'/'+fc
 
-def update_ib_config(symlistL1=sym_priority_list,symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2,day=None, cfg_file=None) :
+def update_ib_config(symlistL1=sym_priority_list, symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2,day=None, cfg_file=None) :
     if symlistL1 is None :
         raise ValueError('symlistL1 cannot be None!')
 

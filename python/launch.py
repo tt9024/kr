@@ -23,6 +23,12 @@ signal.signal(signal.SIGTERM, signal_handler)
 procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe']
 cfg='config/main.cfg'
 proc_map={}
+RESET_WAIT_SECOND = 220
+
+def reset_network() :
+    os.system('netsh interface set interface "Ethernet 2" admin=disable')
+    time.sleep(0.001)
+    os.system('netsh interface set interface "Ethernet 2" admin=enable')
 
 def is_in_daily_trading() :
     dt=datetime.datetime.now()
@@ -62,7 +68,10 @@ def move_bars(bar_path) :
 
 def remove_logs() :
     print 'removing log files in ./log/'
-    os.system('rm -fR log/*')
+    os.system('rm -fR log/*hist*.txt')
+    os.system('rm -fR log/*tpib*.txt')
+    os.system('rm -fR log/*l2*.txt')
+    os.system('rm -fR log/*book*.txt')
     print 'removing log files in /cygdrive/c/Jts/*.20*.log'
     os.system('rm -fR /cygdrive/c/Jts/*.20*.log')
     os.system('rm -fR /cygdrive/c/Jts/dhmeniwux/*.20*.log')
@@ -121,7 +130,18 @@ def launch_sustain() :
         utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
         utcstart=l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
                 '%Y%m%d'), 17, 59, 59)
-        print 'wait for Sunday open...', utcnow, utcstart, utcstart-utcnow
+        while utcnow < utcstart -  RESET_WAIT_SECOND :
+            print 'wait for Sunday open...', utcnow, utcstart, utcstart-utcnow
+            reset_network()
+            time.sleep( RESET_WAIT_SECOND )
+            dtnow = datetime.datetime.now()
+            utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
+
+        print 'getting on-line, updating roll ', datetime.datetime.now()
+        ibbar.update_ib_config(cfg_file=cfg)
+        alive = True
+        dtnow = datetime.datetime.now()
+        utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
         time.sleep(utcstart-utcnow)
         dtnow = datetime.datetime.now()
         utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
@@ -158,7 +178,7 @@ def launch_sustain() :
             bar_path = dt.strftime('%Y%m%d')
             print 'moving bar files to ', bar_path
             move_bars(bar_path)
-            #remove_logs()
+            remove_logs()
 
 if __name__ == "__main__":
     launch_sustain()

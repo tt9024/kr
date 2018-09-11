@@ -208,11 +208,14 @@ struct L2Delta {
     	type=0;  // snapshot, get from the bookdepot
     }
 
-    void addTrade(Price price, Quantity size) {
+    // attr 0: buy, 1 sell
+    // qty set as positive for buy, negative for sell
+    void addTrade(Price price, Quantity size, int attr) {
     	reset();
     	type=4;  // trade
     	px=price;
-    	qty=size;
+    	qty=(1-2*attr)*size; // attr: 0: buy, 1: sell
+    	                   // qty : + buy, - sell
     }
 
     std::string toString() const {
@@ -403,6 +406,12 @@ struct BookDepot {
     	return addTrade();
     }
 
+    bool addTrade(Price px, Quantity sz, int attr) {
+    	trade_price=px;
+    	trade_size=sz;
+    	return addTrade(attr);
+    }
+
     std::string toString() const {
         char buf[1024];
         int n = 0;
@@ -500,9 +509,24 @@ private:
     	}
     	setUpdateType(true, false);
     	return true;
-     }
+    }
 
-     void updateFromEntry( const PriceEntry* from_pe,
+    // This is to allow L2 updates to get L1 trade
+    // also applies to l2delta
+    bool addTrade(int attr) {
+    	trade_attr = attr;
+		if (trade_attr == 0) {
+			// take as buy
+			bvol_cum+=trade_size;
+		} else if (trade_attr == 1) {
+			// take as sell
+			svol_cum+=trade_size;
+		}
+    	setUpdateType(true, false);
+    	return true;
+    }
+
+    void updateFromEntry( const PriceEntry* from_pe,
     		 PriceEntry* to_pe,
 			 int levels) const {
     	 PriceEntry pe_store[BookLevel];
@@ -716,10 +740,20 @@ struct BookL2 {
 
     */
 
-
     bool addTrade(Price px, Quantity sz) {
-    	_book.l2_delta.addTrade(px,sz);
-    	return _book.addTrade(px, sz);
+    	if (_book.addTrade(px, sz)) {
+        	_book.l2_delta.addTrade(px,sz, _book.trade_attr);
+        	return true;
+    	}
+    	return false;
+     }
+
+    // add trade from another book
+    // used for L2 updates gets from L1
+    bool addTrade(Price px, Quantity sz, int attr) {
+    	_book.addTrade(px, sz, attr);
+    	_book.l2_delta.addTrade(px, sz, attr);
+    	return true;
      }
 
     void reset() {
@@ -752,7 +786,13 @@ struct BookL2 {
     		return this->updPrice(delta->px, delta->qty, delta->level, delta->side==0, ts_micro);
     	case 4: // trade
     		logDebug("add trade\n");
-    		return this->addTrade(delta->px, delta->qty);
+    		int attr = 0;
+    		Quantity qty = delta->qty;
+    		if (qty<0) {
+    			attr = 1;
+    			qty*=-1;
+    		}
+    		return this->addTrade(delta->px, qty, attr);
     	}
     	return false;
     }
@@ -881,6 +921,18 @@ public:
 
         bool updTrade(double price, Quantity size) {
         	if(__builtin_expect(_bookL2.addTrade(price,size),1)) {
+            	updateQ(utils::TimeUtil::cur_time_gmt_micro());
+            	return true;
+        	}
+        	return false;
+        };
+
+        // this is different from updTrade, because the addTrade logic for
+        // L2 is wrong as it is updated differently with L1.  So the trade
+        // side may be inferred wrong when a level is being deleted.
+        // So L2 just copy the trade direction from L1.
+        bool updTradeFromL1(double price, Quantity size, const BookDepot& bookL1) {
+        	if(__builtin_expect(_bookL2.addTrade(price,size, bookL1.trade_attr),1)) {
             	updateQ(utils::TimeUtil::cur_time_gmt_micro());
             	return true;
         	}
@@ -1167,6 +1219,7 @@ private:
 				(int) (cur_micro/1000000ULL), bsz,bp,ap,asz,bv,sv,
 				(long long) utils::TimeUtil::cur_time_micro(),
 				bqcnt,aqcnt,btcnt,stcnt,ism_cum/bar_micro);
+
     };
 
     void reset() {

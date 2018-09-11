@@ -385,14 +385,28 @@ public:
             //    multi_fill = (buf[0] == 't');
             //}
             logDebug("RT_VOLUME: %.7lf %d",price, size);
-            IBBookQType* q = _book_queue_l1_to_l2[id-TickerStart];
-            if(q!=NULL){
-            	// update the L2 trade queue
-            	q->theWriter().updTrade(price, size);
-            }
-            if(__builtin_expect(!_book_queue[id-TickerStart]->theWriter().updTrade(price, size),0)) {
+            auto& writer (_book_queue[id-TickerStart]->theWriter());
+            if(__builtin_expect(!writer.updTrade(price, size),0)) {
             	logError("TPIB update trade error: %s",
-            			_book_queue[id-TickerStart]->theWriter().getBook()->toString().c_str());
+            			writer.getBook()->toString().c_str());
+            } else {
+            	const BookDepot& bookL1 (writer.getBook()->_book);
+				IBBookQType* q = _book_queue_l1_to_l2[id-TickerStart];
+				if(q!=NULL){
+					// sending the trade event captured from L1 IB subscription
+					// to the L2 queue.  As the L2 IB subscription doesn't have
+					// Trade (!!!)
+					//
+					// Simple addTrade(price,size) to the L2 book has problem.
+					// L2 trade direction can be wrong when a level is removed.
+					// this is because L2 and L1 updates are slightly different,
+					// and the direction cannot be safely detected from L2 book.
+					// Here since the direction is correct for L1, so
+					// the trade direction is copied (instead of detected) for L2
+					// queue.
+					// Same the L2 Delta recording feeds
+					q->theWriter().updTradeFromL1(price, size, bookL1);
+				}
             }
             return;
         }

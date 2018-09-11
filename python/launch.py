@@ -123,9 +123,11 @@ def launch(p) :
 def launch_sustain() :
     alive = False
     dtnow = datetime.datetime.now()
-    if not should_run() and dtnow.weekday() != 6 :
-        print 'launched in a bad time with should_run() false, doing nothing'
-        return
+    while not should_run() and dtnow.weekday() != 6 :
+        print 'wait for Sunday open...'
+        reset_network()
+        time.sleep( RESET_WAIT_SECOND )
+        dtnow = datetime.datetime.now()
     while dtnow.weekday() == 6 and not should_run() :
         utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
         utcstart=l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
@@ -166,7 +168,13 @@ def launch_sustain() :
                 print 'getting off-line, killing all ', datetime.datetime.now()
                 kill_all()
                 alive = False
-        time.sleep(1)
+            # do one hour of reset
+            retry = 3600/RESET_WAIT_SECOND -1
+            while retry > 0 :
+                reset_network()
+                time.sleep( RESET_WAIT_SECOND )
+                retry -= 1
+        time.sleep(0.5)
     
     print 'stopped ' , datetime.datetime.now()
     kill_all()

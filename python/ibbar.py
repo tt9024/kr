@@ -3,6 +3,7 @@ import os
 import datetime
 import numpy as np
 import traceback
+import time
 
 sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM','LFU','LOU','ZW','ZS','ZM','ZL','HE','LE','PA']
 #sym_priority_list_L2=['CL','LCO','ES']
@@ -34,7 +35,7 @@ def ibfc(sym,day,next_contract=False) :
         fc=sym+fc[-2:]
     return ibvenue(sym)+'/'+fc
 
-def update_ib_config(symlistL1=sym_priority_list, symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2,day=None, cfg_file=None) :
+def update_ib_config(symlistL1=sym_priority_list + ib_sym_etf, symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2,day=None, cfg_file=None) :
     if symlistL1 is None :
         raise ValueError('symlistL1 cannot be None!')
 
@@ -161,7 +162,8 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
                             print 'running ', cmdline
                             if not mock_run :
                                 os.system( cmdline )
-                                os.system( 'sleep 2' )
+                                time.sleep(2)
+                                #os.system( 'sleep 2' )
                     tic.next()
                     d0=tic.yyyymmdd()
             except (KeyboardInterrupt, SystemExit) :

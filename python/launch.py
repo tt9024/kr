@@ -23,7 +23,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe']
 cfg='config/main.cfg'
 proc_map={}
-RESET_WAIT_SECOND = 220
+RESET_WAIT_SECOND = 110
 
 def reset_network() :
     os.system('netsh interface set interface "Ethernet 2" admin=disable')
@@ -163,18 +163,29 @@ def launch_sustain() :
             for p in procs :
                 if (p not in proc_map.keys()) or (not is_proc_alive(proc_map[p])) :
                     launch(p)
+            time.sleep(1)
+            continue
         else :
             if alive :
                 print 'getting off-line, killing all ', datetime.datetime.now()
                 kill_all()
                 alive = False
             # do one hour of reset
-            retry = 3600/RESET_WAIT_SECOND -1
-            while retry > 0 :
-                reset_network()
-                time.sleep( RESET_WAIT_SECOND )
-                retry -= 1
-        time.sleep(0.5)
+            dtnow = datetime.datetime.now()
+            utcstart=l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
+                '%Y%m%d'), 17, 59, 59)
+            cur_utc = l1.TradingDayIterator.local_ymd_to_utc.cur_utc()
+            while  cur_utc <= utcstart:
+                if utcstart - cur_utc > RESET_WAIT_SECOND + 1 :
+                    print 'reset network', cur_utc, utcstart
+                    reset_network()
+                    time.sleep( RESET_WAIT_SECOND )
+                else :
+                    time.sleep(1)
+                cur_utc = l1.TradingDayIterator.local_ymd_to_utc.cur_utc()
+            print 'spinning for start', cur_utc
+            while cur_utc <= utcstart+1 :
+                cur_utc = l1.TradingDayIterator.local_ymd_to_utc.cur_utc()
     
     print 'stopped ' , datetime.datetime.now()
     kill_all()

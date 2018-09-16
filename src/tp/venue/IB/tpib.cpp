@@ -30,7 +30,7 @@ void sig_handler(int signo)
   ibclient->stop();
 }
 
-int main() {
+int main(int argc, char**argv) {
     if ((signal(SIGINT, sig_handler) == SIG_ERR) ||
     	(signal(SIGTERM,sig_handler) == SIG_ERR))
     {
@@ -38,7 +38,11 @@ int main() {
             return -1;
     }
     utils::PLCC::instance("tpib");
-    ibclient=new tp::TPIB();
+    if (argc>1) {
+    	ibclient=new tp::TPIB(atoi(argv[1]));
+    } else {
+    	ibclient=new tp::TPIB();
+    }
     ibclient->run();
     delete ibclient;
     return 0;

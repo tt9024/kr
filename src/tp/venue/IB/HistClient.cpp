@@ -254,7 +254,7 @@ int main(int argc, char** argv)
 		printf("switching to port %d...\n", port);
 		if (++retrycnt > 1) {
 			printf("wait and retry...\n");
-			sleep(10);
+			sleep( clientId % 4 + 1);
 		}
 	}
 	delete client;

@@ -174,7 +174,7 @@ def launch_sustain() :
             dtnow = datetime.datetime.now()
             utcstart=l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
                 '%Y%m%d'), 17, 59, 59)
-            cur_utc = l1.TradingDayIterator.local_ymd_to_utc.cur_utc()
+            cur_utc = l1.TradingDayIterator.cur_utc()
             while  cur_utc <= utcstart:
                 if utcstart - cur_utc > RESET_WAIT_SECOND + 1 :
                     print 'reset network', cur_utc, utcstart
@@ -182,10 +182,10 @@ def launch_sustain() :
                     time.sleep( RESET_WAIT_SECOND )
                 else :
                     time.sleep(1)
-                cur_utc = l1.TradingDayIterator.local_ymd_to_utc.cur_utc()
+                cur_utc = l1.TradingDayIterator.cur_utc()
             print 'spinning for start', cur_utc
             while cur_utc <= utcstart+1 :
-                cur_utc = l1.TradingDayIterator.local_ymd_to_utc.cur_utc()
+                cur_utc = l1.TradingDayIterator.cur_utc()
     
     print 'stopped ' , datetime.datetime.now()
     kill_all()

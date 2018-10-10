@@ -209,7 +209,7 @@ def ib_bar_by_file(fn, skip_header) :
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
 
-def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=213, exclude_list=[], sym_list=None, num_thread=None, wait_thread=True) :
+def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=213, exclude_list=[], sym_list=None, num_threads=None, wait_thread=True) :
     """
     This gets non-future history files, such as FX and ETF
     """
@@ -226,7 +226,7 @@ def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='I
         if s not in exclude_list :
             sym0.append(s)
 
-    return get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, bar_path=bar_path,getqt=True,gettrd=False, cid=cid, num_thread=num_thread, wait_thread=wait_thread)
+    return get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, bar_path=bar_path,getqt=True,gettrd=False, cid=cid, num_threads=num_threads, wait_thread=wait_thread)
 
 
 #################################
@@ -338,12 +338,12 @@ def get_all_hist(start_day, end_day, bar_sec = 1, cid = None) :
         dt = datetime.datetime.now()
         cid = dt.month * 31 + dt.day + 300 + dt.second
 
-    # consider putting it to multiple processes
-    get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
+    # Using Thread Pool for     
+    #get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
     #get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
 
     #get_ib(start_day, end_day, cid=cid+4, num_threads=4, wait_thread=True)
-    #get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+3, getqt=True, gettrd=True, next_contract=True, num_threads=4, wait_thread=True)
+    get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+3, getqt=True, gettrd=True, next_contract=True, num_threads=4, wait_thread=True)
 
 def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
     if cid  is None :

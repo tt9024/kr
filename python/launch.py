@@ -20,15 +20,20 @@ def signal_handler(signal, frame) :
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe']
+procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','python/ibg_mon.py']
 cfg='config/main.cfg'
 proc_map={}
-RESET_WAIT_SECOND = 110
+RESET_WAIT_SECOND = 70
 
 def reset_network() :
     os.system('netsh interface set interface "Ethernet 2" admin=disable')
     time.sleep(0.001)
     os.system('netsh interface set interface "Ethernet 2" admin=enable')
+
+def bounce_ibg() :
+    import ibg_mon
+    ibm = IBGatewayMonitor()
+    ibm.kill()
 
 def is_in_daily_trading() :
     dt=datetime.datetime.now()
@@ -125,7 +130,8 @@ def launch_sustain() :
     dtnow = datetime.datetime.now()
     while not should_run() and dtnow.weekday() != 6 :
         print 'wait for Sunday open...'
-        reset_network()
+        #reset_network()
+        bounce_ibg()
         time.sleep( RESET_WAIT_SECOND )
         dtnow = datetime.datetime.now()
     while dtnow.weekday() == 6 and not should_run() :
@@ -134,7 +140,8 @@ def launch_sustain() :
                 '%Y%m%d'), 17, 59, 59)
         while utcnow < utcstart -  RESET_WAIT_SECOND :
             print 'wait for Sunday open...', utcnow, utcstart, utcstart-utcnow
-            reset_network()
+            #reset_network()
+            bounce_ibg()
             time.sleep( RESET_WAIT_SECOND )
             dtnow = datetime.datetime.now()
             utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
@@ -178,7 +185,8 @@ def launch_sustain() :
             while  cur_utc <= utcstart:
                 if utcstart - cur_utc > RESET_WAIT_SECOND + 1 :
                     print 'reset network', cur_utc, utcstart
-                    reset_network()
+                    #reset_network()
+                    bounce_ibg()
                     time.sleep( RESET_WAIT_SECOND )
                 else :
                     time.sleep(1)

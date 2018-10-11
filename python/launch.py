@@ -32,7 +32,7 @@ def reset_network() :
 
 def bounce_ibg() :
     import ibg_mon
-    ibm = IBGatewayMonitor()
+    ibm = ibg_mon.IBGatewayMonitor()
     ibm.kill()
 
 def is_in_daily_trading() :

@@ -23,7 +23,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','python/ibg_mon.py']
 cfg='config/main.cfg'
 proc_map={}
-RESET_WAIT_SECOND = 70
+RESET_WAIT_SECOND = 80
 
 def reset_network() :
     os.system('netsh interface set interface "Ethernet 2" admin=disable')
@@ -34,6 +34,7 @@ def bounce_ibg() :
     import ibg_mon
     ibm = ibg_mon.IBGatewayMonitor()
     ibm.kill()
+    ibm._launch()
 
 def is_in_daily_trading() :
     dt=datetime.datetime.now()

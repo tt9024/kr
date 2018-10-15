@@ -338,12 +338,11 @@ def get_all_hist(start_day, end_day, bar_sec = 1, cid = None) :
         dt = datetime.datetime.now()
         cid = dt.month * 31 + dt.day + 300 + dt.second
 
-    # Using Thread Pool for     
+    # Using Thread Pool for 
     #get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
-    #get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
-
-    #get_ib(start_day, end_day, cid=cid+4, num_threads=4, wait_thread=True)
-    get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+3, getqt=True, gettrd=True, next_contract=True, num_threads=4, wait_thread=True)
+    #get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, num_threads=5, wait_thread=True)
+    get_ib(start_day, end_day, cid=cid+20, num_threads=4, wait_thread=True)
+    #get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, num_threads=4, wait_thread=True)
 
 def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
     if cid  is None :

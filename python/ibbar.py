@@ -333,16 +333,26 @@ def bar_file_cleanup(sym, hist_dir='hist') :
         print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
 
 
-def get_all_hist(start_day, end_day, bar_sec = 1, cid = None) :
-    if cid  is None :
-        dt = datetime.datetime.now()
-        cid = dt.month * 31 + dt.day + 300 + dt.second
+def get_all_hist(start_day, end_day, type_str) :
+    """
+    type_str = ['future', 'etf', 'fx', 'future2']
+    future2 is the next contract
+    """
+    dt = datetime.datetime.now()
+    cid = dt.month * 31 + dt.day + 300 + dt.second
+    bar_sec = 1
 
     # Using Thread Pool for 
-    #get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
-    #get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, num_threads=5, wait_thread=True)
-    get_ib(start_day, end_day, cid=cid+20, num_threads=4, wait_thread=True)
-    #get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, num_threads=4, wait_thread=True)
+    if type_str == 'future' :
+        get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
+    elif type_str == 'etf' :
+        get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
+    elif type_str == 'fx' :
+        get_ib(                                  start_day, end_day,                        cid=cid+20,                                              num_threads=4, wait_thread=True)
+    elif type_str == 'future2' :
+        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, num_threads=4, wait_thread=True)
+    else :
+        print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
 
 def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
     if cid  is None :

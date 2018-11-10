@@ -69,7 +69,7 @@ class IBGatewayMonitor :
             time.sleep(1)
 
             self._launch()
-            time.sleep(10)
+            time.sleep(20)
 
 if __name__ == '__main__' :
     ibm = IBGatewayMonitor()

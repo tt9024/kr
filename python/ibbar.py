@@ -333,17 +333,26 @@ def bar_file_cleanup(sym, hist_dir='hist') :
         print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
 
 
-def get_all_hist(start_day, end_day, bar_sec = 1, cid = None) :
-    if cid  is None :
-        dt = datetime.datetime.now()
-        cid = dt.month * 31 + dt.day + 300 + dt.second
+def get_all_hist(start_day, end_day, type_str) :
+    """
+    type_str = ['future', 'etf', 'fx', 'future2']
+    future2 is the next contract
+    """
+    dt = datetime.datetime.now()
+    cid = dt.month * 31 + dt.day + 300 + dt.second
+    bar_sec = 1
 
-    # Using Thread Pool for     
-    #get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
-    #get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
-
-    #get_ib(start_day, end_day, cid=cid+4, num_threads=4, wait_thread=True)
-    get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+3, getqt=True, gettrd=True, next_contract=True, num_threads=4, wait_thread=True)
+    # Using Thread Pool for 
+    if type_str == 'future' :
+        get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
+    elif type_str == 'etf' :
+        get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
+    elif type_str == 'fx' :
+        get_ib(                                  start_day, end_day,                        cid=cid+20,                                              num_threads=4, wait_thread=True)
+    elif type_str == 'future2' :
+        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, num_threads=2, wait_thread=True)
+    else :
+        print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
 
 def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
     if cid  is None :
@@ -361,6 +370,27 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
                 fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=True)
     return fnarr
 
+
+####################
+# History Ingestion 
+####################
+
+def all_hist_symbols() :
+    sym = []
+    for v in l1.ven_sym_map.keys() :
+        sym += l1.ven_sym_map[v]
+    return sym
+
+def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
+    import KDB_hist as kdb
+    for symbol in symbol_list :
+        print'ingesting ', symbol, ' from KDB.'
+        try :
+            kdb.gen_bar(symbol, year_s = year_s, year_e = year_e, repo=repo)
+        except :
+            print 'problem with ', symbol
+
+
 def get_l1_bar(fn) :
     """
     1532408276, 24, 67.6100000, 67.6200000, 11, 0, 0, 1532408276000000, 1, 1, 0, 0, 67.6166726 
@@ -375,27 +405,4 @@ def get_l2_bar(fn) :
     extract some intermediate features for study.
     """
     pass
-
-def all_symbols() :
-    sym = []
-    for v in l1.ven_sym_map.keys() :
-        sym += l1.ven_sym_map[v]
-    return sym
-
-def get_barsec(venue) :
-    if venue in l1.fx_venues :
-        return 5
-    if venue in l1.future_venues :
-        return 1
-
-
-def ingest_kdb_history(symbol = None, start_day='19980101', end_day='20180523' dbar_repo = dbar) :
-    import IB_hist as ibhist
-
-    if symbol is None :
-        symbol = all_symbols()
-
-    bs = 5
-    for sym in all_symbols() :
-        ibhist.gen_daily_bar_ib(symbol, start_day, end_day, bs, dbar_repo=dbar, get_missing=False)
 

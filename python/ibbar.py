@@ -350,7 +350,7 @@ def get_all_hist(start_day, end_day, type_str) :
     elif type_str == 'fx' :
         get_ib(                                  start_day, end_day,                        cid=cid+20,                                              num_threads=4, wait_thread=True)
     elif type_str == 'future2' :
-        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, num_threads=4, wait_thread=True)
+        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, num_threads=2, wait_thread=True)
     else :
         print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
 
@@ -369,6 +369,26 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
             else :
                 fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=True)
     return fnarr
+
+
+####################
+# History Ingestion 
+####################
+
+def all_hist_symbols() :
+    sym = []
+    for v in l1.ven_sym_map.keys() :
+        sym += l1.ven_sym_map[v]
+    return sym
+
+def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
+    import KDB_hist as kdb
+    for symbol in symbol_list :
+        print'ingesting ', symbol, ' from KDB.'
+        try :
+            kdb.gen_bar(symbol, year_s = year_s, year_e = year_e, repo=repo)
+        except :
+            print 'problem with ', symbol
 
 def get_l1_bar(fn) :
     """

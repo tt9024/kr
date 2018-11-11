@@ -6,7 +6,14 @@ import traceback
 import time
 import multiprocessing as mp
 
-sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC','FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R','6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS','FGBM','LFU','LOU','ZW','ZS','ZM','ZL','HE','LE','PA']
+# the order makes a difference in priority of receiving live update
+sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC',\
+                   'FDX','STXE','6A','6C','6B','6N','ZB','ZF','6R',\
+                   '6Z','6M','HO','RB','SI','HG','FGBX','FGBL','FGBS',\
+                   'FGBM','LFU','LOU','ZW','ZS','ZM','ZL','HE','LE','PA',\
+                   # nybot no permission yet
+                   #'CC','CT','SB','KC',\
+                   ]
 #sym_priority_list_L2=['CL','LCO','ES']
 sym_priority_list_L2=['CL','LCO','ES','6E','ZN','GC']
 sym_priority_list_l1_next=['CL', 'LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB', 'ZW','ZS','ZM','ZL']

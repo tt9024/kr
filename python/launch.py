@@ -23,7 +23,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','python/ibg_mon.py','bin/floor.exe']
 cfg='config/main.cfg'
 proc_map={}
-RESET_WAIT_SECOND = 70
+RESET_WAIT_SECOND = 60
 
 def reset_network() :
     os.system('netsh interface set interface "Ethernet 2" admin=disable')

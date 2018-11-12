@@ -152,7 +152,8 @@ def launch_sustain() :
         alive = True
         dtnow = datetime.datetime.now()
         utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
-        time.sleep(utcstart-utcnow)
+        if utcstart > utcnow :
+            time.sleep(utcstart-utcnow)
         dtnow = datetime.datetime.now()
         utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
         print 'spining for start', utcnow

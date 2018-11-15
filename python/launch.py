@@ -139,29 +139,27 @@ def launch_sustain() :
         utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
         utcstart=l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
                 '%Y%m%d'), 17, 59, 59)
-        while utcnow < utcstart -  RESET_WAIT_SECOND :
+        while utcnow < utcstart -  RESET_WAIT_SECOND - 10 :
             print 'wait for Sunday open...', utcnow, utcstart, utcstart-utcnow
             #reset_network()
             bounce_ibg()
             time.sleep( RESET_WAIT_SECOND )
-            dtnow = datetime.datetime.now()
-            utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
+            utcnow = l1.TradingDayIterator.cur_utc()
 
         print 'getting on-line, updating roll ', datetime.datetime.now()
         ibbar.update_ib_config(cfg_file=cfg)
         alive = True
-        dtnow = datetime.datetime.now()
-        utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
+        utcnow = l1.TradingDayIterator.cur_utc()
         if utcstart > utcnow :
             time.sleep(utcstart-utcnow)
-        dtnow = datetime.datetime.now()
-        utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
+
+        utcnow = l1.TradingDayIterator.cur_utc()
         print 'spining for start', utcnow
         while utcnow <= utcstart :
-            dtnow = datetime.datetime.now()
-            utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
+            utcnow = l1.TradingDayIterator.cur_utc()
             #time.sleep( float((1000000-utcnow.microsecond)/1000)/1000.0 )
         print 'starting on', utcnow
+        alive = True
     while should_run() : 
         if is_in_daily_trading() :
             if not alive :
@@ -184,18 +182,22 @@ def launch_sustain() :
             utcstart=l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
                 '%Y%m%d'), 17, 59, 59)
             cur_utc = l1.TradingDayIterator.cur_utc()
-            while  cur_utc <= utcstart:
-                if utcstart - cur_utc > RESET_WAIT_SECOND + 1 :
-                    print 'reset network', cur_utc, utcstart
-                    #reset_network()
-                    bounce_ibg()
-                    time.sleep( RESET_WAIT_SECOND )
-                else :
-                    time.sleep(1)
+            while  cur_utc <= utcstart - RESET_WAIT_SECOND - 10 :
+                print 'reset network', cur_utc, utcstart
+                #reset_network()
+                bounce_ibg()
+                time.sleep( RESET_WAIT_SECOND )
                 cur_utc = l1.TradingDayIterator.cur_utc()
+            print 'getting on-line, updating roll ', datetime.datetime.now()
+            ibbar.update_ib_config(cfg_file=cfg)
+            cur_utc = l1.TradingDayIterator.cur_utc()
+            if utcstart > cur_utc :
+                time.sleep(utcstart-cur_utc)
+            cur_utc = l1.TradingDayIterator.cur_utc()
             print 'spinning for start', cur_utc
-            while cur_utc <= utcstart+1 :
+            while cur_utc <= utcstart :
                 cur_utc = l1.TradingDayIterator.cur_utc()
+            alive = True
     
     print 'stopped ' , datetime.datetime.now()
     kill_all()

@@ -7,6 +7,8 @@
 #pragma once
 #include <string>
 
+
+
 namespace trader {
 template<typename FloorType>
 class Trader {

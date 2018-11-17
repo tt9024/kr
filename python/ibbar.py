@@ -43,12 +43,11 @@ def ibfc(sym,day,next_contract=False) :
         fc=sym+fc[-2:]
     return ibvenue(sym)+'/'+fc
 
-def update_ib_config(symlistL1=sym_priority_list + ib_sym_etf, symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2,day=None, cfg_file=None) :
+def update_ib_config(symlistL1=sym_priority_list + ib_sym_etf, symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2, cfg_file=None) :
     if symlistL1 is None :
         raise ValueError('symlistL1 cannot be None!')
 
-    if day is None :
-        day=datetime.datetime.now().strftime('%Y%m%d')
+    day=l1.trd_day()
     symL1=[]
     symL1n=[]
     symL2=[]
@@ -126,17 +125,18 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
 
         ti = l1.TradingDayIterator(start_date)
         day=ti.yyyymmdd()
+        eday=day
         while day <= end_date :
+            sday=eday
             fc=l1fc(symbol, day)
             fcn=l1fc(symbol,day,next_contract=True)
-            sday=day
             while day <= end_date :
                 ti.next()
                 day=ti.yyyymmdd()
                 fc0=l1fc(symbol, day)
                 if fc != fc0 :
                     break
-            eday=day
+                eday=day
             # make sure eday is not more than end_date
             # if end_date was given as a weekend dates
             if (eday > end_date) :

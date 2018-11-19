@@ -149,14 +149,13 @@ def launch_sustain() :
 
         print 'getting on-line, updating roll ', datetime.datetime.now()
         ibbar.update_ib_config(cfg_file=cfg)
-        alive = True
         utcnow = l1.TradingDayIterator.cur_utc()
-        if utcstart > utcnow :
+        if utcstart > utcnow and not is_in_daily_trading() :
             time.sleep(utcstart-utcnow)
 
         utcnow = l1.TradingDayIterator.cur_utc()
         print 'spining for start', utcnow
-        while utcnow <= utcstart :
+        while not is_in_daily_trading() :
             utcnow = l1.TradingDayIterator.cur_utc()
             #time.sleep( float((1000000-utcnow.microsecond)/1000)/1000.0 )
         print 'starting on', utcnow

@@ -84,7 +84,7 @@ def update_ib_config(symlistL1=sym_priority_list + ib_sym_etf, symlistL1next=sym
             f.writelines(txt)
     return symL1, symL2, symL1n
 
-def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist',getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False, num_threads=None, wait_thread=True) :
+def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist',getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False, repo_path=None, num_threads=None, wait_thread=True) :
 
     if num_threads is not None :
         import _strptime
@@ -95,7 +95,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
         for i0, i1 in zip(k[:-1], k[1:]) :
             if i1 == i0 :
                 continue
-            res.append(pool.apply_async(get_ib_future, args=(symbol_list[i0:i1], start_date, end_date, barsec, ibclient, clp, mock_run, bar_path, getqt,gettrd, cid, start_end_hour, next_contract, None, True,)))
+            res.append(pool.apply_async(get_ib_future, args=(symbol_list[i0:i1], start_date, end_date, barsec, ibclient, clp, mock_run, bar_path, getqt,gettrd, cid, start_end_hour, next_contract, repo_path, None, True,)))
             cid += 1
 
         fnarr = []
@@ -206,6 +206,11 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
                 print 'gzip ', fn0
                 os.system('gzip ' + fn0)
 
+    if repo_path is not None :
+        future_inclusion = ['back' if next_contract else 'front']
+        import IB_hist as ibh
+        ibh.ingest_all_symbol(start_date, end_date, repo_path, get_missing=True, sym_list=sym_list, future_inclusion=future_inclusion)
+
     return fnarr
 
 def ib_bar_by_file(fn, skip_header) :
@@ -216,7 +221,7 @@ def ib_bar_by_file(fn, skip_header) :
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
 
-def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=213, exclude_list=[], sym_list=None, num_threads=None, wait_thread=True) :
+def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=213, exclude_list=[], sym_list=None, repo_path=None, num_threads=None, wait_thread=True) :
     """
     This gets non-future history files, such as FX and ETF
     """
@@ -233,7 +238,7 @@ def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='I
         if s not in exclude_list :
             sym0.append(s)
 
-    return get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, bar_path=bar_path,getqt=True,gettrd=False, cid=cid, num_threads=num_threads, wait_thread=wait_thread)
+    return get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, bar_path=bar_path,getqt=True,gettrd=False, cid=cid, repo_path=repo_path, num_threads=num_threads, wait_thread=wait_thread)
 
 
 #################################
@@ -340,7 +345,7 @@ def bar_file_cleanup(sym, hist_dir='hist') :
         print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
 
 
-def get_all_hist(start_day, end_day, type_str) :
+def get_all_hist(start_day, end_day, type_str, repo_path=None) :
     """
     type_str = ['future', 'etf', 'fx', 'future2']
     future2 is the next contract
@@ -351,13 +356,14 @@ def get_all_hist(start_day, end_day, type_str) :
 
     # Using Thread Pool for 
     if type_str == 'future' :
-        get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
+        get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, repo_path=repo_path, num_threads=4, wait_thread=True)
     elif type_str == 'etf' :
-        get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
+        get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, repo_path=repo_path, num_threads=4, wait_thread=True)
     elif type_str == 'fx' :
-        get_ib(                                  start_day, end_day,                        cid=cid+20,                                              num_threads=4, wait_thread=True)
+        get_ib(                                  start_day, end_day,                        cid=cid+20,                                               repo_path=repo_path, num_threads=4, wait_thread=True)
     elif type_str == 'future2' :
-        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, num_threads=2, wait_thread=True)
+        # future_2 symbols are covered by future and written there
+        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True,  repo_path=None, num_threads=2, wait_thread=True)
     else :
         print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
 

@@ -9,3 +9,7 @@ cd /cygdrive/e
 rsync -avz ib/kisco/hist/ bfu@192.168.1.235:/media/bfu/backup_2/kisco/hist --exclude=log --exclude=.git --delete --exclude=*.pyc --exclude=repo*
 rsync -avz ib/kisco/bar/ bfu@192.168.1.235:/media/bfu/backup_2/kisco/bar --exclude=log --exclude=.git --delete --exclude=*.pyc --exclude=repo*
 
+rsync -avz ib/kisco/hist/ /cygdrive/c/zfu/kisco/hist --exclude=log --exclude=.git --delete --exclude=*.pyc --exclude=repo*
+rsync -avz ib/kisco/bar/  /cygdrive/c/zfu/kisco/bar  --exclude=log --exclude=.git --delete --exclude=*.pyc --exclude=repo*
+rsync -avz research/kdb/repo/ /cygdrive/c/zfu/kisco/repo
+

@@ -65,6 +65,7 @@ def is_weekend() :
 def should_run() :
     return (not is_weekend()) and _should_run
 
+
 def move_bars(bar_path) :
     print 'moving bar files to bar/' + bar_path
     os.system('mkdir -p bar/' + bar_path)

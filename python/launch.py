@@ -22,9 +22,9 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','python/ibg_mon.py','bin/floor.exe']
 #procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','bin/floor.exe']
-cfg='config/main.cfg'
+cfg=ibbar.CFG_FILE
 proc_map={}
-RESET_WAIT_SECOND = 60
+RESET_WAIT_SECOND = 80
 
 def reset_network() :
     os.system('netsh interface set interface "Ethernet 2" admin=disable')
@@ -64,15 +64,6 @@ def is_weekend() :
 
 def should_run() :
     return (not is_weekend()) and _should_run
-
-
-def move_bars(bar_path) :
-    print 'moving bar files to bar/' + bar_path
-    os.system('mkdir -p bar/' + bar_path)
-    os.system('mv bar/*.csv bar/' + bar_path)
-    os.system('mv bar/*.bin bar/' + bar_path)
-    # gzip 
-    os.system('gzip bar/'+bar_path+'/*')
 
 def remove_logs() :
     print 'removing log files in ./log/'
@@ -208,9 +199,10 @@ def launch_sustain() :
         wd=dt.weekday()
         if wd == 4 :
             bar_path = dt.strftime('%Y%m%d')
-            print 'moving bar files to ', bar_path
-            move_bars(bar_path)
             remove_logs()
+            prev_wk, this_wk = ibbar.move_bar()
+            print 'moving bar files to ', this_wk
+            print 'previous week was ', prev_wk
 
 if __name__ == "__main__":
     launch_sustain()

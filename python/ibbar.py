@@ -5,6 +5,11 @@ import numpy as np
 import traceback
 import time
 import multiprocessing as mp
+import glob
+
+## The global configuration file
+## Assuming the current direcctory is the kisco home
+CFG_FILE='config/main.cfg'
 
 # the order makes a difference in priority of receiving live update
 sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC',\
@@ -84,8 +89,18 @@ def update_ib_config(symlistL1=sym_priority_list + ib_sym_etf, symlistL1next=sym
             f.writelines(txt)
     return symL1, symL2, symL1n
 
-def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist',getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False, repo_path=None, num_threads=None, wait_thread=True) :
+def read_cfg(key, cfg_file=CFG_FILE, default_value=None) :
+    with open(cfg_file, 'r') as f :
+        while True :
+            d = f.readline()
+            if len(d) == 0 :
+                return default_value
+            da=d.strip().split('=')
+            if da[0].strip() == key.strip() :
+                return da[1].strip()
 
+def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False, upd_repo=False, num_threads=None, wait_thread=True) :
+    bar_path = read_cfg('HistPath')
     if num_threads is not None :
         import _strptime
         n = len(symbol_list)
@@ -95,7 +110,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
         for i0, i1 in zip(k[:-1], k[1:]) :
             if i1 == i0 :
                 continue
-            res.append(pool.apply_async(get_ib_future, args=(symbol_list[i0:i1], start_date, end_date, barsec, ibclient, clp, mock_run, bar_path, getqt,gettrd, cid, start_end_hour, next_contract, repo_path, None, True,)))
+            res.append(pool.apply_async(get_ib_future, args=(symbol_list[i0:i1], start_date, end_date, barsec, ibclient, clp, mock_run, getqt,gettrd, cid, start_end_hour, next_contract, upd_repo, None, True,)))
             cid += 1
 
         fnarr = []
@@ -206,10 +221,11 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
                 print 'gzip ', fn0
                 os.system('gzip ' + fn0)
 
-    if repo_path is not None :
+    if upd_repo :
+        repo_path = read_cfg('RepoPath')
         future_inclusion = ['back' if next_contract else 'front']
-        import IB_hist as ibh
-        ibh.ingest_all_symbol(start_date, end_date, repo_path, get_missing=True, sym_list=sym_list, future_inclusion=future_inclusion)
+        from IB_hist import ingest_all_symbol
+        ingest_all_symbol(start_date, end_date, repo_path=repo_path, get_missing=True, sym_list=sym_list, future_inclusion=future_inclusion)
 
     return fnarr
 
@@ -221,7 +237,7 @@ def ib_bar_by_file(fn, skip_header) :
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
 
-def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, bar_path='hist', cid=213, exclude_list=[], sym_list=None, repo_path=None, num_threads=None, wait_thread=True) :
+def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, cid=213, exclude_list=[], sym_list=None, upd_repo=False, num_threads=None, wait_thread=True) :
     """
     This gets non-future history files, such as FX and ETF
     """
@@ -238,7 +254,7 @@ def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='I
         if s not in exclude_list :
             sym0.append(s)
 
-    return get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, bar_path=bar_path,getqt=True,gettrd=False, cid=cid, repo_path=repo_path, num_threads=num_threads, wait_thread=wait_thread)
+    return get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, getqt=True,gettrd=False, cid=cid, upd_repo=upd_repo, num_threads=num_threads, wait_thread=wait_thread)
 
 
 #################################
@@ -273,7 +289,7 @@ def matchts(fromfn, tofn, is_head=True) :
                 ix += 1
         return ix
 
-def bar_file_cleanup(sym, hist_dir='hist') :
+def bar_file_cleanup(sym) :
     """
     clean up the crap of qt/trd mismatch
     This is just one time thing, won't 
@@ -286,9 +302,9 @@ def bar_file_cleanup(sym, hist_dir='hist') :
     3. move all the 2017 stuffs to kdb_verify
     And hopefully it's only need for once
     """
-    import glob
     import subprocess
 
+    hist_dir = read_cfg('HistPath')
     sym_dir = hist_dir + '/' + sym
     f2017 = glob.glob(sym_dir+'/*2017*')
     if len(f2017) > 0 :
@@ -345,10 +361,13 @@ def bar_file_cleanup(sym, hist_dir='hist') :
         print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
 
 
-def get_all_hist(start_day, end_day, type_str, repo_path=None) :
+def ingest_all_hist(start_day, end_day, type_str, upd_repo = True) :
     """
     type_str = ['future', 'etf', 'fx', 'future2']
     future2 is the next contract
+    This is the function to be called at the end of week to ingest all the history so far. 
+    if upd_repo, then repo will be updated by the ingestion
+    Otherwise, only history file will be written
     """
     dt = datetime.datetime.now()
     cid = dt.month * 31 + dt.day + 300 + dt.second
@@ -356,33 +375,64 @@ def get_all_hist(start_day, end_day, type_str, repo_path=None) :
 
     # Using Thread Pool for 
     if type_str == 'future' :
-        get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, repo_path=repo_path, num_threads=4, wait_thread=True)
+        get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, upd_repo=upd_repo, num_threads=4, wait_thread=True)
     elif type_str == 'etf' :
-        get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, repo_path=repo_path, num_threads=4, wait_thread=True)
+        get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False,upd_repo=upd_repo, num_threads=4, wait_thread=True)
     elif type_str == 'fx' :
-        get_ib(                                  start_day, end_day,                        cid=cid+20,                                               repo_path=repo_path, num_threads=4, wait_thread=True)
+        get_ib(                                  start_day, end_day,                        cid=cid+20,                                              upd_repo=upd_repo, num_threads=4, wait_thread=True)
     elif type_str == 'future2' :
         # future_2 symbols are covered by future and written there
-        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True,  repo_path=None, num_threads=2, wait_thread=True)
+        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, upd_repo=upd_repo, num_threads=2, wait_thread=True)
     else :
         print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
 
-def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
+def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None, upd_repo=False) :
     if cid  is None :
         dt = datetime.datetime.now()
         cid = dt.month * 31 + dt.day + 300 + dt.second 
 
     fnarr = []
     for day in trd_day_arr :
+        if day in l1.bad_days :
+            print 'not getting holiday ', day
+            continue
+
         if is_fx :
             fnarr += get_ib(day, day, cid=cid+3,sym_list=[symbol])
         else :
             if is_front :
-                fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False)
+                fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, upd_repo=upd_repo)
             else :
-                fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=True)
+                fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+2, getqt=True, gettrd=True, next_contract=True, upd_repo=upd_repo)
     return fnarr
 
+
+def get_and_ingest_all() :
+    bar_path = read_cfg('BarPath')
+    dt = datetime.datetime.now()
+    if dt.weekday() != 4 :
+        print 'not a friday!'
+        return
+    yyyymmdd = dt.strftime('%Y%m%d')
+    # getting the previous week
+    wk = glob.glob(bar_path+'/2???????')
+    wk.sort()
+    prev_yyyymmdd = wk[-1].split('/')[-1]
+    # make sure it's a friday
+
+    prev_dt = datetime.datetime.strptime(prev_yyyymmdd, '%Y%m%d')
+    if prev_dt.weekday() != 4 :
+        print 'previous week', prev_yyyymmdd, ' not a friday ', prev_dt
+        return
+
+    # move bars
+    print 'moving bar files to ', bar_path +'/' + yyyymmdd
+    os.system('mkdir -p bar/' + bar_path+'/'+yyyymmdd)
+
+    for ft in ['csv','bin'] :
+        os.system('mv ' + bar_path+'/*.' + ft + ' ' + bar_path+'/' + yyyymmdd)
+    os.system('gzip '+bar_path+'/'+yyyymmdd+'/*')
+    return prev_yyyymmdd, yyyymmdd
 
 ####################
 # History Ingestion 
@@ -404,18 +454,4 @@ def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
             print 'problem with ', symbol
 
 
-def get_l1_bar(fn) :
-    """
-    1532408276, 24, 67.6100000, 67.6200000, 11, 0, 0, 1532408276000000, 1, 1, 0, 0, 67.6166726 
-    parse such bars into a l1/l2 repo ...
-    """
-    pass
-
-def get_l2_bar(fn) :
-    """
-    The file is a binary dump of bookdepot object.
-    Read the huge object in with timeseries of 20 levels + trade
-    extract some intermediate features for study.
-    """
-    pass
 

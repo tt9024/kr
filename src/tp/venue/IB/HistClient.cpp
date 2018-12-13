@@ -156,7 +156,10 @@ public:
 			} else if (errorString.find("no data")!=std::string::npos || errorString.find("query returned")!=std::string::npos) {
 					logInfo("received no data for the query, mark received");
 					received += 1;
-			}
+			} else if (errorString.find("Starting time must occur before ending time")!=std::string::npos) {
+                logInfo("requesting date is too early for the bar second");
+                received += 1;
+            }
 			// is this a pacing violation or security not found????
 			//if ( errorString.find("pacing")!=std::string::npos || errorString.find("violation")!=std::string::npos) {
 				// logError("pacing violation!");

@@ -104,7 +104,7 @@ def read_cfg(key, cfg_file=CFG_FILE, default_value=None) :
             if da[0].strip() == key.strip() :
                 return da[1].strip()
 
-def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False, num_threads=None, wait_thread=True) :
+def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False, reuse_exist_file=False, verbose=False, num_threads=None, wait_thread=True) :
     bar_path = read_cfg('HistPath')
     if num_threads is not None :
         import _strptime
@@ -115,7 +115,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
         for i0, i1 in zip(k[:-1], k[1:]) :
             if i1 == i0 :
                 continue
-            res.append(pool.apply_async(get_ib_future, args=(symbol_list[i0:i1], start_date, end_date, barsec, ibclient, clp, mock_run, getqt,gettrd, cid, start_end_hour, next_contract, None, True,)))
+            res.append(pool.apply_async(get_ib_future, args=(symbol_list[i0:i1], start_date, end_date, barsec, ibclient, clp, mock_run, getqt,gettrd, cid, start_end_hour, next_contract, reuse_exist_file, verbose, None, True)))
             cid += 1
 
         fnarr = []
@@ -169,27 +169,44 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
                 fc=fcn
             fn=bar_dir+'/'+ibfn(fc,barsec,sday,eday)
             fnarr.append(fn)
-            if symbol in ib_sym_special :
-                fc = symbol+fc[-2:]
-            sym=venue+'/'+fc
-
             fext = []
             cext = []
-            if getqt :
-                print 'getting quote'
-                fext.append('_qt.csv')
-                cext.append('0')
-            if gettrd :
-                print 'getting trade'
-                fext.append('_trd.csv')
-                cext.append('1')
-            #for ext in ['_qt.csv','_trd.csv']:
+            for gt, ext, ext_str, etp in zip([getqt, gettrd], ['_qt.csv','_trd.csv'], ['quote','trade'], ['0','1']) :
+                if not gt :
+                    continue
+                fn0=fn+ext
+                # reuse_exist_file
+                try :
+                    found=0
+                    assert reuse_exist_file
+                    for ext0 in ['', '.gz'] :
+                        try :
+                            if os.stat(fn0+ext0).st_size > 1024:
+                                found += 1
+                            print 'found existing file: ', fn0+ext0, ' count = ', found
+                        except :
+                            continue
+                    assert found == 1
+                    print 'reusing ', fn0, ' for ', ext_str, '! file_size: ', os.stat(fn0+ext0).st_size
+                except :
+                    print 'getting ', ext_str, ' FILE: ', fn0, ' (found = %d)'%(found)
+                    fext.append(ext)
+                    cext.append(etp)
+
+            if len(fext) == 0 :
+                print 'Nothing to get from %s to %s!'%(sday, eday)
+                continue
+
+            # clean up the existing files
             for ext in fext :
                 fn0=fn+ext
                 if not mock_run:
                     os.system( 'rm -f ' + fn0 + ' > /dev/null 2>&1')
                     os.system( 'rm -f ' + fn0 + '.gz' + ' > /dev/null 2>&1')
             
+            if symbol in ib_sym_special :
+                fc = symbol+fc[-2:]
+            sym=venue+'/'+fc
             # get all days with the same contract, saving to the same file
             tic=l1.TradingDayIterator(sday)
             d0=tic.yyyymmdd()
@@ -244,7 +261,7 @@ def ib_bar_by_file(fn, skip_header) :
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
 
-def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, cid=213, exclude_list=[], sym_list=None, num_threads=None, wait_thread=True) :
+def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, cid=213, exclude_list=[], sym_list=None, reuse_exist_file=False, verbose=False, num_threads=None, wait_thread=True) :
     """
     This gets non-future history files, such as FX and ETF
     """
@@ -261,7 +278,7 @@ def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='I
         if s not in exclude_list :
             sym0.append(s)
 
-    return get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, getqt=True,gettrd=False, cid=cid, num_threads=num_threads, wait_thread=wait_thread)
+    return get_ib_future(sym0, start_date, end_date, barsec, ibclient=ibclient, clp=clp,mock_run=mock_run, getqt=True,gettrd=False, cid=cid, reuse_exist_file=reuse_exist_file, verbose=verbose, num_threads=num_threads, wait_thread=wait_thread)
 
 #################################
 # Just because getting IB history bars
@@ -367,7 +384,7 @@ def bar_file_cleanup(sym) :
         print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
 
 
-def get_all_hist(start_day, end_day, type_str) :
+def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=False) :
     """
     type_str = ['future', 'etf', 'fx', 'future2']
     future2 is the next contract
@@ -379,18 +396,18 @@ def get_all_hist(start_day, end_day, type_str) :
 
     # Using Thread Pool for 
     if type_str == 'future' :
-        get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
+        get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, reuse_exist_file=reuse_exist_file, verbose=verbose, num_threads=4, wait_thread=True)
     elif type_str == 'etf' :
-        get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, num_threads=4, wait_thread=True)
+        get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=4, wait_thread=True)
     elif type_str == 'fx' :
-        get_ib(                                  start_day, end_day,                        cid=cid+20,                                              num_threads=4, wait_thread=True)
+        get_ib(                                  start_day, end_day,                        cid=cid+20,                                              reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=4, wait_thread=True)
     elif type_str == 'future2' :
         # future_2 symbols are covered by future and written there
-        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, num_threads=2, wait_thread=True)
+        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=2, wait_thread=True)
     else :
         print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
 
-def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
+def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_exist_file=True) :
     if cid  is None :
         dt = datetime.datetime.now()
         cid = dt.month * 31 + dt.day + 300 + dt.second 
@@ -400,12 +417,12 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, is_fx, cid = None) :
         if day in l1.bad_days :
             print 'not getting holiday ', day
             continue
-        if is_fx :
-            fnarr += get_ib(day, day, cid=cid+3,sym_list=[symbol])
+        if l1.venue_by_symbol(symbol) == 'FX':
+            fnarr += get_ib(day, day, cid=cid+3,sym_list=[symbol],reuse_exist_file=reuse_exist_file, verbose=False)
         else :
             # future or etf
             next_contract = not is_front
-            fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=next_contract)
+            fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=next_contract,reuse_exist_file=reuse_exist_file, verbose=False)
 
     return fnarr
 

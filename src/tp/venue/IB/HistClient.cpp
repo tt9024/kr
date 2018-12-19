@@ -39,7 +39,7 @@ public:
 
 	explicit HistoryDataClient(int clientid, const char* symbol,
 			const char* histFile, bool istrade,
-			int bsize)
+			int bsize, bool verbose)
 	    : ClientBaseImp(2000),  // don't have much to do other than process incoming
 		  tid(clientid*10000), is_trade(istrade),
 		  barsize(bsize), sz_str(str_by_barsize(bsize, SIZESTR)),
@@ -47,13 +47,14 @@ public:
 		  type_str(is_trade? "TRADES":"MIDPOINT"),
 		  historyFile(histFile), client_id(clientid),
 		  received(0), fp(fopen(histFile,"a+")),
-		  inactive(true)
+		  inactive(true), quite(!verbose)
 	{
 		RicContract::get().makeContract(con, symbol,NULL);
 		if (!fp) {
 			throw std::runtime_error("file open failed");
 		}
-		printf("started -- %s\n", toString().c_str());
+        if (!quite)
+		    printf("started -- %s\n", toString().c_str());
 	};
 
 	void reqHistBar(const char*end_date) {
@@ -186,6 +187,7 @@ private:
 	volatile int received;
 	FILE *fp;
 	bool inactive;
+    bool quite;
 };
 
 HistoryDataClient *client;
@@ -204,7 +206,7 @@ int main(int argc, char** argv)
 {
 	if (argc < 7) {
 		printf("Usage: %s client_id(100) symbol(NYM/CLM8) end_date(YYYYMMDD HH:MM:SS GMT) "
-				"bar_sec(5) filename is_trade(0/1) client_port(\"IB\" [def] or \"TWS\")\n",
+				"bar_sec(5) filename is_trade(0/1) client_port(\"IB\" [def] or \"TWS\") [--verbose]\n",
 				argv[0]);
 		return -1;
 	}
@@ -223,23 +225,34 @@ int main(int argc, char** argv)
 	bool is_trade = argv[6][0]=='1';
 	int port = IBG_PORT;
 	if (argc > 7) {
-		if (strcmp("TWS", argv[6]) == 0) {
+		if (strcmp("TWS", argv[7]) == 0) {
 			port = TWS_PORT;
 		}
 	}
-	client = new HistoryDataClient(clientId,symbol, histFile, is_trade, barSize);
+    bool quite = true;
+    if (argc > 7) {
+        for (int i=7; i<argc; ++i) {
+            if (strcmp(argv[i], "--verbose")==0) {
+                quite = false;
+                break;
+            }
+        }
+    }
+
+	client = new HistoryDataClient(clientId,symbol, histFile, is_trade, barSize, !quite);
 	bool received=false;
 	int retrycnt=0;
 	while( !received ) {
-		printf("client %d trying to get data for %s, connecting to port %d... \n", clientId, symbol, port);
+        if (!quite)
+		    printf("client %d trying to get data for %s, connecting to port %d... \n", clientId, symbol, port);
 		client->connect( "127.0.0.1", port, clientId);
 		if (client->isConnected()) {
-			printf("requesting %s on %s, bar size is %dS, writing to %s\n",
+			printf("requesting %s on %s, bar size is %dS, writing to %s: ",
 					symbol, date, barSize, histFile);
 		    //client->reqHistBar(date);
 		    client->reqHistBar(date);
 		    int cnt = 0;
-			while (client->isConnected() && cnt < 5) {
+			while (client->isConnected() && cnt < 3) {
 				client->processMessages();
 				if (int cnt = client->getReceived()) {
 					printf("received %d updates\n", cnt);
@@ -247,16 +260,21 @@ int main(int argc, char** argv)
 					break;
 				}
 				++cnt;
+                sleep( 1 );
 			}
 		}
 		if (received) break;
 		delete client;
-		client = new HistoryDataClient(clientId,symbol, histFile, is_trade, barSize);
+		client = new HistoryDataClient(clientId,symbol, histFile, is_trade, barSize, !quite);
 		// switch a port
 		port = IBPortSwitch(port);
-		printf("switching to port %d...\n", port);
+        if (!quite)
+		    printf("switching to port %d...\n", port);
+        else 
+            printf(".");
 		if (++retrycnt > 1) {
-			printf("wait and retry...\n");
+            if (!quite)
+			    printf("wait and retry...\n");
 			sleep( clientId % 4 + 1);
 		}
 	}

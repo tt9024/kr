@@ -50,6 +50,8 @@ public:
 	    	makeETFContract(con, symbol);
 	    } else if (strncmp(symbol, "NYBOT", 5) == 0) {
 	    	makeNybotContract(con, symbol);
+	    } else if (strncmp(symbol, "IDX", 5) == 0) {
+	    	makeIdxContract(con, symbol);
 	    }
 
 	    else {
@@ -223,6 +225,21 @@ private:
 	    con.includeExpired = true;
 	}
 
+	// invoked by all index symbols
+	// UnderlyingSymbol: {Currency,Exchage,Symbol,kdbSymbol}, {startHour, stopHour}, tick
+	// ==========================================================================================
+	// IDX/ATX     {EUR, VSE,     ATXF,  "Austrian Trading Index", ATX   }, {03:00, 11:00}, 0.01
+	// IDX/AP      {AUD, ASX,     AP  ,  "Australian ASX200"     , AXJO  }, {17:50, 00:30}, 0.001
+	// IDX/TSX     {CAD, TSE,     TSX ,  "Toranto TSE Composit"  , GSPTSE}, {09:30, 17:00}, 0.01
+	// IDX/HSI     {HKD, HKFE,    HSI ,  "Hang Seng Stock Index" , HSI   }, {20:30, 03:00}, 0.01
+	// IDX/K200    {KRW, KSE,     KS200, "Korean KSE 200"        , KS11  }, {18:30, 01:45}, 0.01
+	// IDX/Y       {GBP, ICEEU,   Y,     "London FTSE 250 Index" , MCX   }, {03:00, 14:00}, 0.5
+	// IDX/MXY     {USD, PSE,     MXY,   "Mexico Bolsa Idx"      , MXX   }, {09:30, 16:00}, 0.01
+	// IDX/N225    {JPY, OSE.JPN, N225,  "Nekei 225"             , N225  }, {19:00, 01:00}, 0.1
+	// IDX/OMXS30  {SEK, OMS,     OMXS30,"Sweden OMXS30"         , OMXS30}, {03:00, 11:25}, 0.01
+	// IDX/VIX     {USD, CBOE,    VIX,   "Sector:Indices"        , VIX   }, {03:00, 16:15}, 0.01
+	void makeIdxContract(Contract &con, const char* symbol, const char* curDate) const {
 
+	}
 
 };

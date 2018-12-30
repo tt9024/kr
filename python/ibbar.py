@@ -10,6 +10,7 @@ import glob
 ## The global configuration file
 ## Assuming the current direcctory is the kisco home
 CFG_FILE='/cygdrive/e/ib/kisco/config/main.cfg'
+IB_CLIENT='bin/histclient.exe'
 
 # the order makes a difference in priority of receiving live update
 sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC',\
@@ -104,7 +105,7 @@ def read_cfg(key, cfg_file=CFG_FILE, default_value=None) :
             if da[0].strip() == key.strip() :
                 return da[1].strip()
 
-def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histclient.exe', clp='IB',mock_run=False, getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False, reuse_exist_file=False, verbose=False, num_threads=None, wait_thread=True) :
+def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT, clp='IB',mock_run=False, getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False, reuse_exist_file=False, verbose=False, num_threads=None, wait_thread=True) :
     bar_path = read_cfg('HistPath')
     if num_threads is not None :
         import _strptime
@@ -197,6 +198,15 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
                 print 'Nothing to get from %s to %s!'%(sday, eday)
                 continue
 
+            if ibclient is None :
+                # here if ibclient is None then
+                # don't run it (save time)
+                # the caller should except file
+                # not found and handle it with zero bar
+                print 'Not running ibclient (None)!'
+                fnarr.remove(fn)
+                continue
+
             # clean up the existing files
             for ext in fext :
                 fn0=fn+ext
@@ -227,12 +237,12 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient='bin/histc
                             if not mock_run :
                                 os.system( cmdline )
                                 time.sleep(2)
-                                #os.system( 'sleep 2' )
+                                #os.system( 'sleep 2' 
                     tic.next()
                     d0=tic.yyyymmdd()
             except (KeyboardInterrupt, SystemExit) :
                 print 'stop ...'
-                return
+                return []
             except :
                 traceback.print_exc()
 
@@ -261,7 +271,7 @@ def ib_bar_by_file(fn, skip_header) :
     qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
     trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
 
-def get_ib(start_date, end_date, barsec=5, ibclient='bin/histclient.exe', clp='IB',mock_run=False, cid=213, exclude_list=[], sym_list=None, reuse_exist_file=False, verbose=False, num_threads=None, wait_thread=True) :
+def get_ib(start_date, end_date, barsec=5, ibclient=IB_CLIENT, clp='IB',mock_run=False, cid=213, exclude_list=[], sym_list=None, reuse_exist_file=False, verbose=False, num_threads=None, wait_thread=True) :
     """
     This gets non-future history files, such as FX and ETF
     """
@@ -407,7 +417,22 @@ def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=F
     else :
         print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
 
-def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_exist_file=True) :
+def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_exist_file=True, reuse_exist_only=False) :
+    """
+    Couple of options:
+    reuse_exist_file: will take the previous daily file
+                      and try to reuse it
+    reuse_exist_only: will only try to reuse the existing
+                      daily file.  If not found, then
+                      don't run the ibclient.  This is
+                      usually the case for unnecessary
+                      days (such as outside of sday/eday
+                      of file name).
+    """
+    ibclient=IB_CLIENT
+    if reuse_exist_only :
+        ibclient=None
+
     if cid  is None :
         dt = datetime.datetime.now()
         cid = dt.month * 31 + dt.day + 300 + dt.second 
@@ -418,11 +443,11 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_ex
             print 'not getting holiday ', day
             continue
         if l1.venue_by_symbol(symbol) == 'FX':
-            fnarr += get_ib(day, day, cid=cid+3,sym_list=[symbol],reuse_exist_file=reuse_exist_file, verbose=False)
+            fnarr += get_ib(day, day, cid=cid+3,sym_list=[symbol],reuse_exist_file=reuse_exist_file, verbose=False, ibclient=ibclient)
         else :
             # future or etf
             next_contract = not is_front
-            fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=next_contract,reuse_exist_file=reuse_exist_file, verbose=False)
+            fnarr += get_ib_future([symbol], day, day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=next_contract,reuse_exist_file=reuse_exist_file, verbose=False,ibclient=ibclient)
 
     return fnarr
 

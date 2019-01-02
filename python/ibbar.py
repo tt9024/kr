@@ -31,6 +31,7 @@ sym_priority_list_l1_next=['CL','LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB',
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
 ib_sym_etf=['EEM','EPI','EWJ','EWZ','EZU','FXI','GDX','ITB','KRE','QQQ','RSX','SPY','UGAZ','USO','VEA','VXX','XLE','XLF','XLK','XLU','XOP']
+ib_sym_idx=['ATX','HSI','K200','N225','VIX']; # to add ['AP','TSX','Y','MXY','OMXS30']
 
 def ibvenue(symbol) :
     return l1.venue_by_symbol(symbol)
@@ -54,7 +55,7 @@ def ibfc(sym,day,next_contract=False) :
         fc=sym+fc[-2:]
     return ibvenue(sym)+'/'+fc
 
-def update_ib_config(symlistL1=sym_priority_list + ib_sym_etf, symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2, cfg_file=None) :
+def update_ib_config(symlistL1=sym_priority_list + ib_sym_etf + ib_sym_idx, symlistL1next=sym_priority_list_l1_next,symlistL2=sym_priority_list_L2, cfg_file=None) :
     if symlistL1 is None :
         raise ValueError('symlistL1 cannot be None!')
 
@@ -133,6 +134,8 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
             bar_dir = bar_path+'/FX'
         elif venue == 'ETF' :
             bar_dir = bar_path+'/ETF'
+        elif venue == 'IDX' :
+            bar_dir = bar_path+'/IDX'
         else :
             bar_dir = bar_path+'/'+symbol
         if next_contract :
@@ -170,6 +173,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
                 fc=fcn
             fn=bar_dir+'/'+ibfn(fc,barsec,sday,eday)
             fnarr.append(fn)
+
             fext = []
             cext = []
             for gt, ext, ext_str, etp in zip([getqt, gettrd], ['_qt.csv','_trd.csv'], ['quote','trade'], ['0','1']) :
@@ -184,11 +188,11 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
                         try :
                             if os.stat(fn0+ext0).st_size > 1024:
                                 found += 1
-                            print 'found existing file: ', fn0+ext0, ' count = ', found
+                                print 'found existing file: ', fn0+ext0, ' count = ', found
                         except :
                             continue
                     assert found == 1
-                    print 'reusing ', fn0, ' for ', ext_str, '! file_size: ', os.stat(fn0+ext0).st_size
+                    print 'reusing ', fn0, ' for ', ext_str 
                 except :
                     print 'getting ', ext_str, ' FILE: ', fn0, ' (found = %d)'%(found)
                     fext.append(ext)
@@ -198,6 +202,10 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
                 print 'Nothing to get from %s to %s!'%(sday, eday)
                 continue
 
+            if len(fext) == 1 and fext[0] == '_trd.csv' and next_contract and getqt :
+                print '!! Next Contract using existing quote only'
+                continue
+                
             if ibclient is None :
                 # here if ibclient is None then
                 # don't run it (save time)
@@ -414,10 +422,12 @@ def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=F
     elif type_str == 'future2' :
         # future_2 symbols are covered by future and written there
         get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=2, wait_thread=True)
+    elif type_str == 'idx' :
+        get_ib_future(ib_sym_idx,                start_day, end_day, bar_sec,mock_run=False,cid=cid+40, getqt=False, gettrd=True, next_contract=False,reuse_exist_file=reuse_exist_file,verbose=verbose)
     else :
         print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
 
-def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_exist_file=True, reuse_exist_only=False) :
+def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_exist_file=True, reuse_exist_only=True) :
     """
     Couple of options:
     reuse_exist_file: will take the previous daily file

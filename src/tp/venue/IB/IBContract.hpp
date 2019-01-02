@@ -50,8 +50,8 @@ public:
 	    	makeETFContract(con, symbol);
 	    } else if (strncmp(symbol, "NYBOT", 5) == 0) {
 	    	makeNybotContract(con, symbol);
-	    } else if (strncmp(symbol, "IDX", 5) == 0) {
-	    	makeIdxContract(con, symbol);
+	    } else if (strncmp(symbol, "IDX/", 4) == 0) {
+	    	makeIdxContract(con, symbol+4);
 	    }
 
 	    else {
@@ -226,7 +226,7 @@ private:
 	}
 
 	// invoked by all index symbols
-	// UnderlyingSymbol: {Currency,Exchage,Symbol,kdbSymbol}, {startHour, stopHour}, tick
+	// Symbol: {Currency,Exchage,localSymbol,desc,kdbSymbol}, {startHour, stopHour}, tick
 	// ==========================================================================================
 	// IDX/ATX     {EUR, VSE,     ATXF,  "Austrian Trading Index", ATX   }, {03:00, 11:00}, 0.01
 	// IDX/AP      {AUD, ASX,     AP  ,  "Australian ASX200"     , AXJO  }, {17:50, 00:30}, 0.001
@@ -238,8 +238,60 @@ private:
 	// IDX/N225    {JPY, OSE.JPN, N225,  "Nekei 225"             , N225  }, {19:00, 01:00}, 0.1
 	// IDX/OMXS30  {SEK, OMS,     OMXS30,"Sweden OMXS30"         , OMXS30}, {03:00, 11:25}, 0.01
 	// IDX/VIX     {USD, CBOE,    VIX,   "Sector:Indices"        , VIX   }, {03:00, 16:15}, 0.01
-	void makeIdxContract(Contract &con, const char* symbol, const char* curDate) const {
-
+	void makeIdxContract(Contract &con, const char* symbol) const {
+        if (strcmp(symbol, "ATX")==0) {
+            con.symbol = "ATX";
+            con.currency = "EUR";
+            con.secType = "IND";
+            con.exchange = "VSE";
+            con.localSymbol = "ATXF";
+        } else if (strcmp(symbol, "VIX")==0) {
+            con.symbol = "VIX";
+            con.currency="USD";
+            con.secType="IND";
+            con.exchange="CBOE";
+        } else if (strcmp(symbol, "Y")==0) {
+            con.symbol = "Y";
+            con.currency="GBP";
+            con.secType="IND";
+            con.exchange="ICEEU";
+        } else if (strcmp(symbol, "N225")==0) {
+            con.symbol = "N225";
+            con.currency="JPY";
+            con.secType="IND";
+            con.exchange="OSE.JPN";
+        } else if (strcmp(symbol,"HSI")==0) {
+            con.symbol = "HSI";
+            con.currency="HKD";
+            con.secType="IND";
+            con.exchange="HKFE";
+        } else if (strcmp(symbol, "K200")==0) {
+            con.symbol="K200";
+            con.currency="KRW";
+            con.secType="IND";
+            con.exchange="KSE";
+            con.localSymbol="KS200";
+        } else if (strcmp(symbol, "OMXS30")==0) {
+            con.symbol="OMXS30";
+            con.currency="SEK";
+            con.exchange="OMS";
+            con.secType="IND";
+        } else if (strcmp(symbol, "AP")==0) {
+            con.symbol="AP";
+            con.currency="AUD";
+            con.exchange="ASX";
+            con.secType="IND";
+        } else if (strcmp(symbol, "TSX") == 0) {
+            con.symbol="TSX";
+            con.currency="CAD";
+            con.exchange="TSE";
+            con.secType="IND";
+        } else if (strcmp(symbol,"MXY")==0){
+            con.symbol="MXY";
+            con.currency="USD";
+            con.secType="IND";
+            con.exchange="PSE";
+        }
 	}
 
 };

@@ -24,7 +24,7 @@ procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','python/ibg_mon.py',
 #procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','bin/floor.exe']
 cfg=ibbar.CFG_FILE
 proc_map={}
-RESET_WAIT_SECOND = 80
+RESET_WAIT_SECOND = 30
 
 def reset_network() :
     os.system('netsh interface set interface "Ethernet 2" admin=disable')

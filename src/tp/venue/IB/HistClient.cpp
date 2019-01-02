@@ -249,8 +249,8 @@ int main(int argc, char** argv)
 		if (client->isConnected()) {
 			printf("requesting %s on %s, bar size is %dS, writing to %s: ",
 					symbol, date, barSize, histFile);
-		    //client->reqHistBar(date);
 		    client->reqHistBar(date);
+			//client->reqHistTickTrade(date);
 		    int cnt = 0;
 			while (client->isConnected() && cnt < 3) {
 				client->processMessages();

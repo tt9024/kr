@@ -197,12 +197,13 @@ def launch_sustain() :
                     launch(p)
             time.sleep(1)
             if not tpm.check() :
+                # All L2 repo hasn't been updated for 1 min
+                # exit the process and retry in outer (while [ 1 ]) loop
                 print 'stale detected, exit!'
                 _should_run = False
                 kill_all()
                 alive=False
                 sys.exit(1)
-
             continue
         else :
             if alive :

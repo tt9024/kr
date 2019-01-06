@@ -146,6 +146,7 @@ private:
 		{
 		    Contract con;
 		    RicContract::get().makeContract(con, symbol);
+            logInfo("reqMDL2: %s id: %d", symbol, ticker_id);
 		    m_pClient->reqMktDepth(ticker_id, con, numLevel,TagValueListSPtr());
 		} else {
 			logError("reqMDDoB error not connected!");
@@ -159,6 +160,7 @@ private:
 		    RicContract::get().makeContract(con,symbol);
 		    std::string generic_ticks="233"; // this is RT_VOLUME
 		    //std::string generic_ticks="";
+            logInfo("reqMDL1: %s id: %d", symbol, ticker_id);
 		    m_pClient->reqMktData(ticker_id, con, generic_ticks, false,false,TagValueListSPtr());
 		} else {
 			logError("reqMDBBO error not connected!");

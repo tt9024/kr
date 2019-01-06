@@ -9,7 +9,7 @@ import glob
 
 ## The global configuration file
 ## Assuming the current direcctory is the kisco home
-CFG_FILE='/cygdrive/e/ib/kisco/config/main.cfg'
+CFG_FILE='./config/main.cfg'
 
 # the order makes a difference in priority of receiving live update
 sym_priority_list=['CL','LCO','ES','6E','6J','NG','ZN','GC','ZC',\

@@ -9,6 +9,7 @@ import time
 import ibbar
 import l1
 import traceback
+import glob
 
 _should_run = True
 def signal_handler(signal, frame) :
@@ -25,6 +26,36 @@ procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','python/ibg_mon.py',
 cfg=ibbar.CFG_FILE
 proc_map={}
 RESET_WAIT_SECOND = 30
+
+class TPMon :
+    def __init__(self, stale_sec=60) :
+        self.stale_sec=stale_sec
+        self.bar_path=ibbar.read_cfg('BarPath')
+        self.fn = glob.glob(self.bar_path+'/*L2*bin')
+        self.fs = self.upd()
+        self.ts = datetime.datetime.now()
+
+    def upd(self) :
+        fs = []
+        for f in self.fn :
+            fs.append(os.stat(f).st_size)
+        return fs
+
+    def check(self) :
+        ss = (datetime.datetime.now()-self.ts).seconds
+        if ss < self.stale_sec :
+            return True
+
+        fsnow = self.upd()
+        ret=False
+        for s1, s2 in zip(self.fs, fsnow) :
+            if s2 > s1 :
+                ret=True
+                break
+
+        self.ts = datetime.datetime.now()
+        self.fs = fsnow
+        return ret
 
 def reset_network() :
     os.system('netsh interface set interface "Ethernet 2" admin=disable')
@@ -152,6 +183,8 @@ def launch_sustain() :
             #time.sleep( float((1000000-utcnow.microsecond)/1000)/1000.0 )
         print 'starting on', utcnow
         alive = True
+
+    tpm = TPMon()
     while should_run() : 
         if is_in_daily_trading() :
             if not alive :
@@ -163,6 +196,13 @@ def launch_sustain() :
                 if (p not in proc_map.keys()) or (not is_proc_alive(proc_map[p])) :
                     launch(p)
             time.sleep(1)
+            if not tpm.check() :
+                print 'stale detected, exit!'
+                _should_run = False
+                kill_all()
+                alive=False
+                sys.exit(1)
+
             continue
         else :
             if alive :
@@ -190,6 +230,7 @@ def launch_sustain() :
             while cur_utc <= utcstart :
                 cur_utc = l1.TradingDayIterator.cur_utc()
             alive = True
+            tpm = TPMon()
     
     print 'stopped ' , datetime.datetime.now()
     kill_all()

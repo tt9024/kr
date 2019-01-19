@@ -461,7 +461,7 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_ex
 
     return fnarr
 
-def get_and_ingest_all() :
+def move_bar() :
     bar_path = read_cfg('BarPath')
     dt = datetime.datetime.now()
     if dt.weekday() != 4 :

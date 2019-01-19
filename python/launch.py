@@ -102,6 +102,7 @@ def remove_logs() :
     os.system('rm -fR log/*tpib*.txt')
     os.system('rm -fR log/*l2*.txt')
     os.system('rm -fR log/*book*.txt')
+    os.system('rm -fR log/*tickrec*.txt')
     print 'removing log files in /cygdrive/c/Jts/*.20*.log'
     os.system('rm -fR /cygdrive/c/Jts/*.20*.log')
     os.system('rm -fR /cygdrive/c/Jts/dhmeniwux/*.20*.log')

@@ -460,7 +460,7 @@ public:
         case 200 :
         	// security definition not found???
         	logError("Security definition not found??? exiting...  errorCode=%d",errorCode);
-        	//disconnect();
+        	disconnect();
         	stop();
         	break;
         default :

@@ -461,7 +461,10 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_ex
 
     return fnarr
 
-def move_bar() :
+def move_bar(rsync_dir=None) :
+    """
+    rsync_dir could be /cygdrive/e/ib/kisco/bar
+    """
     bar_path = read_cfg('BarPath')
     dt = datetime.datetime.now()
     if dt.weekday() != 4 :
@@ -481,11 +484,14 @@ def move_bar() :
 
     # move bars
     print 'moving bar files to ', bar_path +'/' + yyyymmdd
-    os.system('mkdir -p bar/' + bar_path+'/'+yyyymmdd)
+    os.system('mkdir -p ' + bar_path+'/'+yyyymmdd)
 
     for ft in ['csv','bin'] :
         os.system('mv ' + bar_path+'/*.' + ft + ' ' + bar_path+'/' + yyyymmdd)
     os.system('gzip '+bar_path+'/'+yyyymmdd+'/*')
+
+    if rsync_dir is not None and len(rsync_dir) > 0 :
+        os.system('rsync -avz ' + bar_path + '/ ' + rsync_dir)
     return prev_yyyymmdd, yyyymmdd
 
 ####################

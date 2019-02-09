@@ -241,9 +241,9 @@ def launch_sustain() :
         dt=datetime.datetime.now()
         wd=dt.weekday()
         if wd == 4 :
-            bar_path = dt.strftime('%Y%m%d')
             remove_logs()
-            prev_wk, this_wk = ibbar.move_bar()
+            # edrive
+            prev_wk, this_wk = ibbar.move_bar(rsync_dir='/cygdrive/e/ib/kisco/bar')
             print 'moving bar files to ', this_wk
             print 'previous week was ', prev_wk
 

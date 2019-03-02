@@ -1,0 +1,12 @@
+*.pyc
+kdb/data
+cl
+interview*
+to_read
+todo
+rb
+pyres
+hist
+bar
+main.cfg
+config/main.cfg

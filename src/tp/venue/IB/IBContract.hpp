@@ -91,7 +91,14 @@ private:
 	void makeETFContract(Contract &con, const char* symbol) const {
 		con.symbol=std::string(symbol+4);
 		con.currency = "USD";
-		con.exchange = "ARCA";
+        if (strcmp(con.symbol.c_str(), "VXX")==0) {
+            con.exchange="VALUE";
+        } else if (strcmp(con.symbol.c_str(), "GDX")==0) {
+            con.exchange="ARCA";
+        } else {
+		    //con.exchange = "ARCA";
+		    con.exchange = "SMART";
+        }
 		con.secType = "STK";
 	}
 

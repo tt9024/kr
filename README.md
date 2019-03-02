@@ -39,3 +39,18 @@ System is launched by python/launch.py
 
 4) The entire rule for future roll is in l1.py, used accross by kdb/ib history as well as tpib live
 
+In case reinstall the TWS:
+1. Go to Computer
+2. C drive
+3. Rename the Folder Jts to Jtsold or a name you prefer
+4. Delete the previous installed folder of .i4j_jres and .oracle_jre_usage by going into to C:\Users\(Username).
+5. Go to our website to download a new installer: https://www.interactivebrokers.com/en/index.php?f=14099#tws-software
+6. Install Trader WorkStation
+
+Issues Log
+1/28/2019
+- the problem with security definition of ETF/VXX.  For some reason, at the night, it starts to throw such security definition
+  cannot find. After removed almost all of the subscription, the tpib.exe kept throwing, and TWS DATA flash rad. Turned out to be a problem
+  with IB backend, the live chat asks to ping, restart computer, reinstall the TWS, and finally admit problem. 
+  NOT HELPFUL AT ALL!  Be aware of such crappy customer service!
+

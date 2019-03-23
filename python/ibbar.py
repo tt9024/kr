@@ -30,8 +30,8 @@ sym_priority_list_l1_next=['CL','LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB',
 
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
-ib_sym_etf=['EEM','EPI','EWJ','EWZ','EZU','FXI','GDX','ITB','KRE','QQQ','RSX','SPY','UGAZ','USO','VEA','VXX','XLE','XLF','XLK','XLU','XOP']
-ib_sym_idx=['ATX','HSI','N225','VIX']; # to add ['K200', 'AP','TSX','Y','MXY','OMXS30']
+ib_sym_etf=['EEM','EPI','EWJ','EWZ','EZU','FXI','GDX','ITB','KRE','QQQ','RSX','SPY','UGAZ','USO','VEA','XLE','XLF','XLK','XLU','XOP']
+ib_sym_idx=['ATX','HSI','N225']; # to add ['K200', 'AP','TSX','Y','MXY','OMXS30'] , ['VIX'] should be 'VXX'
 
 def ibvenue(symbol) :
     return l1.venue_by_symbol(symbol)
@@ -427,7 +427,7 @@ def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=F
     else :
         print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
 
-def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_exist_file=True, reuse_exist_only=True) :
+def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_exist_file=True, reuse_exist_only=False) :
     """
     Couple of options:
     reuse_exist_file: will take the previous daily file

@@ -25,7 +25,7 @@ procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','python/ibg_mon.py',
 #procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','bin/floor.exe']
 cfg=ibbar.CFG_FILE
 proc_map={}
-RESET_WAIT_SECOND = 30
+RESET_WAIT_SECOND = 80
 
 class TPMon :
     def __init__(self, stale_sec=60) :
@@ -99,7 +99,7 @@ def should_run() :
 def remove_logs() :
     print 'removing log files in ./log/'
     os.system('rm -fR log/*hist*.txt')
-    os.system('rm -fR log/*tpib*.txt')
+    # os.system('rm -fR log/*tpib*.txt')
     os.system('rm -fR log/*l2*.txt')
     os.system('rm -fR log/*book*.txt')
     os.system('rm -fR log/*tickrec*.txt')

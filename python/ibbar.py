@@ -438,8 +438,17 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_ex
                       usually the case for unnecessary
                       days (such as outside of sday/eday
                       of file name).
+
+    Note: if IB_CLIENT is not found, i.e. on the hp notebook, 
+          reuse_exist_only is set to true
     """
-    ibclient=IB_CLIENT
+    import copy
+    ibclient=copy.deepcopy(IB_CLIENT)
+    try :
+        os.stat(ibclient)
+    except :
+        reuse_exist_only = True
+    
     if reuse_exist_only :
         ibclient=None
 

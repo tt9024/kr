@@ -68,18 +68,22 @@ def bounce_ibg() :
     ibm.kill()
     ibm._launch()
 
+
+# ==================
+# the following 3 functions control start/stop time
+# =================
 def is_in_daily_trading() :
     dt=datetime.datetime.now()
     wd=dt.weekday()
     if wd < 4:
         #return l1.tradinghour(dt) 
-        return dt.hour != 17 or dt.minute < 5
+        return dt.hour != 17 or dt.minute < 5 or dt.minute > 55
     if wd == 4 :
         return dt.hour < 17 or (dt.hour == 17 and dt.minute < 5)
     if wd == 5 :
         return False
     if wd == 6 :
-        return dt.hour >= 18
+        return dt.hour >= 18 or (dt.hour==17 and dt.minute > 55)
 
 def is_weekend() :
     dt=datetime.datetime.now()
@@ -91,7 +95,12 @@ def is_weekend() :
     if wd==4 :
         return dt.hour>17 or (dt.hour == 17 and dt.minute >= 5)
     if wd==6 :
-        return dt.hour<18
+        return dt.hour<17 or (dt.hour == 17 and dt.minute <= 55)
+
+def get_utcstart() :
+    dtnow=datetime.datetime.now()
+    return l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
+            '%Y%m%d'), 17, 55, 59)
 
 def should_run() :
     return (not is_weekend()) and _should_run
@@ -162,8 +171,7 @@ def launch_sustain() :
         dtnow = datetime.datetime.now()
     while dtnow.weekday() == 6 and not should_run() :
         utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
-        utcstart=l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
-                '%Y%m%d'), 17, 59, 59)
+        utcstart=get_utcstart()
         while utcnow < utcstart -  RESET_WAIT_SECOND - 10 :
             print 'wait for Sunday open...', utcnow, utcstart, utcstart-utcnow
             #reset_network()
@@ -213,8 +221,7 @@ def launch_sustain() :
                 alive = False
             # do one hour of reset
             dtnow = datetime.datetime.now()
-            utcstart=l1.TradingDayIterator.local_ymd_to_utc(dtnow.strftime(\
-                '%Y%m%d'), 17, 59, 59)
+            utcstart=get_utcstart()
             cur_utc = l1.TradingDayIterator.cur_utc()
             while  cur_utc <= utcstart - RESET_WAIT_SECOND - 10 :
                 print 'reset network', cur_utc, utcstart

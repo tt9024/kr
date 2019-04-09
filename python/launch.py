@@ -108,7 +108,7 @@ def should_run() :
 def remove_logs() :
     print 'removing log files in ./log/'
     os.system('rm -fR log/*hist*.txt')
-    # os.system('rm -fR log/*tpib*.txt')
+    os.system('rm -fR log/*tpib*.txt')
     os.system('rm -fR log/*l2*.txt')
     os.system('rm -fR log/*book*.txt')
     os.system('rm -fR log/*tickrec*.txt')

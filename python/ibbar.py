@@ -272,14 +272,6 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
 
     return fnarr
 
-def ib_bar_by_file(fn, skip_header) :
-    """
-    using l1.py's write_daily_bar()interface, need to collect all bars in format of
-    bar0=[utc, utc_lt, b['open'],b['high'],b['low'],b['close'],b['vwap'],b['volume'],b['bvol'],b['svol']]
-    """
-    qt_raw=np.genfromtxt(fn+'_qt.csv',delimiter=',',usecols=[0,1,2,3,4])
-    trd_raw=np.genfromtxt(fn+'_trd.csv',delimiter=',',usecols=[0,1,2,3,4,5,6,7])
-
 def get_ib(start_date, end_date, barsec=5, ibclient=IB_CLIENT, clp='IB',mock_run=False, cid=213, exclude_list=[], sym_list=None, reuse_exist_file=False, verbose=False, num_threads=None, wait_thread=True) :
     """
     This gets non-future history files, such as FX and ETF
@@ -427,6 +419,7 @@ def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=F
         get_ib_future(ib_sym_idx,                start_day, end_day, bar_sec,mock_run=False,cid=cid+40, getqt=False, gettrd=True, next_contract=False,reuse_exist_file=reuse_exist_file,verbose=verbose)
     else :
         print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
+    return type_str
 
 def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_exist_file=True, reuse_exist_only=False) :
     """
@@ -524,4 +517,29 @@ def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
             print 'problem with ', symbol
 
 
+
+######################
+# Weekly procedures
+######################
+def weekly_get_hist(sday, eday) :
+    # this is supposed to run on IB connection machine
+    # run 
+    type_str_arr = ['future','future2','etf','fx','idx']
+    num_thread=len(type_str_arr)
+    pool=mp.Pool(processes=num_threads)
+
+    res=[]
+    for ts in type_str_arr :
+        res.append(pool.apply_async(get_all_hist, args=(sday, eday, ts, True, False)))
+
+    type_str_done = []
+    for r in res:
+        type_str_done.append(r.get())
+
+    print 'finished with ', type_str_done
+    if len(type_str_done) == len(type_str_arr) :
+        print 'ALL DONE!'
+        return True
+
+    return False
 

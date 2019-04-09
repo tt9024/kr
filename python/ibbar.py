@@ -464,9 +464,9 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_ex
 
     return fnarr
 
-def move_bar(rsync_dir=None) :
+def move_bar(rsync_dir_list=None) :
     """
-    rsync_dir could be /cygdrive/e/ib/kisco/bar
+    rsync_dir_list could be ['/cygdrive/e/ib/kisco/bar']
     """
     bar_path = read_cfg('BarPath')
     dt = datetime.datetime.now()
@@ -493,8 +493,10 @@ def move_bar(rsync_dir=None) :
         os.system('mv ' + bar_path+'/*.' + ft + ' ' + bar_path+'/' + yyyymmdd)
     os.system('gzip '+bar_path+'/'+yyyymmdd+'/*')
 
-    if rsync_dir is not None and len(rsync_dir) > 0 :
-        os.system('rsync -avz ' + bar_path + '/ ' + rsync_dir)
+    if rsync_dir_list is not None:
+        for rsync_dir in rsync_dir_list :
+            if len(rsync_dir) > 0 :
+                os.system('rsync -avz ' + bar_path + '/ ' + rsync_dir)
     return prev_yyyymmdd, yyyymmdd
 
 ####################
@@ -521,10 +523,9 @@ def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
 ######################
 # Weekly procedures
 ######################
-def weekly_get_hist(sday, eday) :
+def weekly_get_hist(sday, eday, type_str_arr = ['future','future2','etf','fx','idx']) :
     # this is supposed to run on IB connection machine
     # run 
-    type_str_arr = ['future','future2','etf','fx','idx']
     num_thread=len(type_str_arr)
     pool=mp.Pool(processes=num_threads)
 
@@ -542,4 +543,12 @@ def weekly_get_hist(sday, eday) :
         return True
 
     return False
+
+def move_hist_bar(bar_date, from_hist='/cygdrive/c/zfu/kisco/hist',from_bar='/cygdrive/c/zfu/kisco/bar') :
+    """
+    this is intended to be run on Data Machine, on the kisco/kr dir
+    getting from zfu@kisco
+    """
+    os.system('scp -r ' + 'zfu@kisco:'+from_bar+'/'+bar_date + ' bar')
+    os.system('rsync -avz zfu@kisco:'+from_hist+'/ hist')
 

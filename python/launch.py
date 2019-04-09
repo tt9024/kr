@@ -27,6 +27,13 @@ cfg=ibbar.CFG_FILE
 proc_map={}
 RESET_WAIT_SECOND = 80
 
+### data machine settings
+USER='bfu'
+DATA_MACHINE = 'huan'
+BAR_PATH  = '/home/bfu/kisco/bar'
+HIST_PATH = '/home/bfu/kisco/hist'
+REPO_PATH = '/home/bfu/kisco/repo'
+
 class TPMon :
     def __init__(self, stale_sec=60) :
         self.stale_sec=stale_sec
@@ -250,9 +257,14 @@ def launch_sustain() :
         if wd == 4 :
             remove_logs()
             # edrive
-            prev_wk, this_wk = ibbar.move_bar(rsync_dir='/cygdrive/e/ib/kisco/bar')
+            prev_wk, this_wk = ibbar.move_bar(rsync_dir_list=['/cygdrive/e/ib/kisco/bar'])
+            bar_path = ibbar.read_cfg('BarPath')
+            os.system('scp -r ' + bar_path + '/'+yyyymmdd + ' ' + USER+'@'+DATA_MACHINE+':'+BAR_PATH)
+
             print 'moving bar files to ', this_wk
             print 'previous week was ', prev_wk
+            import IB_hist
+            IB_hist.weekly_get_ingest(rsync_dir_list=['/cygdrive/e/ib/kisco/hist'])
 
 if __name__ == "__main__":
     launch_sustain()

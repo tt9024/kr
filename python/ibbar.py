@@ -395,7 +395,7 @@ def bar_file_cleanup(sym) :
         print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
 
 
-def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=False) :
+def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=False, sym_list=None) :
     """
     type_str = ['future', 'etf', 'fx', 'future2','idx']
     future2 is the next contract
@@ -407,16 +407,25 @@ def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=F
 
     # Using Thread Pool for 
     if type_str == 'future' :
-        get_ib_future(sym_priority_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, reuse_exist_file=reuse_exist_file, verbose=verbose, num_threads=4, wait_thread=True)
+        if sym_list is None:
+            sym_list = sym_priority_list
+        get_ib_future(sym_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+1, getqt=True, gettrd=True, next_contract=False, reuse_exist_file=reuse_exist_file, verbose=verbose, num_threads=4, wait_thread=True)
     elif type_str == 'etf' :
-        get_ib_future(ib_sym_etf,                start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=4, wait_thread=True)
+        if sym_list is None :
+            sym_list = ib_sym_etf
+        get_ib_future(sym_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=4, wait_thread=True)
     elif type_str == 'fx' :
-        get_ib(                                  start_day, end_day,                        cid=cid+20,                                              reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=4, wait_thread=True)
+        print 'sym_list ', sym_list, ' ignored!'
+        get_ib(                         start_day, end_day,                        cid=cid+20,                                              reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=4, wait_thread=True)
     elif type_str == 'future2' :
+        if sym_list is None :
+            sym_list = sym_priority_list_l1_next
         # future_2 symbols are covered by future and written there
-        get_ib_future(sym_priority_list_l1_next, start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=2, wait_thread=True)
+        get_ib_future(sym_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+30, getqt=True, gettrd=True, next_contract=True, reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=2, wait_thread=True)
     elif type_str == 'idx' :
-        get_ib_future(ib_sym_idx,                start_day, end_day, bar_sec,mock_run=False,cid=cid+40, getqt=False, gettrd=True, next_contract=False,reuse_exist_file=reuse_exist_file,verbose=verbose)
+        if sym_list is None :
+            sym_list = ib_sym_idx
+        get_ib_future(sym_list,         start_day, end_day, bar_sec,mock_run=False,cid=cid+40, getqt=False, gettrd=True, next_contract=False,reuse_exist_file=reuse_exist_file,verbose=verbose)
     else :
         print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
     return type_str
@@ -523,26 +532,22 @@ def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
 ######################
 # Weekly procedures
 ######################
-def weekly_get_hist(sday, eday, type_str_arr = ['future','future2','etf','fx','idx']) :
+def weekly_get_hist(sday, eday, type_str_arr = ['future','future2','etf','fx','idx'], sym_list=None) :
     # this is supposed to run on IB connection machine
     # run 
-    num_thread=len(type_str_arr)
-    pool=mp.Pool(processes=num_threads)
+    from multiprocessing import Process
 
-    res=[]
+    parr = []
     for ts in type_str_arr :
-        res.append(pool.apply_async(get_all_hist, args=(sday, eday, ts, True, False)))
+        p=Process(target=get_all_hist, args=(sday, eday, ts, False, False, sym_list))
+        p.start()
+        parr.append(p)
 
-    type_str_done = []
-    for r in res:
-        type_str_done.append(r.get())
+    for p in parr :
+        p.join()
+    print 'finished with ', type_str_arr, ' ', sym_list
+    return type_str_arr
 
-    print 'finished with ', type_str_done
-    if len(type_str_done) == len(type_str_arr) :
-        print 'ALL DONE!'
-        return True
-
-    return False
 
 def move_hist_bar(bar_date, from_hist='/cygdrive/c/zfu/kisco/hist',from_bar='/cygdrive/c/zfu/kisco/bar') :
     """

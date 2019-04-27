@@ -259,7 +259,7 @@ def launch_sustain() :
             # edrive
             prev_wk, this_wk = ibbar.move_bar(rsync_dir_list=['/cygdrive/e/ib/kisco/bar'])
             bar_path = ibbar.read_cfg('BarPath')
-            os.system('scp -r ' + bar_path + '/'+yyyymmdd + ' ' + USER+'@'+DATA_MACHINE+':'+BAR_PATH)
+            os.system('scp -r ' + bar_path + '/'+this_wk + ' ' + USER+'@'+DATA_MACHINE+':'+BAR_PATH)
 
             print 'moving bar files to ', this_wk
             print 'previous week was ', prev_wk

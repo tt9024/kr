@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import l1
 import os
 import datetime
@@ -557,4 +558,9 @@ def move_hist_bar(bar_date, from_hist='/cygdrive/c/zfu/kisco/hist',from_bar='/cy
     """
     os.system('scp -r ' + 'zfu@kisco:'+from_bar+'/'+bar_date + ' bar')
     os.system('rsync -avz zfu@kisco:'+from_hist+'/ hist')
+
+if __name__ == "__main__" :
+    import sys
+    if len(sys.argv) == 3 :
+        weekly_get_hist(sys.argv[1], sys.argv[2])
 

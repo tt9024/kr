@@ -259,12 +259,20 @@ def launch_sustain() :
             # edrive
             prev_wk, this_wk = ibbar.move_bar(rsync_dir_list=['/cygdrive/e/ib/kisco/bar'])
             bar_path = ibbar.read_cfg('BarPath')
-            os.system('scp -r ' + bar_path + '/'+this_wk + ' ' + USER+'@'+DATA_MACHINE+':'+BAR_PATH)
+            #os.system('scp -r ' + bar_path + '/'+this_wk + ' ' + USER+'@'+DATA_MACHINE+':'+BAR_PATH)
 
             print 'moving bar files to ', this_wk
             print 'previous week was ', prev_wk
-            import IB_hist
-            IB_hist.weekly_get_ingest(rsync_dir_list=['/cygdrive/e/ib/kisco/hist'])
+
+            #import IB_hist
+            #IB_hist.weekly_get_ingest(rsync_dir_list=['/cygdrive/e/ib/kisco/hist'])
+            eday = dt.strftime('%Y%m%d')
+            tdi = l1.TradingDayIterator(eday)
+            sday = tdi.prev_n_trade_day(5).yyyymmdd()
+            #ibbar.weekly_get_hist(sday, eday)
+            os.system("nohup python/ibbar.py " + sday + " " + eday + " 2>&1 >> ./gethist.log &")
+            print "started nohup python/ibbar.py " + sday + " " + eday + " 2>&1 >> ./gethist.log &", datetime.datetime.now()
+            time.sleep( 30 )
 
 if __name__ == "__main__":
     launch_sustain()

@@ -533,14 +533,14 @@ def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
 ######################
 # Weekly procedures
 ######################
-def weekly_get_hist(sday, eday, type_str_arr = ['future','future2','etf','fx','idx'], sym_list=None, nowait=True) :
+def weekly_get_hist(sday, eday, type_str_arr = ['future','future2','etf','fx','idx'], reuse_existing=False, sym_list=None, nowait=True) :
     # this is supposed to run on IB connection machine
     # run 
     from multiprocessing import Process
 
     parr = []
     for ts in type_str_arr :
-        p=Process(target=get_all_hist, args=(sday, eday, ts, False, False, sym_list))
+        p=Process(target=get_all_hist, args=(sday, eday, ts, reuse_existing, False, sym_list))
         p.start()
         parr.append(p)
 

@@ -27,7 +27,9 @@ sym_priority_list_L2=['CL','LCO','ES','6E','ZN','GC']
 #sym_priority_list_l1_next=['CL', 'LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB', 'ZW','ZS','ZM','ZL']
 # adding '6E','6J','ZN',ZF','ZB','6A','6C','6B','6N','6R','6Z','6M'
 sym_priority_list_l1_next2=['6E','6J','ZN','ZF','ZB','6A','6C','6B','6N','6R','6Z','6M']
+
 sym_priority_list_l1_next=['CL','LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB', 'ZW','ZS','ZM','ZL'] + sym_priority_list_l1_next2
+#sym_priority_list_l1_next=['CL','LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB', 'ZW','ZS'] + sym_priority_list_l1_next2
 
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']

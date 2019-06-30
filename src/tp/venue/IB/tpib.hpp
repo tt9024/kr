@@ -459,9 +459,9 @@ public:
         	break;
         case 200 :
         	// security definition not found???
-        	logError("Security definition not found??? exiting...  errorCode=%d",errorCode);
-        	disconnect();
-        	stop();
+        	logError("Security definition not found??? exiting... id:%d, errorCode=%d",id,errorCode);
+        	//disconnect();
+        	//stop();
         	break;
         default :
         	logError("Error ignored.  errorCode=%d",errorCode);

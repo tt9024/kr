@@ -148,9 +148,13 @@ public:
 
 	void error(int id, int errorCode, const std::string& errorString)
 	{
-		logInfo( "Error. Id: %d, Code: %d, Msg: %s", id, errorCode, errorString.c_str());
+		logInfo( "Error. Id: %d, Code: %d, Msg: %s, State: (isConnected(): %s, inactive: %s)", 
+                id, errorCode, errorString.c_str(),
+                isConnected()?"True":"False",
+                !inactive?"True":"False");
 		m_errorCode=errorCode;
-		if (m_errorCode==162 || ((m_errorCode==200) && isConnected() && (!inactive))) { // no historical data returned
+		//if (m_errorCode==162 || ((m_errorCode==200) && isConnected() && (!inactive))) { // no historical data returned
+		if (m_errorCode==162 || ((m_errorCode==200))) { // no historical data returned
 			if (errorString.find("definition")!=std::string::npos || errorString.find("found")!=std::string::npos) {
 				logInfo("received definition error, mark received");
 				received += 1;

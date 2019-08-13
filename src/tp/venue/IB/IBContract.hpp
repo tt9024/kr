@@ -176,14 +176,19 @@ private:
 
 	// CBOT future invoked by symbol "CBT/ZBM8"
 	// NOTE: also includes ZC
+    // NOTE local name doesn't work, so has to work out
+    // the ten year boundary, i.e. 2010 or 2020 for '0'
 	void makeCbtContract(Contract &con, const char* symbol) const {
 	    con.symbol = std::string(symbol+4, 2);
 	    con.currency = "USD";
 	    con.exchange = "ECBOT";
 	    con.secType = "FUT";
 	    //con.localSymbol = std::string(symbol+4, 2) + "  ";
-	    IBString exp = "201";
-	    exp+=(symbol+7);
+	    IBString exp = "20";
+        const char y=symbol[7];
+        exp+=( (y=='0')?'2':'1');
+	    exp+=y;
+
 	    exp+=ib_futmon.find(symbol[6])->second;
 	    //con.tradingClass = std::string(symbol+4, 2);
 	    //con.expiry=exp;
@@ -211,9 +216,11 @@ private:
 	    con.exchange = "DTB";
 	    con.secType = "FUT";
 	    //con.localSymbol = std::string(symbol+4, 2) + "  ";
-	    IBString exp = "201";
+	    IBString exp = "20";
 	    const size_t n = strlen(symbol);
-	    exp+=(symbol+(n-1));
+        const char y = symbol[n-1];
+        exp+=((y=='0')?'2':'1');
+	    exp+=y;
 	    exp+=ib_futmon.find(symbol[n-2])->second;
 	    //con.tradingClass = std::string(symbol+4, 2);
 	    //con.expiry=exp;

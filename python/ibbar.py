@@ -33,7 +33,7 @@ sym_priority_list_l1_next=['CL','LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB',
 
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
-ib_sym_etf=['EEM','EPI','EWJ','EWZ','EZU','FXI','GDX','ITB','KRE','QQQ','RSX','SPY','UGAZ','USO','VEA','XLE','XLF','XLK','XLU','XOP']
+ib_sym_etf=['EEM','EPI','EWJ','EWZ','EZU','FXI','GDX','ITB','KRE','QQQ','RSX','SPY','USO','VEA','XLE','XLF','XLK','XLU','XOP']
 ib_sym_idx=['ATX','HSI','N225']; # to add ['K200', 'AP','TSX','Y','MXY','OMXS30'] , ['VIX'] should be 'VXX'
 ib_sym=sym_priority_list+ib_sym_etf+ib_sym_idx
 
@@ -398,7 +398,7 @@ def bar_file_cleanup(sym) :
         print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
 
 
-def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=False, sym_list=None) :
+def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=False, sym_list=None, sym_exclude_list=[]) :
     """
     type_str = ['future', 'etf', 'fx', 'future2','idx']
     future2 is the next contract
@@ -476,12 +476,13 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_ex
 
     return fnarr
 
-def move_bar(rsync_dir_list=None) :
+def move_bar(rsync_dir_list=None, dt=None) :
     """
     rsync_dir_list could be ['/cygdrive/e/ib/kisco/bar']
     """
     bar_path = read_cfg('BarPath')
-    dt = datetime.datetime.now()
+    if dt is None: 
+        dt = datetime.datetime.now()
     if dt.weekday() != 4 :
         print 'not a friday!'
         return
@@ -535,14 +536,14 @@ def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
 ######################
 # Weekly procedures
 ######################
-def weekly_get_hist(sday, eday, type_str_arr = ['future','future2','etf','fx','idx'], reuse_existing=False, sym_list=None, nowait=True) :
+def weekly_get_hist(sday, eday, type_str_arr = ['future','future2','etf','fx','idx'], reuse_existing=False, sym_list=None, nowait=True, sym_exclude_list=[]) :
     # this is supposed to run on IB connection machine
     # run 
     from multiprocessing import Process
 
     parr = []
     for ts in type_str_arr :
-        p=Process(target=get_all_hist, args=(sday, eday, ts, reuse_existing, False, sym_list))
+        p=Process(target=get_all_hist, args=(sday, eday, ts, reuse_existing, False, sym_list, sym_exclude_list))
         p.start()
         parr.append(p)
 
@@ -565,4 +566,8 @@ if __name__ == "__main__" :
     import sys
     if len(sys.argv) == 3 :
         weekly_get_hist(sys.argv[1], sys.argv[2])
+    if len(sys.argv) >= 4 :
+        reuse_existing = True if sys.argv[3].upper()[0]=='Y' or sys.argv[3][0]=='1' else False
+        print 'reuse_existing: ', reuse_existing
+        weekly_get_hist(sys.argv[1], sys.argv[2], reuse_existing = reuse_existing)
 

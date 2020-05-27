@@ -92,8 +92,10 @@ private:
 		con.symbol=std::string(symbol+4);
 		con.currency = "USD";
         if (strcmp(con.symbol.c_str(), "VXX")==0) {
-            con.exchange="VALUE";
+            con.exchange="ARCA";
         } else if (strcmp(con.symbol.c_str(), "GDX")==0) {
+            con.exchange="ARCA";
+        } else if (strcmp(con.symbol.c_str(), "UGAZ")==0) {
             con.exchange="ARCA";
         } else {
 		    //con.exchange = "ARCA";

@@ -5,9 +5,10 @@ import time
 
 class IBGatewayMonitor :
     def __init__(self) :
-        self.start_cmd = '/cygdrive/c/zfu/IBController/IBControllerGatewayStart.bat'
+        #self.start_cmd = '/cygdrive/c/zfu/IBController/IBControllerGatewayStart.bat'
+        self.start_cmd = '/cygdrive/c/zfu/IBC/StartGateway.bat'
         self.ibg_proc='IB Gateway'
-        self.ibc_proc='IBController'
+        self.ibc_proc='IBC (GATEWAY'
 
     def _get_pid(self, running_only) :
         cmd = 'tasklist /v'

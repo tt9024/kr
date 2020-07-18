@@ -33,8 +33,8 @@ sym_priority_list_l1_next=['CL','LCO', 'GC', 'SI', 'HG', 'ZC', 'NG', 'HO', 'RB',
 
 barsec_dur={1:1800, 5:3600, 10:14400, 30:28800, 60:60*60*24,300:60*60*24}
 ib_sym_special=['6A','6C','6E','6B','6J','6N','6R','6Z','6M','ZC']
-ib_sym_etf=['EEM','EPI','EWJ','EWZ','EZU','FXI','GDX','ITB','KRE','QQQ','RSX','SPY','USO','VEA','XLE','XLF','XLK','XLU','XOP']
-ib_sym_idx=['ATX','HSI','N225']; # to add ['K200', 'AP','TSX','Y','MXY','OMXS30'] , ['VIX'] should be 'VXX'
+ib_sym_etf=['EEM','EPI','EWJ','EWZ','EZU','FXI','GDX','ITB','KRE','QQQ','RSX','SPY','USO','VEA','XLE','XLF','XLK','XLU','XOP','VXX']
+ib_sym_idx=['ATX','HSI','N225']; # to add ['K200', 'AP','TSX','Y','MXY','OMXS30'] 
 ib_sym=sym_priority_list+ib_sym_etf+ib_sym_idx
 
 def ibvenue(symbol) :

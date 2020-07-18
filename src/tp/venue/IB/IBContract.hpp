@@ -188,7 +188,7 @@ private:
 	    //con.localSymbol = std::string(symbol+4, 2) + "  ";
 	    IBString exp = "20";
         const char y=symbol[7];
-        exp+=( (y=='0')?'2':'1');
+        exp+=( ( y<'3' )?'2':'1');
 	    exp+=y;
 
 	    exp+=ib_futmon.find(symbol[6])->second;
@@ -221,7 +221,7 @@ private:
 	    IBString exp = "20";
 	    const size_t n = strlen(symbol);
         const char y = symbol[n-1];
-        exp+=((y=='0')?'2':'1');
+        exp+=(( y<'3' )?'2':'1');
 	    exp+=y;
 	    exp+=ib_futmon.find(symbol[n-2])->second;
 	    //con.tradingClass = std::string(symbol+4, 2);

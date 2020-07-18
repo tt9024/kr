@@ -389,8 +389,8 @@ public:
             logDebug("RT_VOLUME: %.7lf %d",price, size);
             auto& writer (_book_queue[id-TickerStart]->theWriter());
             if(__builtin_expect(!writer.updTrade(price, size),0)) {
-            	logError("TPIB update trade error: %s",
-            			writer.getBook()->toString().c_str());
+            	logError("TPIB update trade error [RT_VOLUME price(%.7lf) size(%d)] Book:  %s",
+                        price, size, writer.getBook()->toString().c_str());
             } else {
             	const BookDepot& bookL1 (writer.getBook()->_book);
 				IBBookQType* q = _book_queue_l1_to_l2[id-TickerStart];

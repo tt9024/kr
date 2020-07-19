@@ -10,3 +10,5 @@ hist
 bar
 main.cfg
 config/main.cfg
+config/*
+repo*

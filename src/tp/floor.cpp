@@ -106,7 +106,10 @@ void Floor::run() {
 		}
 		if (__builtin_expect(!_server->poll(), 0)) {
 			bounce(true);
-		}
+		} else {
+            usleep(100);
+        }
+
 	}
 	stop();
 }

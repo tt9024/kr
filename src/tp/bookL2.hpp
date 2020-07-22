@@ -1187,11 +1187,12 @@ private:
 	// in the format of
     // bar_sec,bsz,bp,asz,ap,buyVol,sellVol,updMicro,bqcnt,aqcnt,btcnt,stcnt,ismTwap
     void writeBarLine(int64_t cur_micro) {
-		fprintf(bfp, "%d, %d, %.7lf, %.7lf, %d, %d, %d, %lld, %d, %d, %d, %d, %.7lf\n",
-				(int) (cur_micro/1000000ULL), bsz,bp,ap,asz,bv,sv,
-				(long long) utils::TimeUtil::cur_time_micro(),
-				bqcnt,aqcnt,btcnt,stcnt,ism_cum/total_ism_micro);
-
+        if (ap*bp != 0) {
+            fprintf(bfp, "%d, %d, %.7lf, %.7lf, %d, %d, %d, %lld, %d, %d, %d, %d, %.7lf\n",
+                    (int) (cur_micro/1000000ULL), bsz,bp,ap,asz,bv,sv,
+                    (long long) utils::TimeUtil::cur_time_micro(),
+                    bqcnt,aqcnt,btcnt,stcnt,(double)ism_cum/total_ism_micro);
+        }
     };
 
     void reset() {

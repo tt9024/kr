@@ -22,8 +22,8 @@ void sig_handler(int signo)
 }
 
 int main(int argc, char**argv) {
-    if (argc != 4) {
-        printf("Usage: %s symbol [L2|L1|L1n] [full|tail]\n", argv[0]);
+    if (argc < 4) {
+        printf("Usage: %s symbol [L2|L1|L1n] [full|tail] [throttle_micro(250000)] [start_utc_second(-1)] [end_utc_second(0x7fffffff)]\n", argv[0]);
         printf("\nL2 subscriptions: ");
         std::vector<std::string> l2 = plcc_getStringArr("SubL2");
         for (auto s : l2) {
@@ -53,9 +53,26 @@ int main(int argc, char**argv) {
     	next_contract = true;
     }
     bool tail = false;
-    if (argc>2 && strcmp(argv[3], "tail")==0) {
+    if (argc>3 && strcmp(argv[3], "tail")==0) {
     	tail = true;
     }
+
+    int64_t throttle_micro = 250000LL;
+    if (argc>4) {
+        throttle_micro = (int64_t)atoi(argv[4]);
+    }
+
+    int64_t start_utc = -1;
+    if (argc>5) {
+        start_utc = (int64_t)atoi(argv[5]);
+    }
+
+    int64_t end_utc = 0x7fffffff;
+    if (argc>6) {
+        end_utc = (int64_t)atoi(argv[6]);
+    }
+    end_utc*=1000000LL;
+
     if (signal(SIGINT, sig_handler) == SIG_ERR)
     {
             printf("\ncan't catch SIGINT\n");
@@ -66,11 +83,17 @@ int main(int argc, char**argv) {
     L2DeltaReader reader(bcfg, tail);
     user_stopped = false;
     const BookDepot* book;
-    uint64_t last_micro = 0;
+    int64_t last_micro = 0;
     while (!user_stopped) {
         book = reader.readNext();
         if (book) {
-        	if (book->update_ts_micro - last_micro > 250000 || book->update_type == 2) {
+            if ((int64_t)book->update_ts_micro < start_utc) {
+                continue;
+            }
+            if ((int64_t)book->update_ts_micro > end_utc) {
+                break;
+            }
+        	if ((int64_t)book->update_ts_micro - last_micro > throttle_micro || book->update_type == 2) {
         		printf("%s\n", book->prettyPrint().c_str());
         		last_micro = book->update_ts_micro;
         	}

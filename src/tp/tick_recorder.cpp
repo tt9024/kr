@@ -66,35 +66,48 @@ int main() {
     //uint64_t start_tm = utils::TimeUtil::cur_time_micro();
     user_stopped = false;
     long long fcnt=0;
-    int idle_cnt = 0;
+    const int64_t bar_micro = bsec * 1000000LL;
+    const int64_t MAX_SLEEP_MICRO = 50000LL;
 
+    int64_t cur_micro = utils::TimeUtil::cur_time_micro();
+    int64_t next_bar = (cur_micro / bar_micro  + 1) * bar_micro;
+    int flush_need = 0; // zero bar files need to be flushed
     while (!user_stopped) {
     	bool has_update = false;
     	for (auto bw : bws) {
-    		has_update |= bw->update_continous();
+            cur_micro = utils::TimeUtil::cur_time_micro();
+            if (cur_micro >= next_bar) {
+                has_update = true;
+                break;
+            }
+    		has_update |= bw->update_continous(cur_micro);
     	}
+        if (cur_micro >= next_bar) {
+            for (auto bw2 : bws) {
+                bw2->onBar(next_bar);
+            }
+            next_bar += bar_micro;
+            flush_need = (int)bws.size();
+        }
+
     	if (!has_update) {
-    		++ idle_cnt;
-    	} else {
-    		idle_cnt = 0;
-    		continue;
-    	}
-        long long next_bar_micro= (long long)utils::TimeUtil::cur_time_micro();
-    	if (idle_cnt > 10) {
-    		next_bar_micro += 200000ULL;
-    	}  else {
-    		if (idle_cnt > 3) {
-    			next_bar_micro += 50000ULL;
-    		}
-    	}
-    	long long i = fcnt;
-    	for (; i<fcnt+(long long)bws.size(); ++i) {
-    		if ((long long)utils::TimeUtil::cur_time_micro() < next_bar_micro )
-    			bws[(i%(long long)bws.size())]->flush();
-    		else
-    			break;
-    	}
-    	fcnt=i;
+            int64_t sleep_micro = (next_bar - cur_micro) - MAX_SLEEP_MICRO;
+            if (sleep_micro > MAX_SLEEP_MICRO) {
+                if (flush_need > 0) {
+                    long long i = fcnt;
+                    for (; flush_need>0 ; ++i, --flush_need) {
+                        if (cur_micro >= next_bar) {
+                            break;
+                        }
+                        bws[(i%(long long)bws.size())]->flush();
+                        cur_micro = utils::TimeUtil::cur_time_micro();
+                    }
+                    fcnt=i;
+                } else {
+                    usleep(MAX_SLEEP_MICRO);
+                }
+            }
+        }
     }
     for (auto bw : bws) {
     	delete bw;

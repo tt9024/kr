@@ -25,7 +25,7 @@ void sig_handler(int signo)
 
 int main(int argc, char**argv) {
     if (argc < 3) {
-        printf("Usage: %s symbol type(L1|L2) [-t trade_only]\n", argv[0]);
+        printf("Usage: %s symbol type(L1|L2) [-t trade_only | -d dump_all]\n", argv[0]);
         std::vector<std::string> l1 = plcc_getStringArr("SubL1");
         printf("L1 subscriptions: ");
         for (auto s : l1) {
@@ -55,6 +55,10 @@ int main(int argc, char**argv) {
     if (argc>3 && strcmp(argv[3], "-t")==0) {
     	trade_only = true;
     }
+    bool dump_all = false;
+    if (argc>3 && strcmp(argv[3], "-d")==0) {
+        dump_all=true;
+    }
     BookQType bq(bcfg, true);
     BookQType::Reader* book_reader = bq.newReader();
     BookDepot myBook;
@@ -62,14 +66,21 @@ int main(int argc, char**argv) {
     //uint64_t start_tm = utils::TimeUtil::cur_time_micro();
     user_stopped = false;
     while (!user_stopped) {
-        if (book_reader->getLatestUpdateAndAdvance(myBook))
-        {
-        	if (!trade_only || myBook.update_type==2)
-        	printf("%s\n", myBook.prettyPrint().c_str());
+        if (dump_all) {
+            if (book_reader->getNextUpdate(myBook)) {
+        	    printf("%s\n", myBook.prettyPrint().c_str());
+            } else {
+                usleep(1000);
+            }
         } else {
-        	usleep(100*1000);
+            if (book_reader->getLatestUpdateAndAdvance(myBook))
+            {
+                if (!trade_only || myBook.update_type==2)
+                printf("%s\n", myBook.prettyPrint().c_str());
+            } else {
+                usleep(100*1000);
+            }
         }
-
     }
     delete book_reader;
     printf("Done.\n");

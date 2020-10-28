@@ -1,7 +1,5 @@
 #pragma once
 
-//#pragma message __INSIDE_CYGWIN__ " " __POSIX_VISIBLE " " __XSI_VISIBLE
-
 #include <fcntl.h>    /* For O_RDWR */
 #include <unistd.h>
 #include <sys/types.h>
@@ -38,13 +36,13 @@ namespace utils {
 
     typedef long long QPos;
 
-    inline QPos fetchAndAdd(QPos* pos, int val) {
+    inline QPos fetchAndAdd(volatile QPos* pos, int val) {
         return __sync_fetch_and_add(pos, val);
     }
-    inline QPos AddAndfetch(QPos* pos, int val) {
+    inline QPos AddAndfetch(volatile QPos* pos, int val) {
         return __sync_add_and_fetch(pos, val);
     }
-    inline QPos compareAndSwap(QPos* pos, QPos old_pos, QPos new_pos) {
+    inline QPos compareAndSwap(volatile QPos* pos, QPos old_pos, QPos new_pos) {
         return __sync_val_compare_and_swap(pos, old_pos, new_pos);
     }
 
@@ -61,16 +59,16 @@ namespace utils {
 
     // The circular buffer stores the content in the first QLen bytes
     // and the header information at the end
-    template<int QLen, int HeaderBytes>
+    template<int QLen, int HeaderLen>
     class CircularBuffer {
     public:
-        CircularBuffer() : m_buffer((char*)malloc(QLen + HeaderBytes)), m_buffer_given(false) {
+        CircularBuffer() : m_buffer((char*)malloc(QLen + HeaderLen)), m_buffer_given(false) {
             // removing this restriction.  Not a bid deal to use modulo QLen vs. & QMask
             //static_assert(((QLen-1)&(QLen)) == 0, "CircularBuffer: qlen not power of 2");
             if (!m_buffer)
                 throw std::runtime_error("CircularBuffer: malloc failed");
             // zero out everything
-            memset((void*)m_buffer, 0, QLen + HeaderBytes);
+            memset((void*)m_buffer, 0, QLen + HeaderLen);
         }
 
         explicit CircularBuffer(char* buf) : m_buffer(buf), m_buffer_given(true) {
@@ -80,13 +78,13 @@ namespace utils {
 
         // adding this for the shm interface
         explicit CircularBuffer(const char*, bool, bool) :
-                m_buffer((char*)malloc(QLen + HeaderBytes)), m_buffer_given(false) {
+                m_buffer((char*)malloc(QLen + HeaderLen)), m_buffer_given(false) {
 
             // shouldn't allow this?
             if (!m_buffer)
                 throw std::runtime_error("CircularBuffer: malloc failed");
             // zero out everything
-            memset((void*)m_buffer, 0, QLen + HeaderBytes);
+            memset((void*)m_buffer, 0, QLen + HeaderLen);
         }
 
         ~CircularBuffer() {
@@ -104,8 +102,15 @@ namespace utils {
         // behavior is unspecified
         // it returns the pointer of the next write location
         // within the circular buffer
+        //
+        //
+        // We have three sets of copyBtes interfaces
+        // copyBytes<ifInbound>(char*, char*, len) is the lowest memcopy
+        // copyBytes<ifInboud>(start_pos, *content, bytes) mainly used by write (maybe a change?)
+        // copyBytesFromBuffer(start_pos, *content, bytes) used by reader only
+        //
         template<bool ifInbound>
-        void copyBytes(QPos start_pos, const char* content, int bytes) volatile {
+        void copyBytes(QPos start_pos, const char* content, int bytes) volatile const {
             int s_pos = start_pos % QLen;
             int e_pos = (start_pos + bytes) % QLen;
             if (__builtin_expect((e_pos < s_pos),0)) {
@@ -115,6 +120,12 @@ namespace utils {
                 bytes -= len1;
                 s_pos = 0;
             }
+            CopyBytes<ifInbound>((char*) (m_buffer + s_pos), (char*) content, bytes);
+        }
+
+        template<bool ifInbound>
+        void copyBytesNoCross(QPos start_pos, const char* content, int bytes) volatile const {
+            int s_pos = start_pos % QLen;
             CopyBytes<ifInbound>((char*) (m_buffer + s_pos), (char*) content, bytes);
         }
 
@@ -128,6 +139,11 @@ namespace utils {
         		bytes -=len1;
         		s_pos = 0;
         	}
+        	CopyBytes<false>((char*) (m_buffer + s_pos),(char*)content,bytes);
+        }
+
+        inline void CopyBytesFromBufferNoCross(QPos start_pos, const char* content, int bytes) volatile const {
+        	int s_pos = start_pos % QLen;
         	CopyBytes<false>((char*) (m_buffer + s_pos),(char*)content,bytes);
         }
 
@@ -145,7 +161,7 @@ namespace utils {
 
     protected:
         void setBuffer(volatile char* buf) {
-            if (!m_buffer_given) {
+            if ( !m_buffer_given ) {
                 delete m_buffer;
                 m_buffer_given = true;
             }
@@ -158,11 +174,11 @@ namespace utils {
         bool m_buffer_given;
     };
 
-    template<int QLen, int HeaderBytes>
-    class ShmCircularBuffer : public CircularBuffer<QLen, HeaderBytes>  {
+    template<int QLen, int HeaderLen>
+    class ShmCircularBuffer : public CircularBuffer<QLen, HeaderLen>  {
     public:
         ShmCircularBuffer(const char* shm_name, bool is_read, bool init_to_zero):
-        CircularBuffer<QLen, HeaderBytes>(NULL), m_shm_name(shm_name), m_is_read(is_read), m_shm_size(QLen + HeaderBytes),
+        CircularBuffer<QLen, HeaderLen>(NULL), m_shm_name(shm_name), m_is_read(is_read), m_shm_size(QLen + HeaderLen),
         m_shm_ptr(NULL), m_shm_fd(-1)
         {
         	if (!shm_name)

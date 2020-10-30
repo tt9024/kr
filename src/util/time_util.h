@@ -1,10 +1,3 @@
-/*
- * time_util.h
- *
- *  Created on: Jun 26, 2011
- *      Author: zfu
- */
-
 #pragma once
 
 #include <stdio.h>

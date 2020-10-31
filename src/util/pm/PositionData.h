@@ -3,6 +3,7 @@
 #include <string>
 #include <stdio.h>
 #include <cstdint>
+#include <cstdlib>
 #include <map>
 #include <vector>
 #include <cmath>
@@ -80,18 +81,30 @@ namespace pm {
 
     class ExecutionReport {
     public:
-        ExecutionReport();
+        ExecutionReport() {
+            memset((void*)this, 0, sizeof(ExecutionReport));
+        }
+
         ExecutionReport(
                 const std::string& symbol, // exchange symbol
                 const std::string& algo,   // fully qualified for position
                 const std::string& clOrdId,
                 const std::string& execId,
                 const std::string& tag39,
-                int qty,
+                int qty,   // + buy, - sell
                 double px,
-                const std::string& utcTime,
+                const std::string& utcTime, // YYYYMMDD-HH:MM:SS[.sss]
                 const std::string& optionalTag // reserved 
-                );
+                ) :
+            m_qty(qty), m_px(px) {
+                snprintf(m_symbol, sizeof(m_symbol),"%s", symbol.c_str());
+                snprintf(m_algo, sizeof(m_algo), "%s", algo.c_str());
+                snprintf(m_clOrdId, sizeof(m_clOrdId), "%s", clOrdId.c_str());
+                snprintf(m_execId, sizeof(m_execId), "%s", execId.c_str());
+                snprintf(m_tag39, sizeof(m_tag39), "%s", tag39.c_str());
+                
+                optionalTag
+            }
 
         explicit ExecutionReport(const std::string& csv_line) {
             std::istringstream iss(csv_line);
@@ -108,9 +121,9 @@ namespace pm {
         IDType m_clOrdId;
         IDType m_execId;
         StatusType m_tag39;
-        int m_qty;
+        int m_qty;   // + buy, - sell
         double m_px;
-        IDType m_utc;
+        uint64_t m_utc_milli;
         IDType m_optional;
     };
 
@@ -159,7 +172,7 @@ namespace pm {
                 int64_t last_utc
                 );
         explicit IntraDayPosition(const std::vector<std::string>& tokens) {
-            // token sequence: algo, symbol, qty, vap, pnl, last_utc
+            // token sequence: algo, symbol, qty, vap, pnl, last_utc, read from a csv file
             m_algo = tokens[1];
             m_symbol = tokens[2];
             int64_t qty = std::stoll(tokens[3]);
@@ -180,7 +193,66 @@ namespace pm {
             }
         }
 
-        void update(const ExecutionReport& er);
+        ~IntraDayPosition() {
+            for(auto& iter=m_oo.begin(); iter!=m_oo.end();++iter) {
+                if (iter->second) {
+                    delete (iter->second);
+                    iter->second=nullptr;
+                }
+            }
+        }
+
+        void update(const ExecutionReport& er) {
+            switch(er.m_tag39[0]) {
+            case '0':
+               // new
+                addOO(er);
+                break;
+
+            case '1': 
+                // Partial Fill
+                // fall through
+            case '2':
+                // Fill
+                int64_t qty = (int64_t) er.m_qty;
+                double px = er.m_px;
+                uint64_t utc_milli = er.m_utc_milli;
+                // add fill
+                addFill(qty, px, utc_milli);
+
+                // update open order
+                updateOO(er.m_clOrdId, qty);
+                break;
+
+            case '3': 
+                // done for day
+            case '4':
+                // cancel
+            case '5':
+                // replaced
+            case '7':
+                // stopped
+            case 'C':
+                // Expired
+                deleteOO(er.m_clOrdId);
+                break;
+
+            case '8':
+                // rejected
+            case 'A':
+                // pending new
+            case 'E':
+                // pending replace
+            case '6':
+                // pending cancel
+                break;
+
+            default :
+                // everything else
+                break;
+            }
+        }
+
         void addPosition(int64_t qty, double px, bool is_long);
         IntraDayPosition& operator+(const IntraDayPosition& idp);
         // this aggregates the two positions
@@ -247,17 +319,63 @@ namespace pm {
             return std::string(buf);
         }
 
+        std::string dumpOpenOrder() const {
+            std::string ret(m_algo+":"+m_symbol+" "+std::to_string(m_oo.size())+" open orders");
+            for (const auto iter=m_oo.begin(); iter!=m_oo.end(); ++iter) {
+                ret += "\n";
+                ret += iter->second->toString();
+            }
+            return ret;
+        }
+
         bool hasPosition() const {
             return m_qty_long || m_qty_short;
         }
 
-        int64_t getPosition(double* ptr_vap = nullptr, double* ptr_pnl = nullptr) const;
-        int64_t getOpenPosition() const;
+        int64_t getPosition(double* ptr_vap = nullptr, double* ptr_pnl = nullptr) const {
+            int64_t qty = m_qty_long - m_qty_short;
+            if (ptr_vap || ptr_pnl) {
+                double vap, pnl;
+                if (qty>0) {
+                    vap = m_vap_long;
+                    pnl = m_qty_short*(m_vap_short-m_vap_long);
+                } else {
+                    vap = m_vap_short;
+                    pnl = m_qty_long*(m_vap_short-m_vap_long);
+                }
+                if (ptr_vap) *ptr_vap=vap;
+                if (ptr_pnl) *ptr_pnl=pnl;
+            }
+            return qty;
+        }
 
-        std::vector<const OpenOrder*const> listOO() const;
+        int64_t getOpenQty() const {
+            int64_t qty = 0;
+            for(const auto iter=m_oo.begin(); iter!=m_oo.end(); ++iter) {
+                qty += iter->second->m_open_qty;
+            }
+            return qty;
+        }
 
-        double getRealizedPnl() const;
-        double getMtmPnl(double ref_px) const;
+        std::vector<const OpenOrder*const> listOO() const {
+            std::vector<const OpenOrder* const> vec;
+            for (const auto iter=m_oo.begin(); iter!=m_oo.end(); ++iter) {
+                vec.push_back(iter->second);
+            };
+            return vec;
+        }
+
+        double getRealizedPnl() const {
+            double pnl;
+            getPosition(nullptr, &pnl);
+            return pnl;
+        }
+        
+        double getMtmPnl(double ref_px) const {
+            double vap, pnl;
+            int64_t m_qty = getPosition(&vap, &pnl);
+            return pnl + m_qty*(ref_px-vap);
+        }
 
     protected:
         std::string m_algo;
@@ -268,14 +386,76 @@ namespace pm {
         double m_vap_short;
         uint64_t m_last_utc;
         std::map<std::string, const OpenOrder* const> m_oo;
+
+        void addOO(const ExecutionReport& er) {
+            OpenOrder* oop = m_oo[er.m_clOrdId];
+            if (oop) {
+                fprintf(stderr, "ERR! new on existing clOrdId! This report %s, existing open order %s\n", er.toString().c_str(), oop->toString().c_str());
+                delete oop;
+            }
+            m_oo[er.m_clOrdId]=new OpenOrder(er);
+        }
+
+        void deleteOO(const char* clOrdId) {
+            auto iter = m_oo.find(clOrdId);
+            if (iter != m_oo.end()) {
+                delete iter->second;
+                m_oo.erase(iter);
+            } else {
+                fprintf(stderr, "Warning! delete a nonexisting open order! clOrdId: %s\n", clOrdId);
+            }
+        }
+
+        void updateOO(const char* clOrdId, int64_t qty) {
+            auto iter = m_oo.find(clOrdId);
+            if (iter != m_oo.end()) {
+                iter->second->m_open_qty-=qty;
+                if (iter->second->m_open_qty == 0) {
+                    deleteOO(clOrdId);
+                }
+            } else {
+                fprintf(stderr, "Warning! update a nonexisting open order! clOrdId: %s, qty: %lld\n", clOrdId, (long long)qty);
+            }
+        }
+
+        void addFill(int64_t qty, double px, uint64_t utc_milli) {
+            uint64_t* qtyp;
+            double* vapp;
+            if (qty>0) {
+                qtyp = &m_qty_long;
+                vapp = &m_vap_long;
+            } else {
+                qty = -qty;
+                qtyp = &m_qty_short;
+                vapp = &m_vap_short;
+            }
+            double vap = (*qtyp) * (*vapp) + qty*px;
+            *qtyp += qty;
+            *vapp = vap/(*qtyp);
     };
 
     struct OpenOrder {
         IDType m_clOrdId;
-        IDType m_execId;
-        int64_t m_open_qty;
+        //IDType m_execId;  // in case clOrdId is not unique (?)
+        int64_t m_open_qty; // + buy - sell, from er
         double m_open_px;
-        uint64_t m_open_utc;
+        uint64_t m_open_utc_milli;
+        OpenOrder() : m_open_qty(0), m_open_px(0), m_open_utc_milli(0)
+        {
+            memset(m_clOrdId, 0, sizeof(m_clOrdId));
+        };
+        OpenOrder(const ExecutionReport& er) : m_open_qty(er.m_qty), m_open_px(er.m_px), m_open_utc_milli(m_utc_milli)
+        {
+            memcpy(m_clOrdId, er.m_clOrdId, sizeof(IDType));
+        };
+        std::string toString() const {
+            char buf[256];
+            size_t bytes = snprintf(buf, sizeof(buf), 
+                    "OpenOrder(clOrdId=%s,%s,open_qty=%lld,open_px=%.7llf,open_time=", m_clOrdId, m_open_qty>0?"Buy":"Sell",std::abs(m_open_qty), m_open_px);
+            bytes += utils::TimeUtil::int_to_string_second_UTC((int)(m_open_utc_milli/1000), buf+bytes, sizeof(buf)-bytes);
+            bytes += snprintf(buf+bytes, sizeof(buf)-bytes, 
+                    ".%d)", (int)(m_open_utc_milli%1000));
+            return std::string(buf);
+        }
     }
-
 }

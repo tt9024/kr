@@ -66,6 +66,7 @@ namespace pm {
             return true;
         }
         if (adjust) {
+            fprintf(stderr, "Warning, %s is going to copy from %s, all existing open order trackings are lost. Download open order again if needed!", m_name.c_str(), pm.m_name.c_str());
             movePosition(pm);
         }
         return false;

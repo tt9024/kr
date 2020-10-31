@@ -69,7 +69,7 @@ namesapce pm {
                      iter2 != iter->second.end();
                      ++iter2) {
                     if (iter2->second) {
-                        free (iter2->second);
+                        delete (iter2->second);
                         iter2->second=nullptr;
                     }
                 }

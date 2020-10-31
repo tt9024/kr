@@ -1,11 +1,17 @@
 #pragma once
 
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <stdexcept>
+#include <string>
 
 namespace utils {
 
@@ -91,6 +97,57 @@ public:
          //printf("%s\n", asctime(&time_tm));
    };
 
+   static uint64_t string_to_frac_UTC(const char* str_buf, const char* fmt_str="%Y%m%d-%H:%M:%S", int frac_decimals=3) {
+       // expects a UTC time string like YYYYMMDD-HH:MM:SS.ssssss
+       // the .ssssss part, if found, is taken as a fraction.
+       // returns the utc * frac_mul + fraction * frac_mul,
+       // where frac_mul = 10**frac_decimals
+       // set frac_decimals to be 0 to get a whole second (fraction rounded if found)
+
+       if (frac_decimals<0 || frac_decimals>9) {
+           throw std::runtime_error("frac_decimals out-of-range: " + std::to_string(frac_decimals));
+       }
+       uint64_t frac_mul = 1;
+       for (int i=frac_decimals; i>0; --i, frac_mul*=10);
+       struct tm time_tm;
+       char* p = strptime(str_buf, fmt_str, &tm);
+       if (!p) {
+           return 0;
+       }
+       uint64_t tsf = (uint64_t)mktime(&time_tm) * frac_mul;
+       if(*p=='.') {
+           double f = std::stod("0"+std::string(p));
+           tsf+=(uint64_t)(f*(double)frac_mul+0.5);
+       }
+       return tsf;
+   };
+
+   static size_t frac_UTC_to_string(uint64_t utc_frac_mul, char* char_buf, int buf_size, const char* fmt_str="%Y%m%d-%H:%M:%S", int frac_decimals=1) {
+       // expects utc_frac_mul = whole_seconds * frac_mul + frac_seconds
+       // where frac_mul=10**frac_decimals
+       // ret YYYYMMDD-HHMMSS.sss, where 0.sss = frac_seconds/frac_mul
+
+       if (frac_decimals<0 || frac_decimals>9) {
+           throw std::runtime_error("frac_decimals out-of-range: " + std::to_string(frac_decimals));
+       }
+       uint64_t frac_mul = 1;
+       for (int i=frac_decimals; i>0; --i, frac_mul*=10);
+
+       time_t sec = (time_t) (utc_frac_mul/frac_mul);
+       struct tm t;
+       size_t bytes = 0;
+
+       if (localtime_r(&sec, &t)) {
+           bytes = strftime(char_buf, buf_size, fmt_str, &t);
+           double frac = (double)(utc_frac_mul%frac_mul)/(double)frac_mul;
+           std::string fmt = "%.0"+to_string(frac_decimals)+"lf";
+           char fbuf[16];
+           snprintf(fbuf, sizeof(fbuf), fmt.c_str(), frac);
+           bytes += snprintf(char_buf+bytes, buf_size-bytes, "%s",fbuf+1);
+       }
+       return bytes;
+   };
+    
    static struct tm int_to_tm_UTC(time_t ts) {
       struct tm*ptm = localtime(&ts);
       return *ptm;
@@ -158,10 +215,10 @@ public:
    }
 
    static std::string cur_time_to_string_day() {
-	   time_t sec=time(NULL);
-	   char char_buf[32];
-	   int_to_string_day_UTC_Packed(sec,char_buf,sizeof(char_buf)-1);
-	   return std::string(char_buf);
+           time_t sec=time(NULL);
+           char char_buf[32];
+           int_to_string_day_UTC_Packed(sec,char_buf,sizeof(char_buf)-1);
+           return std::string(char_buf);
    }
 
    static int int_to_string_second_UTC_Packed(time_t sec, char*char_buf, int buf_size) {
@@ -200,17 +257,17 @@ public:
 
    static int utc_to_local_ymdh(time_t utc, int*day=NULL, int*month=NULL, int*year=NULL)
    {
-	   struct tm t;
-	   if (localtime_r(&utc, &t)) {
-		   if (day)
-			   *day = t.tm_mday;
-		   if (month)
-			   *month = t.tm_mon;
-		   if (year)
-			   *year = t.tm_year;
-		   return t.tm_hour;
-	   }
-	   throw std::runtime_error("invalid utc");
+           struct tm t;
+           if (localtime_r(&utc, &t)) {
+                   if (day)
+                           *day = t.tm_mday;
+                   if (month)
+                           *month = t.tm_mon;
+                   if (year)
+                           *year = t.tm_year;
+                   return t.tm_hour;
+           }
+           throw std::runtime_error("invalid utc");
    }
 
 };

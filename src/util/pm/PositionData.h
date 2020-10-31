@@ -10,6 +10,7 @@
 #include <cmath>
 #include <sstream>
 #include "time_util.h"
+#include "csv_util.h"
 
 namespace pm {
     template<int L>
@@ -20,62 +21,6 @@ namespace pm {
         explicit String(const char* buf, size_t len);
         char m_text[L];
     };
-
-    // CSV Utils 
-    // TODO move to a header file
-    std::vector<std::string> csv_line_tokenizer(const std::string& line, char delimiter = ',') {
-        std::istringstream iss(csv_line);
-        std::vector<std::string> vec;
-        std::string token;
-        while (getline(iss >> std::skipws, token, delimiter)) {
-            vec.push_back(token);
-        }
-        return vec;
-    }
-
-    std::vector< std::vector<std::string> > csv_file_tokenizer(const std::string& csv_file, char delimiter = ',', int skip_head_lines = 0) {
-        std::string line;
-        std::vector<std::vector<std::string> > vec;
-        try {
-            std::ifstream csv(csv_file);
-            while (std::getline(csv, line)) {
-                const auto v = csv_line_tokenizer(line, delimiter);
-                if (v.size()>0) {
-                    vec.push_back(v);
-                }
-            }
-        } catch(const exception& e) {
-            fprintf(stderr, "Error getting csv file %s: %s\n", csv_file.c_str(), e.what());
-        }
-        return vec;
-    }
-
-    void csv_write_line(const std::vector<std::string>& token_vec, std::ofstream& csvfile, char delimiter = ',') {
-        if (token_vec.size()==0) 
-            return;
-        csvfile << token_vec[0];
-        for (size_t i=1; i<token_vec.size();++i) {
-            csvfile << delimiter << token_vec[i];
-        }
-        csvfile << std::endl;
-    }
-
-    bool csv_write_file(const std::vector<std::vector<std::string> > & line_vec, const std::string& filename, delimiter=',') {
-        std::ofstream csvfile
-        try {
-             csvfile.open(filename, std::ios_base::app);
-             for (const auto& line : line_vec) {
-                 csv_write_line(line, csvfile, delimiter);
-             }
-             return true;
-        } catch (const std::exception e) {
-            fprintf(stderr, "csv file %s write failed: %s\n", filename.c_str(), e.what());
-        } catch (...) {
-            fprintf(stderr, "csv file %s write failed for unknown reason\n", filename.c_str());
-        };
-        return false;
-    }
-
     using SymbolType = String<16>;
     using IDType = String<32>;
     using StatusType = String<4>;
@@ -96,7 +41,7 @@ namespace pm {
                 double px,
                 const std::string& utcTime, // YYYYMMDD-HH:MM:SS[.sss]
                 const std::string& optionalTag // reserved 
-                uint64_t recv_micro;
+                uint64_t recv_micro = 0;
                 ) :
             m_qty(qty), m_px(px), 
             m_utc_milli(utils::TimeUtil::string_to_frac_UTC(utcTime.c_str(), 3)),
@@ -107,15 +52,18 @@ namespace pm {
                 snprintf(m_execId, sizeof(m_execId), "%s", execId.c_str());
                 snprintf(m_tag39, sizeof(m_tag39), "%s", tag39.c_str());
                 snprintf(m_optional, sizeof(m_optional), "%s", optionalTag.c_str());
+                if (m_recv_micro==0) {
+                    m_recv_micro=utils::TimeUtil::cur_micro();
+                }
             }
 
-        static ExecutionReport fromCSVLine(const std::vector<std::string>& token_vec) {
+        static ExecutionReport fromCSVLine(const utils::CSVUtil::LineTokens& token_vec) {
             return ExecutionReport(token_vec[0], token_vec[1], token_vec[2], token_vec[3],
                     token_vec[4], std::stod(token_vec[5]), std::stod(token_vec[6]),
                     token_vec[7], token_vec[8], std::stod(token_vec[9]));
         }
 
-        std::vector<std::string> toCSVLine() const {
+        utils::CSVUtil::LineTokens toCSVLine() const {
             std::vector<std::string> token_vec;
             token_vec.push_back(m_symbol);
             token_vec.push_back(m_algo);
@@ -185,6 +133,17 @@ namespace pm {
     class IntraDayPosition {
     public:
         IntraDayPosition(); // do init
+
+        IntraDayPosition(
+                const std::string& symbol,
+                const std::string& algo,
+                int64_t qty = 0,
+                double vap = 0,
+                int64_t last_utc = 0 
+                ) : m_algo(algo), m_symbol(symbol) {
+            resetPositionUnsafe(qty, vap, last_utc);
+        }
+
         IntraDayPosition(
                 const std::string& symbol,
                 const std::string& algo,
@@ -192,9 +151,16 @@ namespace pm {
                 double vap_long,
                 int64_t qty_short,
                 double vap_short,
-                int64_t last_utc
-                );
-        explicit IntraDayPosition(const std::vector<std::string>& tokens) {
+                int64_t last_utc = 0
+                ) : m_algo(algo), m_symbol(symbol), 
+                    m_qty_long(qty_long), m_vap_long(vap_long),
+                    m_qty_short(qty_short), m_vap_short(vap_short),
+                    m_last_utc(last_utc) {
+                        if (m_last_utc==0) 
+                            m_last_utc=utils::TimeUtil::cur_micro();
+                    };
+
+        explicit IntraDayPosition(const utils::CSVUtil::LineTokens& tokens) {
             // token sequence: algo, symbol, qty, vap, pnl, last_utc, read from a csv file
             m_algo = tokens[1];
             m_symbol = tokens[2];
@@ -202,18 +168,7 @@ namespace pm {
             double vap = std::stod(tokens[4]);
             double pnl = std::stod(tokens[5]);
             m_last_utc = std::stoll(tokens[6]);
-
-            if (qty>0) {
-                m_qty_long = qty;
-                m_qty_short = 0;
-                m_vap_long = vap;
-                m_vap_short = 0;
-            } else {
-                m_qty_short = qty;
-                m_qty_long = 0;
-                m_vap_short = vap;
-                m_vap_long = 0;
-            }
+            resetPositionUnsafe(qty, vap, m_last_utc);
         }
 
         ~IntraDayPosition() {
@@ -227,57 +182,64 @@ namespace pm {
 
         void update(const ExecutionReport& er) {
             switch(er.m_tag39[0]) {
-            case '0':
-               // new
+            case '0': // new
                 addOO(er);
                 break;
 
-            case '1': 
-                // Partial Fill
-                // fall through
-            case '2':
-                // Fill
+            case '1': // Partial Fill
+            case '2': // Fill
                 int64_t qty = (int64_t) er.m_qty;
                 double px = er.m_px;
-                uint64_t utc_milli = er.m_utc_milli;
+                uint64_t utc_micro = er.m_recv_micro;
+
                 // add fill
-                addFill(qty, px, utc_milli);
+                addFill(qty, px, utc_micro);
 
                 // update open order
                 updateOO(er.m_clOrdId, qty);
                 break;
 
-            case '3': 
-                // done for day
-            case '4':
-                // cancel
-            case '5':
-                // replaced
-            case '7':
-                // stopped
-            case 'C':
-                // Expired
+            case '3': // done for day
+            case '4': // cancel
+            case '5': // replaced
+            case '7': // stopped
+            case 'C': // Expired
                 deleteOO(er.m_clOrdId);
                 break;
 
-            case '8':
-                // rejected
-            case 'A':
-                // pending new
-            case 'E':
-                // pending replace
-            case '6':
-                // pending cancel
+            case '8': // rejected
+            case 'A': // pending new
+            case 'E': // pending replace
+            case '6': // pending cancel
                 break;
 
-            default :
-                // everything else
+            default : // everything else
                 break;
             }
         }
 
-        void addPosition(int64_t qty, double px, bool is_long);
-        IntraDayPosition& operator+(const IntraDayPosition& idp);
+        void resetPositionUnsafe(int64_t qty, double vap, uint64_t last_utc=0) {
+            // reset the position.  
+            if (qty>0) {
+                m_qty_long = qty;
+                m_qty_short = 0;
+                m_vap_long = vap;
+                m_vap_short = 0;
+            } else {
+                m_qty_long = 0;
+                m_qty_short = -qty;
+                m_vap_long = 0;
+                m_vap_short = vap;
+            }
+            m_last_utc=last_utc;
+            if (m_last_utc==0) 
+                m_last_utc=utils::TimeUtil::cur_micro();
+        }
+
+        IntraDayPosition& operator+(const IntraDayPosition& idp) {
+
+        }
+
         // this aggregates the two positions
         
         std::string diff(const IntraDayPosition& idp) const 
@@ -313,7 +275,7 @@ namespace pm {
             return diff(idp).size()==0;
         };
 
-        std::vector<std::string> toStringVec() const {
+        utils::CSVUtil::LineTokens toCSVLine() const {
             // same token sequence as above
             std::vector<std::string> vec;
             double vap, pnl;
@@ -441,7 +403,7 @@ namespace pm {
             }
         }
 
-        void addFill(int64_t qty, double px, uint64_t utc_milli) {
+        void addFill(int64_t qty, double px, uint64_t utc_micro) {
             uint64_t* qtyp;
             double* vapp;
             if (qty>0) {
@@ -455,7 +417,7 @@ namespace pm {
             double vap = (*qtyp) * (*vapp) + qty*px;
             *qtyp += qty;
             *vapp = vap/(*qtyp);
-            m_last_utc = utc_milli;
+            m_last_utc = utc_micro;
     };
 
     struct OpenOrder {

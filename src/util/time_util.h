@@ -1,10 +1,3 @@
-/*
- * time_util.h
- *
- *  Created on: Jun 26, 2011
- *      Author: zfu
- */
-
 #pragma once
 
 #include <stdio.h>
@@ -13,6 +6,8 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <string>
+#include <stdexcept>
 
 namespace utils {
 

@@ -97,7 +97,7 @@ public:
          //printf("%s\n", asctime(&time_tm));
    };
 
-   static uint64_t string_to_frac_UTC(const char* str_buf, const char* fmt_str="%Y%m%d-%H:%M:%S", int frac_decimals=3) {
+   static uint64_t string_to_frac_UTC(const char* str_buf, int frac_decimals=0, const char* fmt_str="%Y%m%d-%H:%M:%S") {
        // expects a UTC time string like YYYYMMDD-HH:MM:SS.ssssss
        // the .ssssss part, if found, is taken as a fraction.
        // returns the utc * frac_mul + fraction * frac_mul,
@@ -110,10 +110,11 @@ public:
        uint64_t frac_mul = 1;
        for (int i=frac_decimals; i>0; --i, frac_mul*=10);
        struct tm time_tm;
-       char* p = strptime(str_buf, fmt_str, &tm);
+       char* p = strptime(str_buf, fmt_str, &time_tm);
        if (!p) {
            return 0;
        }
+       time_tm.tm_isdst = -1;
        uint64_t tsf = (uint64_t)mktime(&time_tm) * frac_mul;
        if(*p=='.') {
            double f = std::stod("0"+std::string(p));
@@ -122,7 +123,7 @@ public:
        return tsf;
    };
 
-   static size_t frac_UTC_to_string(uint64_t utc_frac_mul, char* char_buf, int buf_size, const char* fmt_str="%Y%m%d-%H:%M:%S", int frac_decimals=1) {
+   static size_t frac_UTC_to_string(uint64_t utc_frac_mul, char* char_buf, int buf_size, int frac_decimals=0, const char* fmt_str="%Y%m%d-%H:%M:%S") {
        // expects utc_frac_mul = whole_seconds * frac_mul + frac_seconds
        // where frac_mul=10**frac_decimals
        // ret YYYYMMDD-HHMMSS.sss, where 0.sss = frac_seconds/frac_mul
@@ -140,13 +141,19 @@ public:
        if (localtime_r(&sec, &t)) {
            bytes = strftime(char_buf, buf_size, fmt_str, &t);
            double frac = (double)(utc_frac_mul%frac_mul)/(double)frac_mul;
-           std::string fmt = "%.0"+to_string(frac_decimals)+"lf";
+           std::string fmt = "%.0"+std::to_string(frac_decimals)+"lf";
            char fbuf[16];
            snprintf(fbuf, sizeof(fbuf), fmt.c_str(), frac);
            bytes += snprintf(char_buf+bytes, buf_size-bytes, "%s",fbuf+1);
        }
        return bytes;
    };
+
+   static std::string frac_UTC_to_string(uint64_t utc_frac_mul, int frac_decimals=0, const char* fmt_str="%Y%m%d-%H:%M:%S") {
+       char buf[32];
+       frac_UTC_to_string(utc_frac_mul, buf, sizeof(buf), frac_decimals, fmt_str);
+       return std::string(buf);
+   }
     
    static struct tm int_to_tm_UTC(time_t ts) {
       struct tm*ptm = localtime(&ts);

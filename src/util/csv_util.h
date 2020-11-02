@@ -29,7 +29,6 @@ namespace utils {
             }
             std::istringstream iss(line0);
             std::string token;
-            //while (getline(iss >> std::ws, token, delimiter)) {
             while (getline(iss, token, delimiter)) {
                 std::string tk;
                 std::istringstream issl(token);
@@ -87,6 +86,12 @@ namespace utils {
                 fprintf(stderr, "csv file %s write failed for unknown reason\n", filename.c_str());
             };
             return false;
+        };
+
+        bool write_line(const LineTokens& token_vec, const std::string& filename, bool append=true,  char delimiter=Delimiter) {
+            FileTokens ft;
+            ft.push_back(token_vec);
+            return write_file(ft, filename, append, delimiter);
         };
     };
 }

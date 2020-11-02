@@ -41,7 +41,7 @@ public:
        // the .ssssss part, if found, is taken as a fraction.
        // returns the utc * frac_mul + fraction * frac_mul,
        // where frac_mul = 10**frac_decimals
-       // set frac_decimals to be 0 to get a whole second (fraction rounded if found)
+       // set frac_decimals to be 0 to get a whole second (fraction dropped, NOT rounded)
 
        if (frac_decimals<0 || frac_decimals>9) {
            throw std::runtime_error("frac_decimals out-of-range: " + std::to_string(frac_decimals));
@@ -57,7 +57,7 @@ public:
        uint64_t tsf = (uint64_t)mktime(&time_tm) * frac_mul;
        if(*p=='.') {
            double f = std::stod("0"+std::string(p));
-           tsf+=(uint64_t)(f*(double)frac_mul+0.5);
+           tsf+=(uint64_t)(f*(double)frac_mul);
        }
        return tsf;
    };
@@ -66,12 +66,27 @@ public:
        // expects utc_frac_mul = whole_seconds * frac_mul + frac_seconds
        // where frac_mul=10**frac_decimals
        // ret YYYYMMDD-HHMMSS.sss, where 0.sss = frac_seconds/frac_mul
+       // set the utc_frac_mul to 0 for the current time
 
        if (frac_decimals<0 || frac_decimals>9) {
            throw std::runtime_error("frac_decimals out-of-range: " + std::to_string(frac_decimals));
        }
        uint64_t frac_mul = 1;
        for (int i=frac_decimals; i>0; --i, frac_mul*=10);
+
+       if (utc_frac_mul==0) {
+           // use current time
+           utc_frac_mul = cur_micro();
+           int decimal_adj = frac_decimals-6;
+           while (decimal_adj > 0) {
+               utc_frac_mul*=10;
+               --decimal_adj;
+           }
+           while (decimal_adj < 0) {
+               utc_frac_mul/=10;
+               ++decimal_adj;
+           }
+       }
 
        time_t sec = (time_t) (utc_frac_mul/frac_mul);
        struct tm t;
@@ -127,13 +142,6 @@ public:
    static int int_to_string_second_UTC(time_t sec, char*char_buf, int buf_size) {
      struct tm *tmsec = localtime(&sec);
      return strftime(char_buf, buf_size, "%Y%m%d,%H:%M:%S", tmsec);
-   }
-
-   static std::string cur_time_to_string_day() {
-           time_t sec=time(NULL);
-           char char_buf[32];
-           int_to_string_day_UTC_Packed(sec,char_buf,sizeof(char_buf)-1);
-           return std::string(char_buf);
    }
 
    static uint64_t cur_micro() {

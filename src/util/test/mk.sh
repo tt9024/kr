@@ -1,1 +1,1 @@
-g++ -std=c++11 -O3 -o qtest_shm qtest_shm.cpp -I..  -lpthread -lrt
+g++ -std=c++11 -O3 -o $1 "$1.cpp" -I.. 

@@ -36,13 +36,24 @@ int main() {
     }
 
 
-    uint64_t cur_micro = utils::TimeUtil::cur_time_micro();
+    uint64_t cur_micro = utils::TimeUtil::cur_micro();
     utils::TimeUtil::frac_UTC_to_string(cur_micro, buf, sizeof(buf), 6, "%Y%m%d%H%M%S");
 
-    time_t cur_utc;
-    utils::TimeUtil::string_to_int_second_UTC_Packed(cur_utc, buf, sizeof(buf));
+    std::string ct_milli = utils::TimeUtil::frac_UTC_to_string(0, 3, "%Y%m%d%H%M%S");
+    std::string ct_sec = utils::TimeUtil::frac_UTC_to_string(0, 0, "%Y%m%d%H%M%S");
+    std::string ct_nano = utils::TimeUtil::frac_UTC_to_string(0, 9, "%Y%m%d%H%M%S");
 
-    printf("%lld, %s, %d, %d\n", (long long)cur_micro, buf, (int)cur_utc, (int) (cur_utc - cur_micro/1000000));
+    uint64_t ct_milli_ts = utils::TimeUtil::string_to_frac_UTC(ct_milli.c_str(), 3, "%Y%m%d%H%M%S");
+    uint64_t ct_sec_ts = utils::TimeUtil::string_to_frac_UTC(ct_sec.c_str(), 0, "%Y%m%d%H%M%S");
+    uint64_t ct_nano_ts = utils::TimeUtil::string_to_frac_UTC(ct_nano.c_str(), 9, "%Y%m%d%H%M%S");
+
+    // demand they be less tha 1000 micro
+    if ((-cur_micro + ct_milli_ts*1000ULL  < 1000000ULL) ||
+        (-cur_micro + ct_sec_ts*1000000ULL < 1000000ULL) ||
+        (-cur_micro + ct_nano_ts/1000ULL   < 1000000ULL)) {
+        printf("matched!\n");
+    }
+    printf("%s, %s, %s, %s\n", buf, ct_milli.c_str(), ct_sec.c_str(), ct_nano.c_str());
 
     return 0;
 }

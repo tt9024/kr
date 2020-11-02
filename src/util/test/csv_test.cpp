@@ -7,7 +7,7 @@ int main() {
         "a, 1, 2.0, , ",
         "b, 2, 0.2, a ,c "};
     const int line_cnt = 2;
-    utils::CSVUtils::FileTokens ftr ={ 
+    utils::CSVUtil::FileTokens ftr ={ 
         {"a", "1", "2.0", "", ""}, 
         {"b", "2", "0.2", "a", "c"}
     };
@@ -21,7 +21,7 @@ int main() {
     };
 
     // read and write, and compare with re-read
-    auto ft = utils::CSVUtils::read_file(testfile);
+    auto ft = utils::CSVUtil::read_file(testfile);
 
     bool matched = (ftr == ft);
     std::cout << (matched? "Matched!":"Mismatch!") << std::endl;
@@ -36,8 +36,8 @@ int main() {
         }
     }
 
-    utils::CSVUtils::write_file(ft, testfile, true);
-    auto ft2 = utils::CSVUtils::read_file(testfile);
+    utils::CSVUtil::write_file(ft, testfile, true);
+    auto ft2 = utils::CSVUtil::read_file(testfile);
     matched = (ft2[0] == ft2[2]) && (ft2[1]==ft2[3]);
 
     std::cout << (matched? "Matched!":"Mismatch!") << std::endl;

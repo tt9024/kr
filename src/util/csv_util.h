@@ -12,12 +12,12 @@
 #include <cstdlib>
 
 namespace utils {
-    namespace CSVUtils {
+    namespace CSVUtil {
         using LineTokens = std::vector<std::string>;
         using FileTokens = std::vector<LineTokens>;
         static const char Delimiter = ',';
 
-        LineTokens read_line(const std::string& line, char delimiter = Delimiter) {
+        static LineTokens read_line(const std::string& line, char delimiter = Delimiter) {
             LineTokens vec;
             if (line.size()==0) 
                 return vec;
@@ -40,7 +40,7 @@ namespace utils {
             return vec;
         }
 
-        FileTokens read_file(const std::string& csv_file, char delimiter = Delimiter, int skip_head_lines = 0) {
+        static FileTokens read_file(const std::string& csv_file, char delimiter = Delimiter, int skip_head_lines = 0) {
             std::string line;
             FileTokens vec;
             try {
@@ -57,7 +57,7 @@ namespace utils {
             return vec;
         }
 
-        void write_line(const LineTokens& token_vec, std::ofstream& csvfile, char delimiter = Delimiter) {
+        static void write_line(const LineTokens& token_vec, std::ofstream& csvfile, char delimiter = Delimiter) {
             if (token_vec.size()==0) 
                 return;
             csvfile << token_vec[0];
@@ -67,7 +67,7 @@ namespace utils {
             csvfile << std::endl;
         }
 
-        bool write_file(const FileTokens& line_vec, const std::string& filename, bool append=true,  char delimiter=Delimiter) {
+        static bool write_file(const FileTokens& line_vec, const std::string& filename, bool append=true,  char delimiter=Delimiter) {
             std::ofstream csvfile;
             try {
                 if (append) 
@@ -88,7 +88,7 @@ namespace utils {
             return false;
         };
 
-        bool write_line(const LineTokens& token_vec, const std::string& filename, bool append=true,  char delimiter=Delimiter) {
+        static bool write_line(const LineTokens& token_vec, const std::string& filename, bool append=true,  char delimiter=Delimiter) {
             FileTokens ft;
             ft.push_back(token_vec);
             return write_file(ft, filename, append, delimiter);

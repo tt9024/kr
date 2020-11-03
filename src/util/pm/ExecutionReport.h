@@ -6,35 +6,6 @@
 #include <memory>
 
 namespace pm {
-    /*
-    template<int L>
-    class String {
-    public:
-        String();
-        explicit String(const std::string& text) {
-            snprintf(m_text, L, "%s", text.c_str());
-        }
-        explicit String(const char* buf, size_t len) {
-            if (len > L) {
-                throw std::runtime_error(std::to_string(len)+" more than " + std::to_string(L) + " in String()");
-            }
-            memset(m_text,0,L);
-            memcpy(m_text, buf, len);
-        }
-
-        char m_text[L];
-        operator char*() const {
-            return (char*)m_text;
-        }
-        operator std::string() const {
-            return std::string(m_text);
-        }
-    };
-    using SymbolType = String<16>;
-    using IDType = String<32>;
-    using StatusType = String<4>;
-    */
-
     static const int SymbolLen = 16;
     static const int IDLen = 32;
     static const int StatusLen = 4;

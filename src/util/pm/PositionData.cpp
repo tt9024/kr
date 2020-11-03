@@ -184,7 +184,7 @@ namespace pm {
     }
 
     bool IntraDayPosition::hasPosition() const {
-        return m_qty_long || m_qty_short;
+        return m_qty_long == m_qty_short;
     }
 
     int64_t IntraDayPosition::getPosition(double* ptr_vap = nullptr, double* ptr_pnl = nullptr) const {

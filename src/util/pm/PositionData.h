@@ -60,12 +60,15 @@ namespace pm {
         IntraDayPosition& operator+(const IntraDayPosition& idp);
             // aggregate two intra-day position
 
-        std::string diff(const IntraDayPosition& idp) const;
+        std::string diff(const IntraDayPosition& idp, bool check_pnl=false) const;
             // finds difference with the given idp, 
             // return "" in case no difference is found 
+            // set check_pnl to true to also check the realized pnl
+            // from the position.  This may differ if one is loaded
+            // from eod (with pnl reset)
 
         bool operator==(const IntraDayPosition& idp) const;
-            // compares two positions
+            // compares two positions, in terms of position and vap
 
         utils::CSVUtil::LineTokens toCSVLine() const;
             // writes the current position to a csv line
@@ -130,5 +133,5 @@ namespace pm {
 
         std::string toString() const;
             // writes this open order to a text line
-    }
+    };
 }

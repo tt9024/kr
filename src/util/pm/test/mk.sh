@@ -1,1 +1,1 @@
-g++ -std=c++11 -g -o $1 "$1.cpp" $2 $3 -I.. -I../.. 
+g++ -std=c++11 -g -o $1 "$1.cpp" ../ExecutionReport.cpp ../PositionData.cpp ../PositionManager.cpp  -I.. -I../..

@@ -111,14 +111,20 @@ namespace pm {
             m_last_micro=utils::TimeUtil::cur_micro();
     }
 
-    IntraDayPosition& IntraDayPosition::operator+(const IntraDayPosition& idp) {
+    void IntraDayPosition::operator+=(const IntraDayPosition& idp) {
         addFill(idp.m_qty_long, idp.m_vap_long, idp.m_last_micro);
         addFill(-idp.m_qty_short, idp.m_vap_short, idp.m_last_micro);
-        for (const auto& me : idp.m_oo) {
-            if (m_oo.find(me.first) == m_oo.end()) {
-                m_oo.insert(me);
+        for (const auto& me : idp.listOO()) {
+            if (m_oo.find(me->m_clOrdId) == m_oo.end()) {
+                auto iter = idp.m_oo.find(me->m_clOrdId);
+                m_oo[me->m_clOrdId] = iter->second;
             }
         }
+    }
+
+    IntraDayPosition IntraDayPosition::operator+(const IntraDayPosition& idp) {
+        *this+=idp;
+        return *this;
     }
 
     // this aggregates the two positions
@@ -134,7 +140,7 @@ namespace pm {
 
         // check position
         std::string ret((qty1==qty2)?"":
-                "qty: "+std::to_string(qty1) + " != " + std::to_string(qty1) + "\n");
+                "qty: "+std::to_string(qty1) + " != " + std::to_string(qty2) + "\n");
 
         // check vap
         if (qty1 || qty2) {
@@ -180,8 +186,8 @@ namespace pm {
         size_t bytes = snprintf(buf, sizeof(buf), "%s:%s qty=%lld, vap=%.7lf, pnl=%.3lf, last_updated=", 
                 m_algo.c_str(), m_symbol.c_str(), 
                 (long long) qty, vap, pnl);
-        bytes += utils::TimeUtil::int_to_string_second_UTC(m_last_micro, buf+bytes, sizeof(buf)-bytes);
-        bytes += snprintf(buf+bytes, sizeof(bytes)-bytes, "-- DETAIL(lqty=%lld, lvap=%.7lf, sqty=%lld, svap=%.7lf)", 
+        bytes += utils::TimeUtil::frac_UTC_to_string(m_last_micro, buf+bytes, sizeof(buf)-bytes,6);
+        bytes += snprintf(buf+bytes, sizeof(bytes)-bytes, " DETAIL(lqty=%lld, lvap=%.7lf, sqty=%lld, svap=%.7lf)", 
                 (long long) m_qty_long, m_vap_long,
                 (long long) m_qty_short, m_vap_short);
         return std::string(buf);

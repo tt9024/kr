@@ -7,24 +7,20 @@
 #include "csv_util.h"
 #include "time_util.h"
 
-#define EoDPositionFile eod_pos.csv
-#define FillFile fills.csv
+#define EoDPositionFile "eod_pos.csv"
+#define FillFile "fills.csv"
 
 namespace pm {
-
-    explicit PositionManager::PositionManager(const std::string& name, const std::string& recover_path) :
-    m_name(name), m_recovery_path(recovery_path),
-    m_load_timestamp(loadEoD()), m_last_micro(0)
+    PositionManager::PositionManager(const std::string& name, const std::string& recover_path) :
+    m_name(name), m_recovery_path(recover_path),
+    m_load_second(loadEoD()), m_last_micro(0)
     {}
 
-    PositionManager::~PositionManager() {};
-
-    uint64_t PositionManager::getLoadUtc() const {
+    std::string PositionManager::getLoadUtc() const {
         // from YYYYMMDD-HH:MM:SS local
         // see persist()
-        return m_load_timestamp;
+        return m_load_second;
     }
-
 
     std::string PositionManager::eod_csv() const {
         return m_recovery_path + "/" + EoDPositionFile;
@@ -34,11 +30,11 @@ namespace pm {
         return m_recovery_path + "/" + FillFile;
     }
 
-    uint64_t PositionManager::loadEoD() {
+    std::string PositionManager::loadEoD() {
         auto line_vec = utils::CSVUtil::read_file(eod_csv());
         size_t line_cnt = line_vec.size();
         if (line_cnt==0) {
-            return;
+            return utils::TimeUtil::frac_UTC_to_string(0,0);
         }
 
         std::string latest_day = line_vec[line_cnt-1][0];
@@ -54,13 +50,13 @@ namespace pm {
             // remove the first column - the timestamp
             token_vec.erase(token_vec.begin());
             auto idp = std::make_shared<IntraDayPosition>(token_vec);
-            const std::string& symbol = idp->m_symbol;
-            const std::string& algo = idp->m_algo;
+            const std::string& symbol = idp->get_symbol();
+            const std::string& algo = idp->get_algo();
             // add idp to the AlgoPosition
             if ( (m_algo_pos.find(algo)!=m_algo_pos.end()) &&
                  (m_algo_pos[algo].find(symbol)!=m_algo_pos[algo].end()) ) {
                 // we find a duplicated line, failed
-                throw std::runtime_error(std::string("PM load failed: duplicated position line found: ") + line);
+                throw std::runtime_error(std::string("PM load failed: duplicated position found: ") + idp->toString());
             }
             m_algo_pos[algo][symbol]=idp;
             m_symbol_pos[symbol][algo]=idp;
@@ -73,7 +69,7 @@ namespace pm {
         // update the intra-day position
         auto idp = m_algo_pos[er.m_algo][er.m_symbol];
         if (!idp) {
-            idp = std::make_shared<IntraDayPosition>();
+            idp = std::make_shared<IntraDayPosition>(er.m_symbol, er.m_algo);
             m_algo_pos[er.m_algo][er.m_symbol] = idp;
             m_symbol_pos[er.m_symbol][er.m_algo] = idp;
         }
@@ -86,7 +82,7 @@ namespace pm {
         m_last_micro = er.m_recv_micro;
     }
 
-    bool PositionManager::reconcile(const std::string& recovery_file, std::string& diff_logs, bool adjust) const {
+    bool PositionManager::reconcile(const std::string& recovery_file, std::string& diff_logs, bool adjust) {
         // this loads the latest positions from eod_position file
         // update with the execution reports from the given recovery_file
         // and compare the result with this position
@@ -100,26 +96,27 @@ namespace pm {
             return true;
         }
         if (adjust) {
-            fprintf(stderr, "Warning, %s is going to copy from %s, all existing open order trackings are lost. Download open order again if needed!", m_name.c_str(), pm.m_name.c_str());
+            fprintf(stderr, "Warning, %s is going to copy from %s, all existing open order trackings are lost. Download open order again if needed!\n", m_name.c_str(), pm.m_name.c_str());
             *this=pm;
         }
         return false;
     }
 
     bool PositionManager::loadRecovery(const std::string& recovery_file) {
-        // TODO!!
+        const std::string fname = m_recovery_path + "/" + recovery_file;
+        for(auto& line : utils::CSVUtil::read_file(fname)) {
+            update(pm::ExecutionReport::fromCSVLine(line));
+        }
     }
 
-
     bool PositionManager::persist() const {
-        time_t cur_sec = time();
-        std::string eod_timestamp = utils::TimeUtil::frac_utc_to_string(cur_sec,0);
+        std::string eod_timestamp = utils::TimeUtil::frac_UTC_to_string(0,0);
 
         utils::CSVUtil::FileTokens line_vec;
-        for (const auto& iter = m_algo_pos.begin();
+        for (auto iter = m_algo_pos.begin();
              iter != m_algo_pos.end();
              ++iter) {
-            for (const auto& iter2 = iter->second.begin();
+            for (auto iter2 = iter->second.begin();
                      iter2 != iter->second.end();
                      ++iter2) {
                 auto token_vec = iter2->second->toCSVLine();
@@ -136,20 +133,20 @@ namespace pm {
 
     std::string PositionManager::diff(const PositionManager& pm) const {
         std::string diff_str;
-        if (pm.m_load_timestamp != m_load_timestamp) {
-            diff_str = "load utc: " + m_load_timestamp + "(" + m_name+") != " + pm.m_load_timestamp + "("+pm.m_name+")";
-            return false;
+        if (pm.m_load_second != m_load_second) {
+            diff_str = "load utc: " + m_load_second + "(" + m_name+") != " + pm.m_load_second + "("+pm.m_name+")";
+            return diff_str;
         }
-        for (const auto& iter = m_algo_pos.begin();
+        for (auto iter = m_algo_pos.begin();
              iter != m_algo_pos.end();
              ++iter) {
-            for (const auto& iter2 = iter->second.begin();
+            for (auto iter2 = iter->second.begin();
                  iter2 != iter->second.end();
                  ++iter2) {
 
                 const auto idpv = pm.listPosition(&iter->first, &iter2->first);
                 if (idpv.size()==1) {
-                    diff_str+=iter2->second->diff(idpv[0]);
+                    diff_str+=iter2->second->diff(*idpv[0]);
                 } else {
                     // is this a zero position?
                     if (iter2->second->hasPosition()) {
@@ -164,37 +161,37 @@ namespace pm {
     }
 
     
-    int64_t PositionManager::getPosition(const string& algo, const string& symbol, double* ptr_vap, double* pnl) const {
+    int64_t PositionManager::getPosition(const std::string& algo, const std::string& symbol, double* ptr_vap, double* pnl) const {
         const auto pos = listPosition(&algo, &symbol);
         int64_t qty = 0;
-        if (pos.size()==0) {
+        if (pos.size()==1) {
             qty = pos[0]->getPosition(ptr_vap, pnl);
         }
         return qty;
     }
 
-    int64_t PositionManager::getPosition(const string& symbol, double* ptr_vap, double* pnl) const {
+    int64_t PositionManager::getPosition(const std::string& symbol, double* ptr_vap, double* pnl) const {
         // get an aggregated position for the given symbol
         const auto pos = listPosition(nullptr, &symbol);
         int64_t qty = 0;
         if(pos.size()>0) {
-            IntraDayPosition idp(pos[0]);
+            IntraDayPosition idp(*pos[0]);
             for (size_t i = 1; i<pos.size(); ++i) {
-                idp += pos[i];
+                idp += (*pos[i]);
             }
             qty = idp.getPosition(ptr_vap, pnl);
         }
         return qty;
     }
 
-    std::vector<std::shared_ptr<const IntraDayPosition> > PositionManager::listPosition(const string* algo=nullptr, const string* symbol=nullptr) const {
+    std::vector<std::shared_ptr<const IntraDayPosition> > PositionManager::listPosition(const std::string* algo, const std::string* symbol) const {
         std::vector<std::shared_ptr<const IntraDayPosition> > vec;
         if (algo) {
             // use the algo map
             const auto iter = m_algo_pos.find(*algo);
             if (iter != m_algo_pos.end()) {
                 if (symbol) {
-                    const auto iter2 = iter->second.find(*symbol);
+                    const auto& iter2 = iter->second.find(*symbol);
                     if (iter2 != iter->second.end()) {
                         vec.push_back(iter2->second);
                     }
@@ -205,13 +202,13 @@ namespace pm {
         } else {
             // use the symbol map
             if (symbol) {
-                const auto iter = m_symbol_pos.find(*symbol);
+                const auto& iter = m_symbol_pos.find(*symbol);
                 if (iter != m_symbol_pos.end()) {
                     addAllMapVal(vec, iter->second.begin(), iter->second.end());
                 }
             } else {
                 // add all 
-                for (const auto iter = m_symbol_pos.begin(); iter!= m_symbol_pos.end(); ++iter) {
+                for (auto iter = m_symbol_pos.begin(); iter!= m_symbol_pos.end(); ++iter) {
                     addAllMapVal(vec, iter->second.begin(), iter->second.end());
                 }
             }
@@ -219,7 +216,7 @@ namespace pm {
         return vec;
     }
 
-    std::vector<std::shared_ptr<const OpenOrder> > PositionManager::listOO(const string* algo=nullptr, const string* symbol=nullptr) const {
+    std::vector<std::shared_ptr<const OpenOrder> > PositionManager::listOO(const std::string* algo, const std::string* symbol) const {
         std::vector<std::shared_ptr<const OpenOrder> > vec_oo;
         const auto vec = listPosition(algo, symbol);
         for (const auto& idp: vec) {
@@ -231,8 +228,8 @@ namespace pm {
         return vec_oo;
     }
 
-    double PositionManager::getPnl(const string* algo=nullptr, 
-                  const string* symbol=nullptr) const {
+    double PositionManager::getPnl(const std::string* algo, 
+                  const std::string* symbol) const {
         const auto vec = listPosition(algo, symbol);
         double pnl=0;
         for (const auto& idp: vec) {
@@ -250,5 +247,14 @@ namespace pm {
         m_last_micro = m_last_micro;
     }
 
+    std::string PositionManager::toString() const {
+        std::string ret;
+        const auto idp_vec(listPosition());
+        for (const auto& idp:idp_vec) {
+            ret += (idp->toString() + " ");
+            ret += (idp->dumpOpenOrder() + "\n");
+        }
+        return ret;
+    }
 }
 

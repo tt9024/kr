@@ -103,7 +103,7 @@ public:
        return bytes;
    };
 
-   static std::string frac_UTC_to_string(uint64_t utc_frac_mul, int frac_decimals=0, const char* fmt_str="%Y%m%d-%H:%M:%S") {
+   static std::string frac_UTC_to_string(uint64_t utc_frac_mul=0, int frac_decimals=0, const char* fmt_str="%Y%m%d-%H:%M:%S") {
        char buf[32];
        frac_UTC_to_string(utc_frac_mul, buf, sizeof(buf), frac_decimals, fmt_str);
        return std::string(buf);

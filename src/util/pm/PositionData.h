@@ -57,7 +57,8 @@ namespace pm {
             // there will be only one sided position after this, i.e. 
             // the other side will be zero and the realized pnl will be 0
 
-        IntraDayPosition& operator+(const IntraDayPosition& idp);
+        void operator+=(const IntraDayPosition& idp);
+        IntraDayPosition operator+(const IntraDayPosition& idp);
             // aggregate two intra-day position
 
         std::string diff(const IntraDayPosition& idp, bool check_pnl=false) const;
@@ -101,6 +102,9 @@ namespace pm {
         double getMtmPnl(double ref_px) const;
             // calculate realized pnl plus mark to market pnl
             // using the given ref_px
+        
+        std::string get_symbol() const { return m_symbol ; };
+        std::string get_algo() const   { return m_algo;    };
 
     protected:
         std::string m_algo;

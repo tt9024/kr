@@ -198,13 +198,56 @@ bool load_save() {
 }
 
 bool add_copy() {
+    pm::IntraDayPosition idp("sym1","algo1");
+    utils::CSVUtil::FileTokens erlines_update1 = {
+        {"sym1", "algo1","cid1", "eid1", "0","10","3.0", "20201004-18:33:02","", "1601850782023138"},
+        {"sym1", "algo1","cid1", "eid2", "1","1" ,"3.0", "20201004-18:33:02","", "1601850782823033"},
+    };
+    for (const auto& line : erlines_update1) {
+        idp.update(pm::ExecutionReport::fromCSVLine(line));
+    }
 
+    pm::IntraDayPosition* idp_newday_ptr = new pm::IntraDayPosition(idp);
+    pm::IntraDayPosition& idp_newday(*idp_newday_ptr);
 
+    // update with more execution reports
+    utils::CSVUtil::FileTokens erlines_update2 = {
+        {"sym1", "algo1","cid2", "eid3", "0","-10","3.0", "20201004-18:33:02","", "1601850782023138"},
+        {"sym1", "algo1","cid2", "eid4", "1","-3" ,"3.0", "20201004-18:33:02","", "1601850782823033"},
+        {"sym1", "algo1","cid3", "eid5", "0","5"  ,"4.0", "20201004-18:33:08","", "1601850788504031"}
+    };
+    for (const auto& line: erlines_update2) {
+        idp_newday.update(pm::ExecutionReport::fromCSVLine(line));
+    };
+    idp+=idp_newday;
+    delete idp_newday_ptr;
+
+    if (idp.getPosition() != -1) {
+        std::cout << "add_copy position mismatch! " << std::endl;
+        std::cout << idp.toString() << "\n" << idp.dumpOpenOrder() << std::endl;
+        return false;
+    }
+
+    auto oovec = idp.listOO();
+    if (oovec.size() != 3) {
+        std::cout << "add_copy oo list size mismatch! 3 expected " << std::endl;
+        std::cout << idp.toString() << "\n" << idp.dumpOpenOrder() << std::endl;
+        return false;
+    }
+
+    if ((oovec[0]->m_open_qty != 9) ||
+        (oovec[1]->m_open_qty != -7) ||
+        (oovec[2]->m_open_qty != 5)) {
+        std::cout << "add_copy oo open qty mistmach!" << std::endl;
+        std::cout << idp.toString() << "\n" << idp.dumpOpenOrder() << std::endl;
+        return false;
+    }
+    return true;
 }
 
 
 int main() {
-    if (load_save()) {
+    if (load_save() && add_copy()) {
         std::cout << "all good!" << std::endl;
     }
     return 0;

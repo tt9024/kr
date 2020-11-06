@@ -54,6 +54,5 @@ int main() {
         printf("matched!\n");
     }
     printf("%s, %s, %s, %s\n", buf, ct_milli.c_str(), ct_sec.c_str(), ct_nano.c_str());
-
     return 0;
 }

@@ -149,6 +149,16 @@ public:
        gettimeofday(&tv, NULL);
        return ((uint64_t)tv.tv_sec)*1000000ULL + tv.tv_usec;
    };
+
+   static uint64_t micro_sleep(uint64_t micro) {
+       struct timespec req, rem;
+       req.tv_sec=(time_t)(micro/1000000ULL);
+       req.tv_nsec=(long)((micro%1000000ULL)*1000ULL);
+       int ret = nanosleep(&req, &rem);
+       if (ret != 0)
+           return rem.tv_sec*1000000ULL + (uint64_t)rem.tv_nsec/1000ULL;
+       return 0;
+   }
 };
 
 }

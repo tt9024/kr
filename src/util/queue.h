@@ -612,6 +612,7 @@ namespace utils {
             // be very careful calling this
             //void reset() { *m_pos_write = *m_ready_bytes; *m_pos_dirty = 0};
             QPos put(const char* content, int bytes);
+            QPos put(const char* content1, int bytes1, const char* content2, int bytes2); // as one message
             std::string dump() const {
             	char buf[128];
             	snprintf(buf, sizeof(buf), "Writer - %lld, %lld, %lld",
@@ -640,6 +641,22 @@ namespace utils {
         QPos pos = getWritePos(total_bytes);
         m_buffer.template copyBytes<true>(pos, (char*) &bytes, sizeof(int));
         m_buffer.template copyBytes<true>(pos + sizeof(int), (char*) content, bytes);
+        asm volatile("" ::: "memory");
+        finalizeWrite(total_bytes);
+        return pos;
+    }
+
+    // it first get the write pos, write a size, write the content
+    // and check if it detects a synchronous point and update read
+    template<int QLen, template<int, int> class BufferType>
+    inline
+    QPos MwQueue<QLen, BufferType>::Writer::put(const char* content1, int bytes1, const char* content2, int bytes2) {
+        int total_bytes = bytes1 + bytes2 + sizeof(int);
+        QPos pos = getWritePos(total_bytes);
+        total_bytes-=sizeof(int);
+        m_buffer.template copyBytes<true>(pos,                    (char*) &total_bytes, sizeof(int));
+        m_buffer.template copyBytes<true>(pos+sizeof(int),        (char*) content1,     bytes1);
+        m_buffer.template copyBytes<true>(pos+sizeof(int)+bytes1, (char*) content2,     bytes2);
         asm volatile("" ::: "memory");
         finalizeWrite(total_bytes);
         return pos;

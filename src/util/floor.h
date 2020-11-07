@@ -1,5 +1,8 @@
 #include "queue.h"
 #include <memory>
+#include <set>
+#include <iostream>
+#include <stdio.h>
 
 namespace utils {
 
@@ -18,11 +21,15 @@ namespace utils {
             GetPositionResp = 5,
             SendOrderReq = 6,
             SendOrderResp = 7,
-            UserReq = 8,
-            UserResp = 9,
-            TotalTypes = 10
+            ExecutionReplayStart = 8,
+            ExecutionReplayDone = 9,
+            UserReq = 10,
+            UserResp = 11,
+            TotalTypes = 12
         };
 
+        // TODO - maybe protect the buf/buf_capacity
+        // as private if needed in the future usage cases
         struct Message {
             // a stateless message that doesn't demand response
             EventType type;

@@ -65,7 +65,16 @@ namespace pm {
     };
 
     void PositionManager::update(const ExecutionReport& er) {
-        // if it's a fill, need to persist
+        // check for duplicate fill
+        // this could happen if the recovery overlaps with real-time
+        // fills, or otherwise a previous fill is resent
+        if (er.isFill()) {
+            if ( haveThisFill(er) ) {
+                fprintf(stderr, "warning! duplicated fill not updated: %s\n", er.toString().c_str());
+                return ;
+            }
+        }
+
         // update the intra-day position
         auto idp = m_algo_pos[er.m_algo][er.m_symbol];
         if (!idp) {
@@ -74,12 +83,12 @@ namespace pm {
             m_symbol_pos[er.m_symbol][er.m_algo] = idp;
         }
         idp->update(er);
+        m_last_micro = er.m_recv_micro;
 
-        // if it's a fill, append a line to the fill file
+        // if it's a fill, need to persist
         if (er.isFill()) {
             utils::CSVUtil::write_line(er.toCSVLine(), fill_csv(), true);
         }
-        m_last_micro = er.m_recv_micro;
     }
 
     bool PositionManager::reconcile(const std::string& recovery_file, std::string& diff_logs, bool adjust) {
@@ -244,7 +253,8 @@ namespace pm {
         fprintf(stderr, "INFO - %s gets all positions from %s", m_name.c_str(), pm.m_name.c_str());
         m_algo_pos = pm.m_algo_pos;
         m_symbol_pos = pm.m_symbol_pos;
-        m_last_micro = m_last_micro;
+        m_last_micro = pm.m_last_micro;
+        m_fill_execid = pm.m_fill_execid;
     }
 
     std::string PositionManager::toString() const {
@@ -255,6 +265,16 @@ namespace pm {
             ret += (idp->dumpOpenOrder() + "\n");
         }
         return ret;
+    }
+
+    bool PositionManager::haveThisFill(const ExecutionReport& er) {
+        // assuming this er is a fill, check to see if we have seen this er
+        const std::string key = std::string(er.m_execId) + std::string(er.m_clOrdId);
+        if (m_fill_execid.find(key) != m_fill_execid.end()) {
+            return true;
+        }
+        m_fill_execid.insert(key);
+        return false;
     }
 }
 

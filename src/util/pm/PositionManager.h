@@ -4,6 +4,7 @@
 #include <memory>
 #include <map>
 #include <vector>
+#include <unordered_set>
 
 namespace pm {
     using PositionMap = std::map<std::string, std::map<std::string, std::shared_ptr<IntraDayPosition> > >;
@@ -63,6 +64,7 @@ namespace pm {
         PositionMap m_symbol_pos;
         const std::string m_load_second;
         uint64_t m_last_micro;
+        std::unordered_set<std::string> m_fill_execid;
 
         std::string loadEoD();
         // for each position, check with pm
@@ -79,6 +81,8 @@ namespace pm {
                 vec.push_back(iter->second);
             };
         }
+
+        bool haveThisFill(const ExecutionReport& er);
     };
 };
 

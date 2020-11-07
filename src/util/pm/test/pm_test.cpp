@@ -98,6 +98,7 @@ bool load_save() {
 
     // reconcile
     utils::CSVUtil::FileTokens erlines_update2 = {
+    {"sym1", "algo1","cid5", "eid12", "1","5" ,"3.0", "20201004-18:33:02","", "1601850782823033"}, // a duplicate fill
     {"sym2", "algo1","cid4", "eid13", "2","-4","10.1", "20201004-18:33:02","", "1601850782023138"}
     };
 

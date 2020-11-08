@@ -9,10 +9,11 @@
 
 #define EoDPositionFile "eod_pos.csv"
 #define FillFile "fills.csv"
+#define RecoveryPath "recovery"
 
 namespace pm {
     PositionManager::PositionManager(const std::string& name, const std::string& recover_path) :
-    m_name(name), m_recovery_path(recover_path),
+    m_name(name), m_recovery_path(recover_path.size()==0? RecoveryPath:recover_path),
     m_load_second(loadEoD()), m_last_micro(0)
     {}
 

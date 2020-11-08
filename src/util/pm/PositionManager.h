@@ -11,7 +11,7 @@ namespace pm {
 
     class PositionManager {
     public:
-        explicit PositionManager(const std::string& name, const std::string& recover_path);
+        explicit PositionManager(const std::string& name, const std::string& recover_path = "");
         ~PositionManager() {};
 
         std::string getLoadUtc() const;

@@ -196,11 +196,11 @@ namespace pm {
 
     std::vector<std::shared_ptr<const IntraDayPosition> > PositionManager::listPosition(const std::string* algo, const std::string* symbol) const {
         std::vector<std::shared_ptr<const IntraDayPosition> > vec;
-        if (algo) {
+        if (algo && (*algo).size()) {
             // use the algo map
             const auto iter = m_algo_pos.find(*algo);
             if (iter != m_algo_pos.end()) {
-                if (symbol) {
+                if (symbol && (*symbol).size()) {
                     const auto& iter2 = iter->second.find(*symbol);
                     if (iter2 != iter->second.end()) {
                         vec.push_back(iter2->second);
@@ -211,7 +211,7 @@ namespace pm {
             }
         } else {
             // use the symbol map
-            if (symbol) {
+            if (symbol && (*symbol).size()) {
                 const auto& iter = m_symbol_pos.find(*symbol);
                 if (iter != m_symbol_pos.end()) {
                     addAllMapVal(vec, iter->second.begin(), iter->second.end());
@@ -258,9 +258,9 @@ namespace pm {
         m_fill_execid = pm.m_fill_execid;
     }
 
-    std::string PositionManager::toString() const {
+    std::string PositionManager::toString(const std::string* ptr_algo, const std::string* ptr_symbol) const {
         std::string ret;
-        const auto idp_vec(listPosition());
+        const auto idp_vec(listPosition(ptr_algo, ptr_symbol));
         for (const auto& idp:idp_vec) {
             ret += (idp->toString() + " ");
             ret += (idp->dumpOpenOrder() + "\n");

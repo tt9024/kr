@@ -1,6 +1,7 @@
 #include "floor.h"
 #include <string>
 #include "time_util.h"
+#include "csv_util.h"
 
 namespace pm {
 
@@ -24,11 +25,6 @@ namespace pm {
             return mgr;
         }
 
-        FloorManager(const std::string& name) 
-        : m_name(name), m_started(false), m_loaded(false), m_should_run(false) {}
-
-            // this loads up the position manager with eod 
-            // and start the floor
         ~FloorManager() {};
         void start() {
             // process of startup
@@ -95,14 +91,14 @@ namespace pm {
         const std::string m_name;
         PositionManager m_pm;
         ChannelType m_channel;
-        volatile bool m_started, m_loaded, m_should_run;
+        volatile bool m_started, m_loaded, m_should_run, m_in_reconcile;
         std::string m_recovery_file;
 
         explicit FloorManager(const std::string& name)
         : m_name(name), 
           m_pm(m_name),
           m_channel(utils::Floor::get().getServer()),
-          m_started(false), m_loaded(false), m_should_run(false) 
+          m_started(false), m_loaded(false), m_should_run(false), m_in_reconcile(false)
         {}
 
         FloorManager(const FloorManager& mgr) = delete;
@@ -175,18 +171,79 @@ namespace pm {
 
         void handleUserReq(const MsgType& msg, MsgType& msg_out) {
             //    User Request:
-            //       - eod persis
+            //       - "stop"
+            //         - stop processing 
+            //       - "position"
+            //         - output state position
+            //       - "pnl"
+            //         - output pnl 
+            //       - "open"
+            //         - output open orders
+            //       - "trade" "instruction_string"
+            //         - initiate manual trade
+            //       - "adjust" "position_line"
+            //         - resets the position with give line
+            //       - "risk" "limit_line"
+            //         - set max position limit
+            //       - "eod"
             //         - send request for replay
             //         - wait for done
             //         - process recovery
             //         - reconcile
             //         - persist
-            //       - dump state (pnl+position)
-            //       - stop
-            //       - manual trade
-            //       - adjust position
-            //       - set risk
+            //       - "help"
+            //         - output the help string
 
+            const char* cmd = msg.buf;
+            fprintf(stderr, "%s got user command: %s\n", m_name.c_str(), msg.buf);
+
+            if (strncmp(cmd, "help", 4)==0) {
+                char strbuf[256];
+                size_t bytes = snprintf(strbuf, sizeof(strbuf), "Command Line Interface\n"
+                        "P algo=algo_name,symbol=symbol_name\n\tlist positions of the specified algo and sybmol\n\thave to specify both algo and symbol, ALL is reserved for dumping all entries\n"
+                        "O algo=algo_name,symbol=symbol_name\n\tlist positions of the specified algo and sybmol\n\thave to specify both algo and symbol, ALL is reserved for dumping all entries\n"
+                        "B|S instruction\n\tenter buy or sell with instruction string\n"
+                        "!A position_line\n\tadjust the position and pnl using the given csv line\n"
+                        "!R limit_line\n\tset limit according to the given csv line\n"
+                        "!E \n\tinitiate the reconcile process, if good, persist currrent position to EoD file\n"
+                        "!K \n\tstop the message processing and done\n"
+                        "H\n\tlist of commands supported\n");
+                msg_out.type = utils::Floor::UserResp;
+                msg_out.ref = msg_in.ref;
+                msg_out.copyData(strbuf, bytes+1);
+                return;
+            }
+
+            if (strncmp(cmd, "stop", 4)==0) {
+                m_should_run = false;
+                char strbuf[32];
+                size_t bytes = snprintf(strbuf, sizeof(strbuf), "OK\n");
+                msg_out.type = utils::Floor::UserResp;
+                msg_out.ref = msg_in.ref;
+                msg_out.copyData(strbuf, bytes+1);
+                return;
+            }
+
+            if (strcmp(cmd, "dump", 4)==0) {
+                std::string dumpstr = runDump(cmd+4);
+                msg_out.type = utils::Floor::UserResp;
+                msg_out.ref = msg_in.ref;
+                msg_out.copyData(strbuf, bytes+1);
+                return;
+            }
+        }
+
+        std::string runDump(const char* cmd) {
+            auto tokens = utils::CSVUtil::read_line(std::string(cmd));
+            std::string algo, symbol;
+            for (const auto& tk: tokens) {
+                auto fields = utils::CSVUtil::read_line(tk, delimiter='=');
+                if (fields[1] == "ALL"
+                if (fields[0] == "algo") algo=fields[1];
+                if (fields[0] == "symbol") symbol=fields[1];
+
+            }
+            return pm.toString(&algo, &symbol);
         }
 
         void handlePositionReq(const MsgType msg, MsgType msg_out);

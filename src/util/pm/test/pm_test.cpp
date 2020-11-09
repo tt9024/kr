@@ -13,8 +13,8 @@ utils::CSVUtil::FileTokens erlines = {
     {"sym1", "algo2","cid3", "eid6", "0","5"  ,"3.0", "20201004-18:33:08","", "1601850788504031"},
     {"sym1", "algo2","cid3", "eid7", "1","1"  ,"3.0", "20201004-18:33:08","", "1601850788504031"},
     {"sym2", "algo1","cid4", "eid8", "0","-5"  ,"10.1", "20201004-18:33:08","", "1601850788504031"},
-    {"sym2", "algo1","cid4", "eid9", "1","-1"  ,"10.1", "20201004-18:33:08","", "1601850788504031"},
-    {"sym1", "algo2","cid3", "eid10", "4","0"  ,"0", "20201004-18:33:08","", "1601850788504031"}
+    {"sym2", "algo1","cid4", "eid9", "1","-1"  ,"10.1", "20201004-18:33:08","", "1601850788504031"}
+    //,{"sym1", "algo2","cid3", "eid10", "4","0"  ,"0", "20201004-18:33:08","", "1601850788504031"}
 };
 
 bool load_save() {
@@ -49,8 +49,9 @@ bool load_save() {
 
     // get position of sym1 algo1
     double vap, pnl;
-    int64_t qty = pmgr.getPosition("algo1", "sym1", &vap, &pnl);
-    if ((qty != -5) || (std::fabs(vap-2.0)>1e-10) || (std::fabs(pnl+5.0)>1e-10)) {
+    int64_t oqty;
+    int64_t qty = pmgr.getPosition("algo1", "sym1", &vap, &pnl, &oqty);
+    if ((qty != -5) || (std::fabs(vap-2.0)>1e-10) || (std::fabs(pnl+5.0)>1e-10) || (oqty != 5)) {
         std::cout << "getPosition algo1 sym1 mismatch!" << std::endl;
         std::cout << pmgr.toString() << std::endl;
         return false;
@@ -59,8 +60,9 @@ bool load_save() {
     // get Position of sym1
     // algo1: short 5 @ 2.0, 
     // algo2: long 1 @ 3.0
-    qty = pmgr.getPosition("sym1", &vap, &pnl);
-    if ( (qty!=-4) || (std::fabs(vap-2.0)>1e-10) || (std::fabs(pnl+6)>1e-10) ) {
+    oqty=0;
+    qty = pmgr.getPosition("sym1", &vap, &pnl, &oqty);
+    if ( (qty!=-4) || (std::fabs(vap-2.0)>1e-10) || (std::fabs(pnl+6)>1e-10) || (oqty != 9) ) {
         std::cout << "getPosition sym1 mismatch!" << std::endl;
         std::cout << pmgr.toString() << std::endl;
         return false;

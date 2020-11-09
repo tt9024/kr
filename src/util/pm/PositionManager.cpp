@@ -171,16 +171,22 @@ namespace pm {
     }
 
     
-    int64_t PositionManager::getPosition(const std::string& algo, const std::string& symbol, double* ptr_vap, double* pnl) const {
+    int64_t PositionManager::getPosition(const std::string& algo, const std::string& symbol, double* ptr_vap, double* pnl, int64_t* oqty) const {
+        if (algo.size()==0) {
+            return getPosition(symbol, ptr_vap, pnl, oqty);
+        }
         const auto pos = listPosition(&algo, &symbol);
         int64_t qty = 0;
         if (pos.size()==1) {
             qty = pos[0]->getPosition(ptr_vap, pnl);
+            if (oqty) {
+                *oqty = pos[0]->getOpenQty();
+            }
         }
         return qty;
     }
 
-    int64_t PositionManager::getPosition(const std::string& symbol, double* ptr_vap, double* pnl) const {
+    int64_t PositionManager::getPosition(const std::string& symbol, double* ptr_vap, double* pnl, int64_t* oqty) const {
         // get an aggregated position for the given symbol
         const auto pos = listPosition(nullptr, &symbol);
         int64_t qty = 0;
@@ -190,6 +196,9 @@ namespace pm {
                 idp += (*pos[i]);
             }
             qty = idp.getPosition(ptr_vap, pnl);
+            if (oqty) {
+                *oqty = idp.getOpenQty();
+            }
         }
         return qty;
     }

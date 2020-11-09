@@ -17,7 +17,7 @@ namespace utils {
             NOOP = 0,
             ExecutionReport = 1,
             SetPositionReq = 2,
-            SetPositionResp = 3,
+            SetPositionAck = 3,
             GetPositionReq = 4,
             GetPositionResp = 5,
             SendOrderReq = 6,
@@ -25,10 +25,10 @@ namespace utils {
             UserReq = 8,
             UserResp = 9,
             ExecutionReplayReq = 10,
-            ExecutionReplayResp = 11,
+            ExecutionReplayAck = 11,
             ExecutionReplayDone = 12,
             ExecutionOpenOrderReq = 13,
-            ExecutionOpenOrderResp = 14,
+            ExecutionOpenOrderAck = 14,
             TotalTypes = 15
         };
 
@@ -59,15 +59,13 @@ namespace utils {
             }
 
             void copyData(const char* data, const size_t data_size_) {
-                if (buf_capacity < data_size_) {
-                    if (buf) {
-                        free (buf);
-                    }
-                    buf = (char*)malloc(data_size_*2);
-                    buf_capacity = data_size_*2;
-                }
+                reserve(data_size_);
                 memcpy(buf, data, data_size);
                 data_size = data_size_;
+            }
+
+            void copyString(const std::string& str) {
+                copyData(str.c_str(), str.size()+1);
             }
 
             std::string toString() const {
@@ -80,6 +78,16 @@ namespace utils {
 
             bool refSet() const {
                 return ref != NOREF;
+            }
+
+            void reserve(size_t data_size_) {
+                if (buf_capacity<data_size_) {
+                    if (buf) {
+                        free (buf);
+                    }
+                    buf = (char*)malloc(data_size_*2);
+                    buf_capacity = data_size_*2;
+                }
             }
 
         private:

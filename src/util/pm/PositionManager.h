@@ -31,11 +31,12 @@ namespace pm {
         // writes the intraday positions to EoDPosition
         
         int64_t getPosition(const std::string& algo, const std::string& symbol, 
-                           double* ptr_vap, double* ptr_pnl) const ;
+                           double* vap=nullptr, double* pnl=nullptr, int64_t* oqty=nullptr) const ;
         // get position, vap, pnl given algo/symbol
         // set ptr to nullptr if not interested
 
-        int64_t getPosition(const std::string& symbol, double* ptr_vap, double* pnl) const;
+        int64_t getPosition(const std::string& symbol, 
+                           double* vap=nullptr, double* pnl=nullptr, int64_t* oqty=nullptr) const;
         // get total position, vap, pnl given a symbol
 
         std::vector<std::shared_ptr<const IntraDayPosition> > listPosition(const std::string* ptr_algo=nullptr, const std::string* ptr_symbol=nullptr) const;
@@ -54,6 +55,7 @@ namespace pm {
         void operator=(const PositionManager& pm);
         bool operator==(const PositionManager& pm) const;
         const std::string& getName() const { return m_name;};
+        std::string getRecoveryPath() const { return m_recovery_path; };
 
         std::string toString(const std::string* ptr_algo=nullptr, const std::string* ptr_symbol=nullptr) const;
 

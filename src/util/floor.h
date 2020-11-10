@@ -26,7 +26,7 @@ namespace utils {
             //uint64_t id;
             Message() : type(0), ref(NOREF), buf(nullptr), data_size(0), buf_capacity(0) {}
 
-            Message(int type_, char* data_, size_t size_, uint64_t ref_=NOREF)
+            Message(int type_, const char* data_, size_t size_, uint64_t ref_=NOREF)
             : type(type_), ref(ref_), buf((char*)malloc(size_)), data_size(size_), buf_capacity(size_) 
             {
                 memcpy(buf, data_, size_);
@@ -78,7 +78,7 @@ namespace utils {
             static Floor flr;
             return flr;
         };
-        ~Floor();
+        ~Floor() {};
 
         class Channel;
         std::unique_ptr<Channel> getClient() const {
@@ -208,7 +208,7 @@ namespace utils {
                 return _writer->put(buf, hdrsize, msg_data, msg_size);
             }
 
-            int readMessage(char*& buf, int* bytes, uint64_t* ref) {
+            int readMessage(volatile char*& buf, int* bytes, uint64_t* ref) {
                 // given a raw message read from the queue as buf and bytes
                 // parse the type and ref and adjust the buf and bytes for payload data
                 
@@ -222,7 +222,7 @@ namespace utils {
             }
 
             bool nextMessage(Message* msg, std::shared_ptr<QType::Reader> reader, bool filter_on) {
-                char* buf;
+                volatile char* buf;
                 int bytes;
                 while (true) {
                     QStatus status = reader->takeNextPtr(buf, bytes);
@@ -235,7 +235,7 @@ namespace utils {
                         reader->advance(bytes);
                         if ( (!filter_on) ||
                              (_subscribed_types.find(msg->type) != _subscribed_types.end()) ) {
-                            msg->copyData(buf, bytes);
+                            msg->copyData((char*)buf, bytes);
                             return true;
                         }
                         // try next one

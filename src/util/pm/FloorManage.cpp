@@ -146,7 +146,7 @@ namespace pm {
     }
 
     void FloorManager::handleExecutionReport(const MsgType& msg) {
-        m_pm.update(*static_cast<pm::ExecutionReport*>(msg.buf));
+        m_pm.update(*((pm::ExecutionReport*)(msg.buf)));
     }
 
     void FloorManager::handleUserReq(const MsgType& msg) {
@@ -275,9 +275,20 @@ namespace pm {
     bool FloorManager::requestOpenOrder() {
         // this should be replayed
         const std::string reqstr = "ALL";
-        MsgType msgReq(FloorBase::ExecutionOpenOrderReq, rqstr.c_str(), reqstr.size()+1);
+        MsgType msgReq(FloorBase::ExecutionOpenOrderReq, reqstr.c_str(), reqstr.size()+1);
         MsgType msgResp;
         return m_channel->requestAndCheckAck(msgReq, msgResp, 3,  FloorBase::ExecutionOpenOrderAck);
+    }
+
+    std::string FloorManager::toString() const {
+        char buf[128];
+        size_t bytes = snprintf(buf, sizeof(buf),
+                "FloorManager %s [started: %s, loaded: %s, eod_pending: %s, recovery_file: %s, time_loaded: %s]\n"
+                "Position Dump\n",
+                m_name.c_str(), m_started?"Y":"N", m_loaded?"Y":"N", m_eod_pending?"Y":"N",
+                m_recovery_file.c_str(), 
+                utils::TimeUtil::frac_UTC_to_string(m_loaded_time,0).c_str());
+        return std::string(buf) + m_pm.toString();
     }
 };
 

@@ -149,10 +149,10 @@ namespace utils {
 
         // check if the contents of bytes starting from start_pos would
         // cross the boundary.  If not, buffer will be the starting pointer
-        bool wouldCrossBoundary(const QPos start_pos, int bytes, char*& buffer) const volatile {
+        bool wouldCrossBoundary(const QPos start_pos, int bytes, volatile char*& buffer) const volatile {
             QPos s_pos = (start_pos % QLen);
             buffer = m_buffer + s_pos;
-            return s_pos < ((start_pos + bytes) % QLen);
+            return s_pos > ((start_pos + bytes) % QLen);
         }
 
         volatile char* getBufferPtr(QPos start_pos) const {

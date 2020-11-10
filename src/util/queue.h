@@ -570,7 +570,7 @@ namespace utils {
 
             // this doesn't copy the bytes in most cases, except the content
             // go across the circular buffer boundary
-            QStatus takeNextPtr(char*& buffer, int& bytes);
+            QStatus takeNextPtr(volatile char*& buffer, int& bytes);
 
             // this reads from a specific location 
             QStatus copyPosIn(char*buffer, int& bytes, QPos pos);
@@ -582,6 +582,8 @@ namespace utils {
             void advance(int bytes) { m_pos += (bytes+sizeof(int));};
             void syncPos() {m_pos = *m_ready_bytes;};
             std::string dump_state() const;
+            QPos getReadPos() const { return m_pos; };
+            QPos getReadyPos() const { return *m_ready_bytes; };
 
             ~Reader() {
                 if (m_localBuffer) {
@@ -595,7 +597,7 @@ namespace utils {
             const volatile QPos* const m_ready_bytes;
             QPos m_pos;
             mutable char* m_localBuffer;
-            mutable char m_localBufferSize;
+            mutable int  m_localBufferSize;
         };
 
         // each writer will have shared access to the queue
@@ -729,7 +731,7 @@ namespace utils {
 
     template<int QLen, template<int, int> class BufferType>
     inline
-    QStatus MwQueue<QLen, BufferType>::Reader::takeNextPtr(char*& buffer, int& bytes) {
+    QStatus MwQueue<QLen, BufferType>::Reader::takeNextPtr(volatile char*& buffer, int& bytes) {
         bytes = 0;
         if (__builtin_expect((m_pos > *m_pos_write),0)) {
             // queue restarted, return failure
@@ -743,15 +745,16 @@ namespace utils {
         QPos unread_bytes = *m_ready_bytes - m_pos;
         if (unread_bytes == 0)
             return QStat_EAGAIN;
+
         // get size
         m_buffer.template copyBytes<false>(m_pos, (char*)&bytes, sizeof(int));
         QPos data_pos = m_pos + sizeof(int);
-        buffer = m_buffer->getBufferPtr(data_pos);
         if (__builtin_expect(m_buffer.wouldCrossBoundary(data_pos, bytes, buffer), 0))
         {
             // we cannot just return the pointer to the content since the
             // content would cross circular boundary.
             // Copy the bytes locally and return;
+            //
             if (__builtin_expect((!m_localBuffer || (m_localBufferSize<bytes)), 0)) {
                 if (m_localBuffer) {
                     free( m_localBuffer );
@@ -759,6 +762,8 @@ namespace utils {
                 m_localBuffer = (char*) malloc(bytes);
                 m_localBufferSize = bytes;
             }
+            //printf("bytes = %d, local_size = %d, buffer = %p\n", (int) bytes, m_localBufferSize, m_localBuffer);
+
             m_buffer.template copyBytes<false>(data_pos, m_localBuffer, bytes);
             buffer = m_localBuffer;
         }

@@ -24,7 +24,7 @@ public:
         ItemType* buf = (ItemType*)malloc(len*sizeof(ItemType));
         _should_run = true;
         while (_should_run) {
-            uint64_t now = TimeUtil::cur_time_micro();
+            uint64_t now = TimeUtil::cur_micro();
             ++_num;
             for (int i=0; i<len; ++i) {
                 buf[i]._seq = _num;
@@ -36,7 +36,7 @@ public:
                 printf("writer %d wrote %llu\n", _id, (unsigned long long)_num);
             }
             now += _wait_micro;
-            while (TimeUtil::cur_time_micro() < now);
+            while (TimeUtil::cur_micro() < now);
         }
         printf("writer %d stopped.", _id);
     }
@@ -64,7 +64,7 @@ public:
         ItemType* buf = (ItemType*)malloc(len*sizeof(ItemType));
         _should_run = true;
         while (_should_run) {
-            uint64_t now = TimeUtil::cur_time_micro();
+            uint64_t now = TimeUtil::cur_micro();
             ++_num;
             for (int i=0; i<len; ++i) {
                 buf[i]._seq = _num;
@@ -76,7 +76,7 @@ public:
                 printf("writer %d wrote %llu\n", _id, (unsigned long long)_num);
             }
             now += _wait_micro;
-            while (TimeUtil::cur_time_micro() < now);
+            while (TimeUtil::cur_micro() < now);
         }
         printf("writer %d stopped.", _id);
     }
@@ -149,8 +149,8 @@ protected:
     bool checkContent(ItemType* buf, int len) {
         for (int i=1; i<len; ++i) {
             if (memcmp(buf+i, buf, sizeof(ItemType))) {
-                printf ("check failed at %d: [%llu %llu %llu] vs [%llu %llu %llu]\n",
-                        i, (unsigned long long)buf->_id, (unsigned long long)buf->_seq,
+                printf ("check failed at %d(%d) buf(%p): [%llu %llu %llu] vs [%llu %llu %llu]\n",
+                        i, len, (char*)buf, (unsigned long long)buf->_id, (unsigned long long)buf->_seq,
                         (unsigned long long)buf->_ts, (unsigned long long)buf[i]._id,
                         (unsigned long long)buf[i]._seq, (unsigned long long)buf[i]._ts);
                 return false;
@@ -182,7 +182,7 @@ protected:
             printf("reader %d started with %llu", _id, (unsigned long long) new_num);
         }
         num = new_num;
-        uint64_t now = TimeUtil::cur_time_micro();
+        uint64_t now = TimeUtil::cur_micro();
         _lat += (now - iptr->_ts);
         _cnt += 1;
 
@@ -207,13 +207,25 @@ public:
 
     void run(void* data_len_ptr) {
         int len = *((int*)data_len_ptr);
+
+#ifdef CopyBuffer
         ItemType* buf = (ItemType*)malloc(len*sizeof(ItemType));
+        printf("copying ptr\n");
+#else
+        ItemType* buf;
+        printf("taking ptr\n");
+#endif
         this->_should_run = true;
         uint64_t num = 0;
         while (this->_should_run) {
             int bytes;
             utils::QStatus qstatus;
+
+#ifdef CopyBuffer
             qstatus = this->_reader.copyNextIn((char*)buf, bytes);
+#else
+            qstatus = this->_reader.takeNextPtr((volatile char*&)buf, bytes);
+#endif
             len = bytes/(int)sizeof(ItemType);
 
             if (qstatus == utils::QStat_OK) {

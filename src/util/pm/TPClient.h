@@ -17,8 +17,7 @@ namespace pm {
         // 2. errstr = requestReplay(char* data, int size)
         // 3. errstr = requestOpenOrder(char* data, int size)
         // In addition, it needs to update this client with incoming :
-        // 4. void sendExecutionReport(const ExecutionReport)
-        // 5. void updateReplayDone()
+        // 4. sendMsg(msg)
 
     public:
         explicit FloorClientOrder(const std::string& name, OrderConnection& conn)
@@ -30,8 +29,9 @@ namespace pm {
         ~FloorClientOrderr(){};
 
         // update the floor manager whenever
-        void sendExecutionReport(const ExeuctionReport& er);
-        void sendReplayDone();
+        void sendMsg(const FloorBase::MsgType& msg) {
+            m_channel->update(msg);
+        }
 
     protected:
         OrderConnection& m_conn;

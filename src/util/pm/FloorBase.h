@@ -37,6 +37,7 @@ namespace pm {
         // For service provider to check incoming requests
         // ServerType is expected to implement a function
         // void handleMessage(MsgType& msg_in)
+        // returns true if processed a request, false if idle
 
         using MsgType = utils::Floor::Message;
         using ChannelType = std::unique_ptr<utils::Floor::Channel>;

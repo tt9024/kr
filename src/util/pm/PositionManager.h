@@ -18,13 +18,13 @@ namespace pm {
         // read the latest positions from eod_csv_file, 
         // return the utc of the latest persistence
 
-        bool loadRecovery(const std::string& recovery_file);
+        bool loadRecovery(const std::string& recovery_file, bool persist_fill=true);
         // loads execution reports from recovery file
 
         bool reconcile(const std::string& recovery_file, std::string& diff_logs, bool adjust=false) ;
         // reconciles this position with previous eod position updated with recovery_file. 
 
-        void update(const ExecutionReport& er);
+        void update(const ExecutionReport& er, bool persist_fill=true);
         // updates the intraday position from either fill or open
         
         bool persist() const;

@@ -4,7 +4,6 @@
 #include "PositionManager.h"
 
 namespace pm {
-
     class FloorManager: public FloorBase {
         // the FloorManager act as an interface between algo/engine to/from pm and traders
         // It interacts with the following components
@@ -22,6 +21,8 @@ namespace pm {
         static FloorManager& get();
         ~FloorManager();
         void start();
+        void stop();
+        std::string toString() const;
 
     protected:
         PositionManager m_pm;
@@ -33,18 +34,21 @@ namespace pm {
         FloorManager(const FloorManager& mgr) = delete;
         FloorManager& operator=(const FloorManager& mgr) = delete;
 
-        bool run_one_loop();
+        // main handle function from run_one_loop()
         void handleMessage(MsgType& msg_in);
 
-        // helpers
+        // specific request handlers
         void setInitialSubscriptions();
         void addPositionSubscriptions();
         void handleExecutionReport(const MsgType& msg);
         void handleUserReq(const MsgType& msg);
         void handlePositionReq(const MsgType msg);
+
+        // helpers to send requests
         bool requestReplay(const std::string& loadUtc);
         bool requestOpenOrder();
 
-        std::string toString() const;
+        // this allows for base to call handleMessage
+        friend class FloorBase;
     };
 };

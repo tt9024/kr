@@ -33,12 +33,12 @@ namespace pm {
         m_should_run = true;
         m_eod_pending = false;
         m_loaded_time = 0;
-        while (!requestReplay(m_pm.getLoadUtc()) && m_should_run ) {
+        while ( (!requestReplay(m_pm.getLoadUtc())) && m_should_run) {
             fprintf(stderr, "problem requesting replay, retrying in next 5 seconds\n");
             utils::TimeUtil::micro_sleep(5*1000000);
             continue;
         };
-        while (!requestOpenOrder() && m_should_run) {
+        while ((!requestOpenOrder()) && m_should_run) {
             fprintf(stderr, "problem requesting open orders download, retrying in next 5 seconds\n");
             utils::TimeUtil::micro_sleep(5*1000000);
             continue;
@@ -46,7 +46,7 @@ namespace pm {
 
         setInitialSubscriptions();
         while (m_should_run) {
-            bool has_message = run_one_loop();
+            bool has_message = this->run_one_loop(*this);
             if (! has_message) {
                 // idle, don't spin
                 // any other tasks could be performed here
@@ -74,14 +74,6 @@ namespace pm {
       m_started(false), m_loaded(false), m_should_run(false), m_eod_pending(false),
       m_loaded_time(0)
     {}
-
-    bool FloorManager::run_one_loop() {
-        if (m_channel->nextMessage(m_msgin)) {
-            handleMessage(m_msgin);
-            return true;
-        }
-        return false;
-    }
 
     void FloorManager::handleMessage(MsgType& msg_in) {
         switch (msg_in.type) {
@@ -284,9 +276,13 @@ namespace pm {
     std::string FloorManager::toString() const {
         char buf[256];
         size_t bytes = snprintf(buf, sizeof(buf),
-                "FloorManager %s [started: %s, loaded: %s, eod_pending: %s, recovery_file: %s, time_loaded: %s]\n"
+                "FloorManager %s [running: %s, stopping: %s, loaded: %s, eod_pending: %s, recovery_file: %s, time_loaded: %s]\n"
                 "Position Dump\n",
-                m_name.c_str(), m_started?"Y":"N", m_loaded?"Y":"N", m_eod_pending?"Y":"N",
+                m_name.c_str(), 
+                m_started?"Y":"N", 
+                (!m_should_run)?"Y":"N", 
+                m_loaded?"Y":"N", 
+                m_eod_pending?"Y":"N",
                 m_recovery_file.c_str(), 
                 utils::TimeUtil::frac_UTC_to_string(m_loaded_time,0).c_str());
         return std::string(buf) + m_pm.toString();

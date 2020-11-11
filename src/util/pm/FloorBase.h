@@ -32,6 +32,12 @@ namespace pm {
         explicit FloorBase(const std::string& name, bool is_server);
         ~FloorBase() {};
 
+        template<typename ServerType>
+        bool run_one_loop(ServerType& server); 
+        // For service provider to check incoming requests
+        // ServerType is expected to implement a function
+        // void handleMessage(MsgType& msg_in)
+
         using MsgType = utils::Floor::Message;
         using ChannelType = std::unique_ptr<utils::Floor::Channel>;
         const std::string m_name;
@@ -67,6 +73,16 @@ namespace pm {
             return false;
         }
         return true;
+    };
+
+    template<typename ServerType>
+    inline
+    bool FloorBase::run_one_loop(ServerType& server) {
+        if (m_channel->nextMessage(m_msgin)) {
+            server.handleMessage(m_msgin);
+            return true;
+        }
+        return false;
     };
 };
 

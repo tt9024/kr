@@ -65,7 +65,7 @@ namespace pm {
         return latest_day;
     };
 
-    void PositionManager::update(const ExecutionReport& er) {
+    void PositionManager::update(const ExecutionReport& er, bool persist_fill) {
         // check for duplicate fill
         // this could happen if the recovery overlaps with real-time
         // fills, or otherwise a previous fill is resent
@@ -87,7 +87,7 @@ namespace pm {
         m_last_micro = er.m_recv_micro;
 
         // if it's a fill, need to persist
-        if (er.isFill()) {
+        if (persist_fill && er.isFill()) {
             utils::CSVUtil::write_line(er.toCSVLine(), fill_csv(), true);
         }
     }
@@ -99,7 +99,7 @@ namespace pm {
         // return true if match, otherwise, mismatches noted in diff_logs
         // If adjust is set to true, this position becomes the recovery position.
         PositionManager pm ("reconcile", m_recovery_path);
-        pm.loadRecovery(recovery_file);
+        pm.loadRecovery(recovery_file, false);
         diff_logs = diff(pm);
         diff_logs += pm.diff(*this);
         if (diff_logs.size() == 0) {
@@ -112,10 +112,10 @@ namespace pm {
         return false;
     }
 
-    bool PositionManager::loadRecovery(const std::string& recovery_file) {
+    bool PositionManager::loadRecovery(const std::string& recovery_file, bool persist_fill) {
         const std::string fname = m_recovery_path + "/" + recovery_file;
         for(auto& line : utils::CSVUtil::read_file(fname)) {
-            update(pm::ExecutionReport::fromCSVLine(line));
+            update(pm::ExecutionReport::fromCSVLine(line), persist_fill);
         }
     }
 

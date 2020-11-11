@@ -165,10 +165,11 @@ namespace utils {
             }
 
             // sending acknowledgement for a request
-            void updateAck(const Message& req, Message& resp, int ack_type) {
+            void updateAck(const Message& req, Message& resp, int ack_type, const std::string& ack_message = "ACK") {
+                const std::string& ackstr = (ack_message.size()==0? "Ack":ack_message);
                 resp.type = ack_type;
                 resp.ref = req.ref;
-                resp.copyString("Ack");
+                resp.copyString(ackstr);
                 update(resp);
             }
 

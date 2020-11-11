@@ -23,6 +23,7 @@ namespace utils {
         QStat_ERROR
     };
 
+    inline
     const char* QStatStr(QStatus stat) {
         switch (stat) {
         case QStat_OK: return "QStat_OK";

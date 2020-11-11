@@ -258,7 +258,7 @@ namespace pm {
         auto oop_iter = m_oo.find(er.m_clOrdId);
         if (oop_iter!=m_oo.end()) {
             const auto& oop = oop_iter->second;
-            fprintf(stderr, "ERR! new on existing clOrdId! This report %s, existing open order %s\n", er.toString().c_str(), oop->toString().c_str());
+            fprintf(stderr, "Warning! Recived a new on existing clOrdId, overwriting.\nIncoming new: %s, existing open order %s\n", er.toString().c_str(), oop->toString().c_str());
             oop_iter->second = std::make_shared<OpenOrder>(er);
         } else {
             m_oo.emplace(er.m_clOrdId, std::make_shared<OpenOrder>(er));

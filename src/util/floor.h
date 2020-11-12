@@ -41,7 +41,7 @@ namespace utils {
 
             void copyData(const char* data, const size_t data_size_) {
                 reserve(data_size_);
-                memcpy(buf, data, data_size);
+                memcpy(buf, data, data_size_);
                 data_size = data_size_;
             }
 
@@ -214,6 +214,7 @@ namespace utils {
                 
                 std::shared_ptr<QType::Reader> reader(_qin->newReader());  //this sync the read position to latest
                 utils::QPos pos_ref = update(req);
+
                 uint64_t timeout_micro = utils::TimeUtil::cur_micro() + (uint64_t)timeout_sec*1000000ULL;
                 while (utils::TimeUtil::cur_micro() < timeout_micro) {
                     if ( nextMessage(resp, reader, false) ) {

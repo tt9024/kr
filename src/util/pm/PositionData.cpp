@@ -300,7 +300,11 @@ namespace pm {
         }
         double vap = (*qtyp) * (*vapp) + qty*px;
         *qtyp += qty;
-        *vapp = vap/(*qtyp);
+        if (*qtyp == 0) {
+            *vapp = 0;
+        } else {
+            *vapp = vap/(*qtyp);
+        }
         m_last_micro = utc_micro;
     }
 

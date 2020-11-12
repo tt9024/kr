@@ -76,12 +76,12 @@ namespace pm {
         }
 
         void handleOpenOrderReq(const MsgType& msg) {
-            const std::string errstr = m_conn.requestReplay(msg.buf, msg.data_size);
+            const std::string errstr = m_conn.requestOpenOrder(msg.buf, msg.data_size);
             m_channel->updateAck(msg, m_msgout, FloorBase::ExecutionOpenOrderAck, errstr);
         }
 
         void handleExecutionReplayReq(const MsgType& msg) {
-            const std::string errstr = m_conn.requestOpenOrder(msg.buf, msg.data_size);
+            const std::string errstr = m_conn.requestReplay(msg.buf, msg.data_size);
             m_channel->updateAck(msg, m_msgout, FloorBase::ExecutionReplayAck, errstr);
         }
 

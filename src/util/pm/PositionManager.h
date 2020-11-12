@@ -57,7 +57,7 @@ namespace pm {
         const std::string& getName() const { return m_name;};
         std::string getRecoveryPath() const { return m_recovery_path; };
 
-        std::string toString(const std::string* ptr_algo=nullptr, const std::string* ptr_symbol=nullptr) const;
+        std::string toString(const std::string* ptr_algo=nullptr, const std::string* ptr_symbol=nullptr, bool summary=false) const;
 
     protected:
         const std::string m_name;

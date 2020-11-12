@@ -100,11 +100,13 @@ namespace pm {
         // If adjust is set to true, this position becomes the recovery position.
         PositionManager pm ("reconcile", m_recovery_path);
         pm.loadRecovery(recovery_file, false);
-        diff_logs = diff(pm);
-        diff_logs += pm.diff(*this);
-        if (diff_logs.size() == 0) {
+        auto diff_log1 = diff(pm);
+        auto diff_log2 =  pm.diff(*this);
+
+        if ((diff_log1.size()) == 0 && (diff_log2.size()) == 0) {
             return true;
         }
+        diff_logs = diff_log1 + "\n" + diff_log2;
         if (adjust) {
             fprintf(stderr, "Warning, %s is going to copy from %s, all existing open order trackings are lost. Download open order again if needed!\n", m_name.c_str(), pm.m_name.c_str());
             *this=pm;
@@ -144,8 +146,9 @@ namespace pm {
     std::string PositionManager::diff(const PositionManager& pm) const {
         std::string diff_str;
         if (pm.m_load_second != m_load_second) {
-            diff_str = "load utc: " + m_load_second + "(" + m_name+") != " + pm.m_load_second + "("+pm.m_name+")";
-            return diff_str;
+            // print a warning instead of failing it
+            std::string warn_str = "load utc: " + m_load_second + "(" + m_name+") != " + pm.m_load_second + "("+pm.m_name+")";
+            fprintf(stderr, "Warning: %s\n", warn_str.c_str());
         }
         for (auto iter = m_algo_pos.begin();
              iter != m_algo_pos.end();
@@ -267,12 +270,22 @@ namespace pm {
         m_fill_execid = pm.m_fill_execid;
     }
 
-    std::string PositionManager::toString(const std::string* ptr_algo, const std::string* ptr_symbol) const {
+    std::string PositionManager::toString(const std::string* ptr_algo, const std::string* ptr_symbol, bool summary) const {
         std::string ret;
         const auto idp_vec(listPosition(ptr_algo, ptr_symbol));
+        if (idp_vec.size() == 0) {
+            return "Nothing Found.";
+        }
+        IntraDayPosition idp0;
         for (const auto& idp:idp_vec) {
             ret += (idp->toString() + " ");
             ret += (idp->dumpOpenOrder() + "\n");
+            idp0 += *idp;
+        }
+        if (summary) {
+            double vwap = 0, pnl = 0;
+            int64_t qty = idp0.getPosition(&vwap, &pnl);
+            ret += ("***Total qty: " + std::to_string(qty) + " avg_px: " + std::to_string(vwap) + " pnl (realized): " + std::to_string(pnl));
         }
         return ret;
     }

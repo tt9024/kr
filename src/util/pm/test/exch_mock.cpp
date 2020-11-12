@@ -16,6 +16,7 @@ namespace pm {
         : _name(name), 
           _cur_micro( Timer::cur_micro() ),
           _cur_id(100),
+          _cur_exid(100),
           _should_run(false),
           _floor(name, *this)
         {
@@ -59,13 +60,17 @@ namespace pm {
             // order string is supposed to be the following
             // B/S algo, symbol, qty, px
             try {
+                if (size < 5) {
+                    return  "unknown order string of size "+std::to_string(size);
+                }
                 int bs = (data[0]=='B'?1:-1);
                 auto line = utils::CSVUtil::read_line(std::string(data+1));
 
                 // new scheduled in 0.1 seconds
+                ++_cur_id; ++_cur_exid;
                 auto new_micro = _cur_micro + 100000;
-                ExecutionReport er_new ( line[0], line[1], 
-                        "cid"+std::to_string(_cur_id), "exid"+std::to_string(_cur_id),
+                ExecutionReport er_new ( line[1], line[0], 
+                        "cid"+std::to_string(_cur_id), "exid"+std::to_string(_cur_exid),
                         "0",  // tag39 = new
                         std::stoi(line[2])*bs,
                         std::stod(line[3]),
@@ -75,9 +80,10 @@ namespace pm {
                 enq(er_new);
 
                 // fill scheduled in 0.5 second
+                ++_cur_exid;
                 auto fill_micro = _cur_micro + 500000;
-                ExecutionReport er_fill ( line[0], line[1], 
-                        "cid"+std::to_string(_cur_id), "exid"+std::to_string(_cur_id),
+                ExecutionReport er_fill ( line[1], line[0], 
+                        "cid"+std::to_string(_cur_id), "exid"+std::to_string(_cur_exid),
                         "2",  // tag39 = fill 
                         std::stoi(line[2])*bs,
                         std::stod(line[3]),
@@ -92,16 +98,26 @@ namespace pm {
         }
 
         std::string requestReplay(char* data, int size) {
-            // write all the existing ers in the history vector into the given file
+            // data is in format of "from_utc, filepath"
+            // write all the existing ers in the history fill (after from_utc) into the given file
             // schedule a message of done in 2 seconds
             // return errstr
             try {
+                auto tk = utils::CSVUtil::read_line(std::string(data));
+                uint64_t from_micro = utils::TimeUtil::string_to_frac_UTC(tk[0].c_str(), 6);
+
+                fprintf(stderr, "received replay request to file %s from %s (%lld)\n",
+                        tk[1].c_str(), tk[0].c_str(), (long long)from_micro);
+
                 utils::CSVUtil::FileTokens lines;
                 // _history_fill is maintained as all past fills published
-                for (const auto& er: _history_fill) {
-                    lines.push_back(((ExecutionReport*)(er->buf))->toCSVLine());
+                for (const auto& msg: _history_fill) {
+                    const ExecutionReport* er = (ExecutionReport*)(msg->buf);
+                    if (er->m_recv_micro > from_micro) {
+                        lines.push_back(er->toCSVLine());
+                    }
                 }
-                std::string fn(data);
+                std::string fn(tk[1]);
                 utils::CSVUtil::write_file(lines, fn, false);
                 _to_publish.emplace( _cur_micro + 2000000,  
                                      std::make_shared<FloorBase::MsgType>(
@@ -142,7 +158,7 @@ namespace pm {
         std::map<uint64_t, std::shared_ptr<FloorBase::MsgType> > _to_publish;
         std::vector<std::shared_ptr<FloorBase::MsgType> > _history_fill;
         uint64_t _cur_micro;
-        uint64_t _cur_id;
+        uint64_t _cur_id, _cur_exid;
         volatile bool _should_run;
         FloorClientOrder<OrderConnectionMock<Timer> > _floor;
 

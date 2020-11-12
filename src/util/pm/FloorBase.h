@@ -82,7 +82,6 @@ namespace pm {
     inline
     bool FloorBase::run_one_loop(ServerType& server) {
         if (m_channel->nextMessage(m_msgin)) {
-            fprintf(stderr, "got a message!");
             server.handleMessage(m_msgin);
             return true;
         }

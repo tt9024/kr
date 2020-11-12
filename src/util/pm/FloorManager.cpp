@@ -150,7 +150,7 @@ namespace pm {
         m_msgout.ref = msg.ref;
         const std::string helpstr(
                     "Command Line Interface\n"
-                    "P algo=algo_name,symbol=symbol_name\n\tlist positions (and open orders) of the specified algo and sybmol\n\thave to specify both algo and symbol, ALL is reserved for dumping all entries\n"
+                    "P algo_name,symbol_name\n\tlist positions (and open orders) of the specified algo and sybmol\n\thave to specify both algo and symbol, leave empty to include all entries\n"
                     "!B|S algo_name, symbol, qty, price\n\tenter buy or sell with limit order with given qty/px\n"
                     "!A position_line\n\tadjust the position and pnl using the given csv line\n"
                     "!R limit_line\n\tset limit according to the given csv line\n"
@@ -169,11 +169,11 @@ namespace pm {
             case 'P':
             {
                 // get position or open order
-                std::map<std::string, std::string> key_map;
-                if (! parseKeyValue(std::string(cmd+1), key_map)) {
+                auto tk = utils::CSVUtil::read_line(cmd+1);
+                if (tk.size()!=2) {
                     m_msgout.copyString(std::string("Failed to parse Algo or Symbol name: ")+ std::string(cmd)+ "\n"+ helpstr);
                 } else {
-                    m_msgout.copyString(m_pm.toString(&key_map["algo"], &key_map["symbol"]) );
+                    m_msgout.copyString(m_pm.toString(&tk[0], &tk[1], true));
                 }
                 break;
             }
@@ -224,11 +224,11 @@ namespace pm {
                         }
                         break;
                     }
-
                     default :
                         respstr = "not supported (yet)";
                 }
                 m_msgout.copyString(respstr);
+                break;
             };
             default :
                 m_msgout.copyString("not supported (yet?)");

@@ -22,7 +22,8 @@ namespace pm {
         // update the floor manager whenever
         std::string sendReq(const std::string& cmd) {
             m_msgin.copyString(cmd);
-            if (m_channel->requestAndCheckAck(m_msgin, m_msgout, 5,  FloorBase::UserResp)) {
+            if ((m_channel->request(m_msgin, m_msgout, 5) && 
+                (m_msgout.type == FloorBase::UserResp))) {
                 return std::string(m_msgout.buf);
             } else {
                 return "Reqeust Timedout!";

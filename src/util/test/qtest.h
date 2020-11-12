@@ -63,6 +63,8 @@ public:
         int len = *((int*)data_len_ptr);
         ItemType* buf = (ItemType*)malloc(len*sizeof(ItemType));
         _should_run = true;
+
+        fprintf(stderr, "starting dump: %s\n", _writer.dump().c_str());
         while (_should_run) {
             uint64_t now = TimeUtil::cur_micro();
             ++_num;
@@ -217,6 +219,8 @@ public:
 #endif
         this->_should_run = true;
         uint64_t num = 0;
+
+        fprintf(stderr, "starting dump: %s\n", this->_reader.dump_state().c_str());
         while (this->_should_run) {
             int bytes;
             utils::QStatus qstatus;

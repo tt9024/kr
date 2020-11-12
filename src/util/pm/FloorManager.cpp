@@ -33,13 +33,14 @@ namespace pm {
         m_should_run = true;
         m_eod_pending = false;
         m_loaded_time = 0;
-        while ( (!requestReplay(m_pm.getLoadUtc())) && m_should_run) {
-            fprintf(stderr, "problem requesting replay, retrying in next 5 seconds\n");
+        std::string errstr;
+        while (m_should_run && (!requestReplay(m_pm.getLoadUtc(), &errstr))) {
+            fprintf(stderr, "problem requesting replay: %s, retrying in next 5 seconds\n", errstr.c_str());
             utils::TimeUtil::micro_sleep(5*1000000);
             continue;
         };
-        while ((!requestOpenOrder()) && m_should_run) {
-            fprintf(stderr, "problem requesting open orders download, retrying in next 5 seconds\n");
+        while (m_should_run && (!requestOpenOrder(&errstr))) {
+            fprintf(stderr, "problem requesting open orders download: %s, retrying in next 5 seconds\n", errstr.c_str());
             utils::TimeUtil::micro_sleep(5*1000000);
             continue;
         }
@@ -150,7 +151,7 @@ namespace pm {
         const std::string helpstr(
                     "Command Line Interface\n"
                     "P algo=algo_name,symbol=symbol_name\n\tlist positions (and open orders) of the specified algo and sybmol\n\thave to specify both algo and symbol, ALL is reserved for dumping all entries\n"
-                    "B|S instruction\n\tenter buy or sell with instruction string\n"
+                    "!B|S algo_name, symbol, qty, price\n\tenter buy or sell with limit order with given qty/px\n"
                     "!A position_line\n\tadjust the position and pnl using the given csv line\n"
                     "!R limit_line\n\tset limit according to the given csv line\n"
                     "!E \n\tinitiate the reconcile process, if good, persist currrent position to EoD file\n"
@@ -202,14 +203,28 @@ namespace pm {
                             respstr = "Already in EoD\n";
                         } else {
                             PositionManager pmr("reconcile");
-                            if (!requestReplay(pmr.getLoadUtc())) {
-                                respstr = "problem requesting replay\n";
+                            std::string errstr;
+                            if (!requestReplay(pmr.getLoadUtc(), &errstr)) {
+                                respstr = "problem requesting replay: " + errstr;
                             } else {
                                 m_eod_pending = true;
                             }
                         }
                         break;
                     }
+                    case 'B':
+                    case 'S':
+                    {
+                        // send a req and return
+                        std::string bsstr(cmd+1);
+                        FloorBase::MsgType req(FloorBase::SendOrderReq, bsstr.c_str(), bsstr.size()+1);
+                        FloorBase::MsgType resp;
+                        if (!m_channel->requestAndCheckAck(req, resp, 1, FloorBase::SendOrderAck)) {
+                            respstr = "problem sending order: " + std::string(resp.buf);
+                        }
+                        break;
+                    }
+
                     default :
                         respstr = "not supported (yet)";
                 }
@@ -257,20 +272,31 @@ namespace pm {
         }
     }
 
-    bool FloorManager::requestReplay(const std::string& loadUtc) {
+    bool FloorManager::requestReplay(const std::string& loadUtc, std::string* errstr) {
         m_recovery_file = loadUtc+"_"+utils::TimeUtil::frac_UTC_to_string(0,3)+"_replay.csv";
         const std::string reqstr = loadUtc + "," + m_pm.getRecoveryPath()+"/"+m_recovery_file;
         MsgType msgReq(FloorBase::ExecutionReplayReq, reqstr.c_str(), reqstr.size()+1);
         MsgType msgResp;
-        return m_channel->requestAndCheckAck(msgReq, msgResp, 3,  FloorBase::ExecutionReplayAck);
+        if(!m_channel->requestAndCheckAck(msgReq, msgResp, 3,  FloorBase::ExecutionReplayAck) ) {
+            if (errstr)
+                *errstr = std::string(msgResp.buf);
+            return false;
+        }
+        return true;
     }
 
-    bool FloorManager::requestOpenOrder() {
+    bool FloorManager::requestOpenOrder(std::string* errstr) {
         // this should be replayed
         const std::string reqstr = "ALL";
         MsgType msgReq(FloorBase::ExecutionOpenOrderReq, reqstr.c_str(), reqstr.size()+1);
         MsgType msgResp;
-        return m_channel->requestAndCheckAck(msgReq, msgResp, 3,  FloorBase::ExecutionOpenOrderAck);
+        if(!m_channel->requestAndCheckAck(msgReq, msgResp, 3,  FloorBase::ExecutionOpenOrderAck)) {
+            if (errstr) {
+                *errstr = std::string(msgResp.buf);
+            }
+            return false;
+        }
+        return true;
     }
 
     std::string FloorManager::toString() const {

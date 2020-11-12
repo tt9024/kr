@@ -45,8 +45,8 @@ namespace pm {
         void handlePositionReq(const MsgType msg);
 
         // helpers to send requests
-        bool requestReplay(const std::string& loadUtc);
-        bool requestOpenOrder();
+        bool requestReplay(const std::string& loadUtc, std::string* errstr = nullptr);
+        bool requestOpenOrder(std::string* errstr=nullptr);
 
         // this allows for base to call handleMessage
         friend class FloorBase;

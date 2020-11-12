@@ -91,9 +91,19 @@ namespace utils {
             return std::unique_ptr<Channel>(new Channel(_qin, _qout));
         }
 
+
+        /*
+        std::shared_ptr<QType> get_qin() const {
+            return _qin;
+        }
+
+        std::shared_ptr<QType> get_qout() const {
+            return _qout;
+        }
+        */
+
     private:
         static const int QLen = 1024*1024*64; // 64M
-
         using QType = utils::MwQueue<QLen, utils::ShmCircularBuffer>;
         std::shared_ptr<QType> _qin, _qout;
 
@@ -150,22 +160,39 @@ namespace utils {
                 }
             }
 
-            // sending request that expects an acknowledgement (Ack)
+            void outputBuf(char*buf, int size) {
+                fprintf(stderr, "\n");
+                for (int i=0;i<size;++i) {
+                    if (buf[i] < 32 || buf[i] > 127)
+                        fprintf(stderr, " 0x%x ", buf[i]&0xff);
+                    else 
+                        fprintf(stderr, "%c", buf[i]);
+                }
+                fprintf(stderr, "\n");
+            }
+
+            // for simple cases when sending request that expects an acknowledgement (Ack)
+            // it assumes resp is a string
             bool requestAndCheckAck(const Message& req, Message& resp, int timeout_sec, int ack_type) {
+                resp.copyString("Channel Error");
                 if (! request(req, resp, timeout_sec)) {
                     fprintf(stderr, "Error sending request: %s\n", req.toString().c_str());
                     return false;
                 }
+
+                // debug dump
+                //outputBuf(resp.buf, resp.data_size);
+
                 if ( (resp.type != ack_type) || (strncmp(resp.buf, "Ack",3)!=0)) {
-                    fprintf(stderr, "Received message without Ack. type=%d, msg=%s\n", 
-                            (int) ack_type, resp.buf);
+                    fprintf(stderr, "Received message without Ack. resp_type = %d, expected_type=%d, msg=%s\n", 
+                            (int) resp.type, (int) ack_type, resp.buf);
                     return false;
                 }
                 return true;
             }
 
             // sending acknowledgement for a request
-            void updateAck(const Message& req, Message& resp, int ack_type, const std::string& ack_message = "ACK") {
+            void updateAck(const Message& req, Message& resp, int ack_type, const std::string& ack_message = "Ack") {
                 const std::string& ackstr = (ack_message.size()==0? "Ack":ack_message);
                 resp.type = ack_type;
                 resp.ref = req.ref;
@@ -178,6 +205,7 @@ namespace utils {
             std::shared_ptr<QType::Reader> _reader;
             std::shared_ptr<QType::Writer> _writer;
             std::set<int> _subscribed_types;
+            static const int _hdrsize = sizeof(int) + sizeof(uint64_t);
 
             bool sendSync(const Message& req,  Message* resp, int timeout_sec) {
                 // create a new reader (position sync'ed), send the request, record the sending 
@@ -202,23 +230,20 @@ namespace utils {
 
             utils::QPos sendMessage(int et, char* msg_data, size_t msg_size, uint64_t ref= utils::Floor::Message::NOREF) {
                 // header has format of type(int), ref(uint64_t)
-                static const int hdrsize = sizeof(int) + sizeof(uint64_t);
-                char buf[hdrsize];
+                char buf[_hdrsize];
                 memcpy(buf, &et, sizeof(int));
                 memcpy(buf+sizeof(int), &ref, sizeof(uint64_t));
-                return _writer->put(buf, hdrsize, msg_data, msg_size);
+                return _writer->put(buf, _hdrsize, msg_data, msg_size);
             }
 
-            int readMessage(volatile char*& buf, int* bytes, uint64_t* ref) {
+            int readMessage(volatile char*& buf, uint64_t* ref) {
                 // given a raw message read from the queue as buf and bytes
                 // parse the type and ref and adjust the buf and bytes for payload data
                 
                 int type = *(int*)buf;
                 buf+=sizeof(int);
-                (*bytes)-=sizeof(int);
                 *ref = *(uint64_t*)buf;
                 buf+=sizeof(uint64_t);
-                (*bytes)-=sizeof(uint64_t);
                 return type;
             }
 
@@ -228,15 +253,21 @@ namespace utils {
                 while (true) {
                     QStatus status = reader->takeNextPtr(buf, bytes);
                     if (status == utils::QStat_OK) {
-                        msg->type = readMessage(buf, &bytes, &(msg->ref));
+                        msg->type = readMessage(buf, &(msg->ref));
                         if (! msg->refSet()) {
                             msg->ref = reader->getReadPos();
                         }
+
+                        // debug
+                        //fprintf(stderr, "nextMessage received %d bytes, msg: %s, queue dump: %s\n", 
+                        //        bytes, msg->toString().c_str(),
+                        //        reader->dump_state().c_str());
+
                         asm volatile("" ::: "memory");
                         reader->advance(bytes);
                         if ( (!filter_on) ||
                              (_subscribed_types.find(msg->type) != _subscribed_types.end()) ) {
-                            msg->copyData((char*)buf, bytes);
+                            msg->copyData((char*)buf, bytes-_hdrsize);
                             return true;
                         }
                         // try next one

@@ -509,8 +509,9 @@ namespace utils {
                 auto ptr_dirty_pos = getPtrPosDirty();
                 auto ptr_ready_pos = getPtrPosReady();
                 if (!read_only) {
-                    *ptr_dirty_pos = 0;
-                    *ptr_ready_pos = *ptr_write_pos;
+                    // resetState();
+                    //*ptr_dirty_pos = *ptr_write_pos;
+                    //*ptr_ready_pos = *ptr_write_pos;
                 }
             }
         };
@@ -660,7 +661,7 @@ namespace utils {
         m_buffer.template copyBytes<true>(pos+sizeof(int),        (char*) content1,     bytes1);
         m_buffer.template copyBytes<true>(pos+sizeof(int)+bytes1, (char*) content2,     bytes2);
         asm volatile("" ::: "memory");
-        finalizeWrite(total_bytes);
+        finalizeWrite(total_bytes+sizeof(int));
         return pos;
     }
 
@@ -735,6 +736,7 @@ namespace utils {
         bytes = 0;
         if (__builtin_expect((m_pos > *m_pos_write),0)) {
             // queue restarted, return failure
+            fprintf(stderr, "takeNextPtr error: %s\n",dump_state().c_str());
             syncPos();
             return QStat_ERROR;
         }
@@ -913,8 +915,8 @@ namespace utils {
                 auto ptr_dirty_pos = getPtrPosDirty();
                 auto ptr_ready_pos = getPtrPosReady();
                 if (!read_only) {
-                    *ptr_dirty_pos = 0;
-                    *ptr_ready_pos = *ptr_write_pos;
+                    //*ptr_dirty_pos = 0;
+                    //*ptr_ready_pos = *ptr_write_pos;
                 }
             }
         };

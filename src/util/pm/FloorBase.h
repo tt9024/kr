@@ -18,7 +18,7 @@ namespace pm {
             GetPositionReq = 4,
             GetPositionResp = 5,
             SendOrderReq = 6,
-            SendOrderResp = 7,
+            SendOrderAck = 7,
             UserReq = 8,
             UserResp = 9,
             ExecutionReplayReq = 10,
@@ -56,7 +56,9 @@ namespace pm {
     : m_name(name), 
       m_channel(is_server? utils::Floor::get().getServer() :
                            utils::Floor::get().getClient())
-    {};
+    {
+        fprintf(stderr, "%s created as %s\n", name.c_str(),  (is_server?"Server":"Client"));
+    };
 
     inline
     bool FloorBase::parseKeyValue (const std::string& cmd, std::map<std::string, std::string>& key_map) const {
@@ -80,6 +82,7 @@ namespace pm {
     inline
     bool FloorBase::run_one_loop(ServerType& server) {
         if (m_channel->nextMessage(m_msgin)) {
+            fprintf(stderr, "got a message!");
             server.handleMessage(m_msgin);
             return true;
         }

@@ -1,8 +1,9 @@
 #pragma once
 
-#include "FloorBase.h"
 #include "ExecutionReport.h"
-#include "csv_utils.h"
+#include "FloorBase.h"
+#include "csv_util.h"
+#include <stdio.h>
 
 namespace pm {
 
@@ -23,10 +24,10 @@ namespace pm {
         explicit FloorClientOrder(const std::string& name, OrderConnection& conn)
         : FloorBase(name, false), m_conn(conn)
         {
-            setSubscription();
+            setSubscriptions();
         }
 
-        ~FloorClientOrderr(){};
+        ~FloorClientOrder(){};
 
         // update the floor manager whenever
         void sendMsg(const FloorBase::MsgType& msg) {
@@ -40,20 +41,23 @@ namespace pm {
 
         void handleMessage(MsgType& msg_in) {
             switch (msg_in.type) {
-                case FloorBase::SendOrderReq {
+                case FloorBase::SendOrderReq: 
+                {
                     handleOrderReq(msg_in);
                     break;
                 }
-                case FloorBase::ExecutionOpenOrderReq {
+                case FloorBase::ExecutionOpenOrderReq: 
+                {
                     handleOpenOrderReq(msg_in);
                     break;
                 }
-                case FloorBase::ExecutionReplayReq {
+                case FloorBase::ExecutionReplayReq: 
+                {
                     handleExecutionReplayReq(msg_in);
                     break;
                 }
                 default :
-                    fprintf(stderr, "unkown requests %s\n", msg_in.toString());a
+                    fprintf(stderr, "unkown requests %s\n", msg_in.toString().c_str());
             }
         }
 
@@ -67,22 +71,22 @@ namespace pm {
         }
 
         void handleOrderReq(const MsgType& msg) {
-            const std::string errstr = m_conn.makeOrder(msg.buf, msg.data_size);
+            const std::string errstr = m_conn.sendOrder(msg.buf, msg.data_size);
             m_channel->updateAck(msg, m_msgout, FloorBase::SendOrderAck, errstr);
         }
 
         void handleOpenOrderReq(const MsgType& msg) {
             const std::string errstr = m_conn.requestReplay(msg.buf, msg.data_size);
-            m_channel->updateAck(msg, m_msgout, FloorBase::ExecutionRelayAck, errstr);
+            m_channel->updateAck(msg, m_msgout, FloorBase::ExecutionOpenOrderAck, errstr);
         }
 
         void handleExecutionReplayReq(const MsgType& msg) {
             const std::string errstr = m_conn.requestOpenOrder(msg.buf, msg.data_size);
-            m_channel->updateAck(msg, m_msgout, FloorBase::ExecutionOpenOrderAck, errstr);
+            m_channel->updateAck(msg, m_msgout, FloorBase::ExecutionReplayAck, errstr);
         }
 
         // out-going updates
-        bool sendExecutionReport(const ExecutionReport& er) {
+        bool sendExecutionReport(const pm::ExecutionReport& er) {
             m_msgout.type = FloorBase::ExecutionReport;
             m_msgout.copyData((char*)&er, sizeof(ExecutionReport));
             m_channel->update(m_msgout);

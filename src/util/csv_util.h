@@ -12,7 +12,8 @@
 #include <cstdlib>
 
 namespace utils {
-    namespace CSVUtil {
+    class CSVUtil {
+    public:
         using LineTokens = std::vector<std::string>;
         using FileTokens = std::vector<LineTokens>;
         static const char Delimiter = ',';

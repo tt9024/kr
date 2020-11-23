@@ -1,9 +1,11 @@
-#include "queue.h"
 #include <memory>
+#include <map>
 #include <set>
 #include <iostream>
 #include <stdio.h>
+#include <mutex>
 #include "time_util.h"
+#include "queue.h"
 
 namespace utils {
 
@@ -31,6 +33,26 @@ namespace utils {
             {
                 memcpy(buf, data_, size_);
             }
+
+            Message(const Message& msg)
+            : type(msg.type), ref(msg.ref), buf(nullptr), data_size(0), buf_capacity(0)
+            {
+                if (msg.data_size) {
+                    copyData(msg.buf, msg.data_size);
+                }
+            }
+
+            void operator = (const Message& msg)
+            {
+                type = msg.type;
+                ref = msg.ref;
+                if (msg.data_size) {
+                    copyData(msg.buf, msg.data_size);
+                } else {
+                    data_size = 0;
+                }
+            }
+
             ~Message() {
                 if (buf && buf_capacity) {
                     buf_capacity=0;
@@ -75,9 +97,30 @@ namespace utils {
         };
 
         static Floor& get() {
-            static Floor flr;
+            static Floor flr(nullptr);
             return flr;
         };
+
+        static std::shared_ptr<Floor> getByName(const char* flr_name) {
+            static std::map<std::string, std::shared_ptr<Floor> > _floor_map;
+            static std::mutex _lock;
+
+            auto iter = _floor_map.find(flr_name);
+            if (iter != _floor_map.end()) {
+                return iter->second;
+            }
+            {
+                std::lock_guard<std::mutex> gard(_lock);
+                auto iter = _floor_map.find(flr_name);
+                if (iter != _floor_map.end()) {
+                    return iter->second;
+                }
+                std::shared_ptr<Floor> flr_ptr( new Floor(flr_name) );
+                _floor_map.emplace(flr_name, flr_ptr);
+                return flr_ptr;
+            }
+        }
+
         ~Floor() {};
 
         class Channel;
@@ -107,9 +150,9 @@ namespace utils {
         using QType = utils::MwQueue<QLen, utils::ShmCircularBuffer>;
         std::shared_ptr<QType> _qin, _qout;
 
-        Floor()
-        : _qin (std::make_shared<QType>("fq1", false, false)), 
-          _qout(std::make_shared<QType>("fq2", false, false))
+        explicit Floor(const char* name)
+        : _qin (std::make_shared<QType>( (name? (std::string(name)+"_fq1").c_str() : "fq1"), false, false)), 
+          _qout(std::make_shared<QType>( (name? (std::string(name)+"_fq2").c_str() : "fq2"), false, false))
         {
             // createt the two queues read+write, without init to zero
         };
@@ -218,7 +261,7 @@ namespace utils {
                 uint64_t timeout_micro = utils::TimeUtil::cur_micro() + (uint64_t)timeout_sec*1000000ULL;
                 while (utils::TimeUtil::cur_micro() < timeout_micro) {
                     if ( nextMessage(resp, reader, false) ) {
-                        if (resp->ref == pos_ref) {
+                        if (resp->ref == (uint64_t)pos_ref) {
                             return true;
                         }
                         continue;

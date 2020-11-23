@@ -116,9 +116,16 @@ namespace pm {
 
     bool PositionManager::loadRecovery(const std::string& recovery_file, bool persist_fill) {
         const std::string fname = m_recovery_path + "/" + recovery_file;
-        for(auto& line : utils::CSVUtil::read_file(fname)) {
-            update(pm::ExecutionReport::fromCSVLine(line), persist_fill);
+        try {
+            for(auto& line : utils::CSVUtil::read_file(fname)) {
+                update(pm::ExecutionReport::fromCSVLine(line), persist_fill);
+            }
+        } catch (const std::exception& e) {
+            fprintf(stderr, "Failed to load recover.  fname: %s, error: %s\npm:%s", 
+                    fname.c_str(), e.what(), toString().c_str());
+            return false;
         }
+        return true;
     }
 
     bool PositionManager::persist() const {

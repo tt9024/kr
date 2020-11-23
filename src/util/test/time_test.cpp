@@ -15,7 +15,7 @@ int main() {
         auto ts = ts1[i];
         auto dec = dec1[i];
         uint64_t utc = utils::TimeUtil::string_to_frac_UTC(ts, dec);
-        size_t bytes = utils::TimeUtil::frac_UTC_to_string(utc, buf, sizeof(buf), dec);
+        utils::TimeUtil::frac_UTC_to_string(utc, buf, sizeof(buf), dec);
         printf("%s %lld %s %d\n", ts, (long long)utc, buf, (int)strcmp(ts, buf));
     }
 
@@ -31,7 +31,7 @@ int main() {
         auto dec = dec2[i];
         auto tsr = ts2[i];
         uint64_t utc = utils::TimeUtil::string_to_frac_UTC(ts, dec);
-        size_t bytes = utils::TimeUtil::frac_UTC_to_string(utc, buf, sizeof(buf), dec);
+        utils::TimeUtil::frac_UTC_to_string(utc, buf, sizeof(buf), dec);
         printf("%s %lld %s %d\n", ts, (long long)utc, buf, (int)strcmp(tsr, buf));
     }
 

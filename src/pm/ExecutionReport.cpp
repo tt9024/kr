@@ -57,7 +57,7 @@ namespace pm {
 
     std::string ExecutionReport::toString() const {
         char buf[256];
-        size_t bytes = snprintf(buf, sizeof(buf), 
+        snprintf(buf, sizeof(buf), 
                 "Execution Report [symbol=%s, algo=%s, clOrdId=%s, execId=%s, tag39=%s, qty=%d, px=%.7lf, execTime=%s, tag=%s, recvTime=%s]",
                 m_symbol, m_algo, m_clOrdId, m_execId, m_tag39, m_qty, m_px, 
                 utils::TimeUtil::frac_UTC_to_string(m_utc_milli, 3).c_str(), m_optional, 

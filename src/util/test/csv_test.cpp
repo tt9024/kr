@@ -6,7 +6,6 @@ int main() {
     const char* lines[] = {
         "a, 1, 2.0, , ",
         "b, 2, 0.2, a ,c "};
-    const int line_cnt = 2;
     utils::CSVUtil::FileTokens ftr ={ 
         {"a", "1", "2.0", "", ""}, 
         {"b", "2", "0.2", "a", "c"}

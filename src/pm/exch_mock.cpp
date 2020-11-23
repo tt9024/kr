@@ -149,7 +149,7 @@ namespace pm {
 
         std::string toString() const {
             char buf[256];
-            size_t bytes = snprintf(buf, sizeof(buf), "%s: cur_micro: %s, hist_queue_size: %d, pub_queue_size: %d\n", _name.c_str(), utils::TimeUtil::frac_UTC_to_string(_cur_micro, 6).c_str(), (int)_history_fill.size(), (int)_to_publish.size());
+            snprintf(buf, sizeof(buf), "%s: cur_micro: %s, hist_queue_size: %d, pub_queue_size: %d\n", _name.c_str(), utils::TimeUtil::frac_UTC_to_string(_cur_micro, 6).c_str(), (int)_history_fill.size(), (int)_to_publish.size());
             return std::string(buf);
         }
 

@@ -301,7 +301,7 @@ namespace pm {
 
     std::string FloorManager::toString() const {
         char buf[256];
-        size_t bytes = snprintf(buf, sizeof(buf),
+        snprintf(buf, sizeof(buf),
                 "FloorManager %s [running: %s, stopping: %s, loaded: %s, eod_pending: %s, recovery_file: %s, time_loaded: %s]\n"
                 "Position Dump\n",
                 m_name.c_str(), 

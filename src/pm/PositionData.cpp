@@ -43,7 +43,7 @@ namespace pm {
         m_symbol = tokens[1];
         int64_t qty = std::stoll(tokens[2]);
         double vap = std::stod(tokens[3]);
-        double pnl = std::stod(tokens[4]);
+        //double pnl = std::stod(tokens[4]);
         m_last_micro = std::stoll(tokens[5]);
         resetPositionUnsafe(qty, vap, m_last_micro);
     }
@@ -323,7 +323,7 @@ namespace pm {
 
     std::string OpenOrder::toString() const {
         char buf[256];
-        size_t bytes = snprintf(buf, sizeof(buf), 
+        snprintf(buf, sizeof(buf), 
                 "OpenOrder(clOrdId=%s,%s,open_qty=%lld,open_px=%.7lf,open_time=%s)",
                 m_clOrdId, m_open_qty>0?"Buy":"Sell",std::llabs(m_open_qty), m_open_px,
                 utils::TimeUtil::frac_UTC_to_string(m_open_micro,6).c_str());

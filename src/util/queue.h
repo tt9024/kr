@@ -505,9 +505,9 @@ namespace utils {
         MwQueue(const char* shm_name, bool read_only, bool init_to_zero = false) :
                 m_name(shm_name), m_buffer(shm_name, read_only, init_to_zero) {
             if (!init_to_zero) {
-                auto ptr_write_pos = getPtrPosWrite();
-                auto ptr_dirty_pos = getPtrPosDirty();
-                auto ptr_ready_pos = getPtrPosReady();
+                //auto ptr_write_pos = getPtrPosWrite();
+                //auto ptr_dirty_pos = getPtrPosDirty();
+                //auto ptr_ready_pos = getPtrPosReady();
                 if (!read_only) {
                     // resetState();
                     //*ptr_dirty_pos = *ptr_write_pos;
@@ -911,9 +911,9 @@ namespace utils {
 
             static_assert(QLen == (QLen/DataLen*DataLen), "QLen has to be a multiple of DataLen");
             if (!init_to_zero) {
-                auto ptr_write_pos = getPtrPosWrite();
-                auto ptr_dirty_pos = getPtrPosDirty();
-                auto ptr_ready_pos = getPtrPosReady();
+                //auto ptr_write_pos = getPtrPosWrite();
+                //auto ptr_dirty_pos = getPtrPosDirty();
+                //auto ptr_ready_pos = getPtrPosReady();
                 if (!read_only) {
                     //*ptr_dirty_pos = 0;
                     //*ptr_ready_pos = *ptr_write_pos;

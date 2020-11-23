@@ -43,7 +43,14 @@ namespace pm {
         using ChannelType = std::unique_ptr<utils::Floor::Channel>;
         const std::string m_name;
 
+        static std::shared_ptr<FloorBase> getFloor(const std::string& name, bool is_server, const std::string& floor_name);
+        // this operates on a different floor by the name of floor_name.  Usually used as simulation
+        // clients/server can only communicates on the same floor.
+        // Use the public FloorBase constructor for default floor
+        
     protected:
+
+        FloorBase(const std::string& name, bool is_server, const std::string& floor_name);
         ChannelType m_channel;
         MsgType m_msgin, m_msgout;
         bool parseKeyValue (const std::string& cmd, std::map<std::string, std::string>& key_map) const;
@@ -59,6 +66,26 @@ namespace pm {
     {
         fprintf(stderr, "%s created as %s\n", name.c_str(),  (is_server?"Server":"Client"));
     };
+
+    inline
+    FloorBase::FloorBase(const std::string& name, bool is_server,  const std::string& floor_name)
+    : m_name(name), 
+      m_channel(is_server? utils::Floor::getByName(floor_name.c_str())->getServer() :
+                           utils::Floor::getByName(floor_name.c_str())->getClient())
+    {
+        fprintf(stderr, "%s (Name %s) created as %s\n",
+                name.c_str(), floor_name.c_str(), (is_server?"Server":"Client"));
+    };
+
+
+    inline
+    std::shared_ptr<FloorBase> FloorBase::getFloor(
+            const std::string& name,
+            bool is_server,
+            const std::string& floor_name
+    ) {
+        return std::shared_ptr<FloorBase>( new FloorBase(name, is_server, floor_name) );
+    }
 
     inline
     bool FloorBase::parseKeyValue (const std::string& cmd, std::map<std::string, std::string>& key_map) const {

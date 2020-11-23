@@ -115,9 +115,8 @@ public:
         int len = *((int*)data_len_ptr);
         ItemType* buf = (ItemType*)malloc(len*sizeof(ItemType));
         _should_run = true;
-        uint64_t num = 0;
+        //uint64_t num = 0;
         while (_should_run) {
-            int bytes;
             utils::QStatus qstatus;
             qstatus = _reader.copyNextIn((char*)buf);
 
@@ -218,7 +217,7 @@ public:
         printf("taking ptr\n");
 #endif
         this->_should_run = true;
-        uint64_t num = 0;
+        //uint64_t num = 0;
 
         fprintf(stderr, "starting dump: %s\n", this->_reader.dump_state().c_str());
         while (this->_should_run) {

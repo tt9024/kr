@@ -90,12 +90,14 @@ namespace pm {
             m_msgout.type = FloorBase::ExecutionReport;
             m_msgout.copyData((char*)&er, sizeof(ExecutionReport));
             m_channel->update(m_msgout);
+            return true;
         }
 
         bool sendExecutionReplayDone() {
             m_msgout.type = FloorBase::ExecutionReplayDone;
             m_msgout.copyString("Ack");
             m_channel->update(m_msgout);
+            return true;
         }
 
         friend class FloorBase;

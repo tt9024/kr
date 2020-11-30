@@ -33,4 +33,3 @@ target_link_libraries(exch_mock PRIVATE floorlib)
 ## TESTS
 add_subdirectory(test)
 
-

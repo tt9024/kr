@@ -267,20 +267,20 @@ namespace pm {
             fprintf(stderr, "Got instruction: %s\n", pi.toString().c_str());
 
             switch ( (FloorBase::PositionInstruction::TYPE) pi.type ) {
-            case INVALID: 
+            case FloorBase::PositionInstruction::INVALID: 
                 {
                     fprintf(stderr, "ignore the invalid instruction type\n");
                     break;
                 }
-            case MARKET:
+            case FloorBase::PositionInstruction::MARKET:
                 {
                     // to be implemented
                     break;
                 }
-            case TARGET_PX:
+            case FloorBase::PositionInstruction::TARGET_PX:
                 {
                     int64_t done_qty, open_qty, trade_qty;
-                    done_qtr = m_pm.getPosition(pi.algo, pi.symbol, nullptr, nullptr, &(open_qty));
+                    done_qty = m_pm.getPosition(pi.algo, pi.symbol, nullptr, nullptr, &(open_qty));
                     trade_qty = pi.qty - (done_qty + open_qty);
                     if (trade_qty != 0) {
                         bool isBuy = (trade_qty > 0);
@@ -292,7 +292,7 @@ namespace pm {
                     }
                     break;
                 }
-            case PASSIVE:
+            case FloorBase::PositionInstruction::PASSIVE:
                 {
                     fprintf(stderr, " PASSIVE not implemented yet!"); 
                     break;
@@ -323,7 +323,7 @@ namespace pm {
         char buf[256];
         size_t bytes = snprintf(buf, sizeof(buf), "%c %s,%s,%lld,%.7lf",
                 isBuy?'B':'S', algo, symbol,
-                qty, px);
+                (long long)qty, px);
         return sendOrderByString(buf, bytes);
     }
 

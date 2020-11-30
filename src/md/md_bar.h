@@ -33,7 +33,7 @@ public:
     BarPrice(time_t utc_, double open_, double high_,
              double low_, double close_, uint32_t bvol_ = 0, uint32_t svol_=0)
     : bar_time(utc_), open(open_), high(high_), low(low_), close(close_),
-      bvol(bvol_), svol(svol_), last_micro(utc_*1000000ULL) {}
+      bvol(bvol_), svol(svol_), last_micro(utc_*1000000LL) {}
 
     BarPrice(const std::string& csvLine) {
         // format is utc, open, high, low, close, bvol, svol, last_micro
@@ -45,14 +45,15 @@ public:
         close = std::stod(tk[4]);
         bvol = std::stoul(tk[5]);
         svol = std::stoul(tk[6]);
-        last_micro = std:stoll(tk[7]);
+        last_micro = std::stoll(tk[7]);
     }
 
     std::string toCSVLine() const {
         char buf[256];
-        snprintf(buf, sizeof(buf), "%d, %.7lf, %.7lf, %.7lf, %.7lf, %lu, %lu, %lld\n",
+        snprintf(buf, sizeof(buf), "%d, %.7lf, %.7lf, %.7lf, %.7lf, %lu, %lu, %lld",
                 (int) bar_time, open, high, 
-                low, close, bvol, svol, last_micro_offset);
+                low, close, (unsigned long)bvol, (unsigned long)svol, last_micro);
+        return std::string(buf);
     };
 
     bool isValid() const {
@@ -66,11 +67,11 @@ public:
         bar_time = bartime;
         std::string ret = toCSVLine();
         // roll forward
-        bar.open = bar.close;
-        bar.high = bar.close;
-        bar.low = bar.close;
-        bar.bvol = 0;
-        bar.svol = 0;
+        open = close;
+        high = close;
+        low = close;
+        bvol = 0;
+        svol = 0;
         return ret;
     }
 
@@ -112,8 +113,8 @@ public:
 
 class BarReader{
 public:
-    BarReader(const BookConfig& bcfg, int barsec)
-    : fn(bcfg.bfname(barsec)), fp(nullptr)
+    BarReader(const BookConfig& bcfg_, int barsec_)
+    : bcfg(bcfg_), barsec(barsec_), fn(bcfg.bfname(barsec)), fp(nullptr)
     {
         fp = fopen(fn.c_str(), "rt");
         if (!fp) {
@@ -127,9 +128,12 @@ public:
         bar = getLatestBar();
         if (bar.isValid()) {
             bp = bar;
-        } else {
-            bar = bp;
+            return true;
         }
+
+        // no new bar
+        bar = bp;
+        return false;
     }
 
     ~BarReader() {
@@ -139,9 +143,20 @@ public:
         }
     }
 
-private:
+    std::string toString() const {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Bar Reader {config: %s, period: %d, bar_file: %s}",
+                bcfg.toString().c_str(), barsec, fn.c_str());
+        return std::string(buf);
+    }
+
+public:
+    const BookConfig bcfg;
+    const int barsec;
     const std::string fn;
-    FILE* fP;
+
+private:
+    FILE* fp;
     BarPrice bp;
 
     BarPrice getLatestBar() {
@@ -151,17 +166,17 @@ private:
             while (fgets(buf, sizeof(buf)-1, fp));
             if (strlen(buf) > 0 )
                 return BarPrice(std::string(buf));
-        } catch (const std::except& e) {
+        } catch (const std::exception & e) {
             logError("failed to get last bar price from %s: %s", fn.c_str(), e.what());
         }
         return BarPrice();
     }
-}
+};
 
 class BarWriter {
 public:
 
-    BarLine(const BookConfig& bcfg, int64_t cur_micro) 
+    BarWriter(const BookConfig& bcfg, int64_t cur_micro) 
     : m_bcfg(bcfg), m_bq(bcfg, true), m_br(m_bq.newReader())
     {
         auto bsv = m_bcfg.barsec_vec();
@@ -177,6 +192,13 @@ public:
 
     bool checkUpdate() {
         if (m_br->getNextUpdate(m_book)) {
+            // this check is enforced at publisher
+            /*
+            if (!m_book.isValid()) {
+                return false;
+            }
+            */
+
             // got an new snap price, update the bar state
             uint64_t upd_micro = m_book.update_ts_micro;
             double px = m_book.getMid();
@@ -209,16 +231,16 @@ public:
                 continue;
             }
             const auto& bsec = bitem.first;
-            while(cur_sec >= binfo.bar.due) {
-                const auto& line = binfo.bar.writeAndRoll(binfo.bar.due);
+            while(cur_sec >= binfo.due) {
+                const auto& line = binfo.bar.writeAndRoll(binfo.due);
                 fprintf(binfo.fp, "%s\n",line.c_str());
                 fflush(binfo.fp);
-                binfo.bar.due += bsec;
+                binfo.due += bsec;
             }
         }
     }
 
-    ~BarLine() {
+    ~BarWriter() {
         for (auto& bitem: m_bar) {
             auto& binfo = bitem.second;
             if (binfo.fp) {
@@ -279,9 +301,7 @@ public:
                         due_micro = max_sleep_micro;
                     }
                     due_micro -= min_sleep_micro;
-                    req.tv_sec = 0;
-                    req.tv_nsec=(int)due_micro*1000;
-                    nanosleep(&req,NULL);
+                    TimerType::micro_sleep(due_micro);
                     due_micro = next_sec - TimerType::cur_micro(); 
                 }
             }
@@ -303,6 +323,6 @@ public:
 private:
     std::vector<BarWriter> m_writers;
     volatile bool m_should_run;
-}
+};
 
 }

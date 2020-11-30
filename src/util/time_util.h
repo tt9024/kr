@@ -112,10 +112,10 @@ public:
     
 
    static struct tm int_to_tm_UTC(time_t ts) {
-      struct tm*ptm = localtime(&ts);
-      return *ptm;
+       struct tm tmv;
+       localtime_r(&ts, &tmv);
+       return tmv;
    };
-   
    
    static bool isTradingTime_TM(struct tm tm_data, int start_hour, int start_min, int end_hour, int end_min) {
        // trading ends on friday, end_hour, end_min (inclusive, last minute is end_min - 1)
@@ -154,57 +154,58 @@ public:
               }
           }
       }
-      return true;
+
+      // its a weekend, check if it is out side of trading hours
+      int tmin = tm_data.tm_hour*60 + tm_data.tm_min;
+      int tend = end_hour*60 + end_min;
+      int tstart = (start_hour%24)*60 + start_min;
+      return ((tmin - tstart) % (60*24)) < ((tend - tstart) % (60*24));
    };
 
-   static bool isTradingTime(time_t ts, int start_hour = -7, int start_min = 31, int end_hour = 17, int end_min = 30) {
-      return isTradingTime_TM(int_to_tm_UTC(ts, start_hour, start_min, end_hour, end_min));
+   static bool isTradingTime(time_t ts, int start_hour = -6, int start_min = 0, int end_hour = 17, int end_min = 0) {
+      return isTradingTime_TM(int_to_tm_UTC(ts), start_hour, start_min, end_hour, end_min);
    };
 
-   static std::string tradingDay(time_t utc_second, 
-                            int roll_hour = -7.0, 
-                            int roll_min = 30,
-                            int day_offset=0) 
+   static std::string tradingDay(time_t utc_second, int start_hour = -6, int start_min = 0,
+                            int end_hour = 17, int end_min = 0, int day_offset=0, int snap = 0) 
    {
        // get the trading day of utc_second as defined by start/end time.
-       // Current trading day ends as soon as current hour/min equals roll_hour, roll_min
-       // at which time the trading day becomes the next non-weekend calendar day.
        // if day_offset is set, it returns previous or future trading days (non trading
        // days are not counted in the offset days).
-       // Note 
-       //     1. if the utc_second is not in a weekly trading day , i.e. during a weekend,
-       //        it returns a previous trading day (friday).
-       //     2. if roll_hour is negative, trading day is next day during over-night.
-       //        if roll_hour is positive, trading day is calendar day of utc.
+       // if utc_second is not a trading time: 
+       //    snap = 0, returns empty string
+       //    snap = 1, returns the previous trading day
+       //    snap = 2, returns the next trading day
+       //
+       // Note over night sessions should be represented with negative start_hour and
+       // a positive end_hour.
 
-       int start_hour = roll_hour, start_min = roll_min, end_hour = roll_hour, end_min = roll_min;
        while (! isTradingTime(utc_second, start_hour, start_min, end_hour, end_min)) {
-           utc_second -= 3600;
+           if (snap == 0) 
+               return "";
+           utc_second += ((3-snap*2)*3600);
        }
 
        if (day_offset != 0) {
            int offset_sign = std::abs(day_offset)/day_offset;
            do {
-               utc_seond += (offset_sign * 3600 * 24);
+               utc_second += (offset_sign * 3600 * 24);
            } while (!isTradingTime(utc_second, start_hour, start_min, end_hour, end_min));
-           return tradingDay(utc_second, roll_hour, roll_min, day_offset - offset_sign);
+           return tradingDay(utc_second, start_hour, start_min, end_hour, end_min, day_offset - offset_sign, snap);
        }
 
-       time_t utc = utc_second - (utc_second % 60);
-       struct tm *tmsec = localtime(&utc);
-       if (roll_hour < 0) {
-           if (tm_data.tm_hour >= (roll_hour % 24)) {
-               if (tm_data.tm_min >= roll_min) {
-                   utc += (24*3600);
-               }
-           }
+
+       // if start_hour is negative, i.e. over-night session
+       // trading day goes forward during over-night period
+       struct tm tmsec = int_to_tm_UTC(utc_second);
+       if (tmsec.tm_hour*tmsec.tm_min > end_hour*end_min) {
+           utc_second += (24*3600);
        }
-       return frac_UTC_to_string(utc, 0, "%Y%m%d");
+       return frac_UTC_to_string(utc_second, 0, "%Y%m%d");
    }
 
    static int int_to_string_second_UTC(time_t sec, char*char_buf, int buf_size) {
-     struct tm *tmsec = localtime(&sec);
-     return strftime(char_buf, buf_size, "%Y%m%d,%H:%M:%S", tmsec);
+       return frac_UTC_to_string(sec, char_buf, buf_size, 0, "%Y%m%d,%H:%M:%S");
    }
 
    static uint64_t cur_micro() {

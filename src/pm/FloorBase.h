@@ -35,8 +35,8 @@ namespace pm {
         };
 
         struct PositionRequest {
-            const char[16] algo;
-            const char[16] symbol;
+            char algo[16];
+            char symbol[16];
             int64_t qty_done;
             int64_t qty_open;
             PositionRequest() 
@@ -60,8 +60,8 @@ namespace pm {
         };
 
         struct PositionInstruction {
-            const char[16] algo;
-            const char[16] symbol;
+            char algo[16];
+            char symbol[16];
             int64_t qty;
             double px; // maximum price before giving up
             int target_utc; // latest time before cancel all, in utc second
@@ -73,7 +73,7 @@ namespace pm {
                 TARGET_PX = 2,
                 PASSIVE = 3,
                 TOTAL_TYPES
-            }
+            };
 
             PositionInstruction()
             : qty(0), px(0),target_utc(0), type(-1) {
@@ -103,7 +103,7 @@ namespace pm {
                 auto tk = utils::CSVUtil::read_line(bsstr);
                 if ( (tk.size() < 4) ||
                      (tk[0].size() > sizeof(algo)-1) ||
-                     (tk[1]_.size() > sizeof(symbol)-1) ) {
+                     (tk[1].size() > sizeof(symbol)-1) ) {
                     fprintf(stderr, "Position Instruction string format wrong: %s\n", bsstr);
                     throw std::runtime_error("Position Instruction string format wrong!");
                 }
@@ -118,7 +118,7 @@ namespace pm {
             std::string toString() const {
                 char buf[256];
                 snprintf(buf, sizeof(buf), "PositionInstruction: %s, %s, %lld, %.7lf, %d, %s", 
-                        algo, symbol, qty, px, target_utc, TypeString(type));
+                        algo, symbol, (long long)qty, px, target_utc, TypeString((TYPE)type).c_str());
                 return std::string(buf);
             }
 
@@ -133,7 +133,7 @@ namespace pm {
                 case PASSIVE:
                     return "PASSIVE";
                 default :
-                    "Unknown";
+                    return "Unknown";
                 }
             }
 

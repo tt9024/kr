@@ -31,32 +31,33 @@ public:
         return ConfigFilePath;
     };
     static const std::string getLogFileName(std::string logfile,
-    		                                std::string instname) {
-    	 return logfile+
-    	        (instname.size()>0?(std::string("_")+instname):std::string(""))+
-    	        std::string("_")+
-				TimeUtil::cur_time_to_string_day() +
-    			std::string(".txt");
+            std::string instname) 
+    {
+         return logfile+
+                (instname.size()>0?(std::string("_")+instname):std::string(""))+
+                std::string("_")+ 
+                TimeUtil::frac_UTC_to_string(0,0,"%Y%m%d") +
+                std::string(".txt");
     }
 
     static PLCC& instance(const char* instname=NULL) {
+        // note this is NOT thread safe
         static std::map<std::string, PLCC*>plcc_map;
         static PLCC* default_plcc=NULL;
 
-        // not thread safe
         const std::string inststr=std::string(instname?instname:"");
         if (!default_plcc) {
-			default_plcc=new PLCC(getConfigPath(),inststr);
-        	plcc_map[inststr] = default_plcc;
-        	return *default_plcc;
+            default_plcc=new PLCC(getConfigPath(),inststr);
+            plcc_map[inststr] = default_plcc;
+            return *default_plcc;
         }
 
         if (inststr.size()==0) {
-        	return *default_plcc;
+                return *default_plcc;
         }
         auto iter=plcc_map.find(inststr);
         if (iter !=plcc_map.end()) {
-        	return *(iter->second);
+                return *(iter->second);
         }
         PLCC* inst=new PLCC(getConfigPath(), inststr);
         plcc_map[inststr]=inst;

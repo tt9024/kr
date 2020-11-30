@@ -11,5 +11,5 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 
 
 add_subdirectory(util)
-add_subdirectory(pm)
-
+#add_subdirectory(pm)
+add_subdirectory(md)

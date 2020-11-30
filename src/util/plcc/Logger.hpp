@@ -25,8 +25,9 @@ namespace utils {
     case Info: return "INF";
     case Trace: return "TRC";
     case Debug: return "DBG";
-    };
-    return "???";
+    default:
+        return "???";
+    }
   }
 
   class Logger {

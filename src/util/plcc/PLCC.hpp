@@ -1,10 +1,3 @@
-/*
- * PLCC.hpp
- *
- *  Created on: May 26, 2014
- *      Author: zfu
- */
-
 #pragma once
 
 #include <stdio.h>
@@ -20,8 +13,6 @@
 static const char* LoggerConfigKey = "logger";
 static const char* ConfigFilePath =  "config/main.cfg";
 
-// TODO: include file and line number
-//#define logDebug(a...) utils::PLCC::instance().logDebug(__FILE__,__LINE__,a)
 #define logDebug(a...)
 #define logInfo(a...) utils::PLCC::instance().logInfo(__FILE__,__LINE__,a)
 #define logError(a...) utils::PLCC::instance().logError(__FILE__,__LINE__,a)
@@ -37,7 +28,6 @@ namespace utils {
 class PLCC : public ConfigureReader, public FileLogger {
 public:
     static const char* getConfigPath() {
-        // TODO - read from the shell as well
         return ConfigFilePath;
     };
     static const std::string getLogFileName(std::string logfile,

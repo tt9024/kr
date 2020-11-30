@@ -185,8 +185,12 @@ namespace pm {
         if (algo.size()==0) {
             return getPosition(symbol, ptr_vap, pnl, oqty);
         }
-        const auto pos = listPosition(&algo, &symbol);
+
         int64_t qty = 0;
+        if (oqty) {
+            *oqty = 0;
+        }
+        const auto pos = listPosition(&algo, &symbol);
         if (pos.size()==1) {
             qty = pos[0]->getPosition(ptr_vap, pnl);
             if (oqty) {
@@ -197,9 +201,12 @@ namespace pm {
     }
 
     int64_t PositionManager::getPosition(const std::string& symbol, double* ptr_vap, double* pnl, int64_t* oqty) const {
+        int64_t qty = 0;
+        if (oqty) {
+            *oqty = 0;
+        }
         // get an aggregated position for the given symbol
         const auto pos = listPosition(nullptr, &symbol);
-        int64_t qty = 0;
         if(pos.size()>0) {
             IntraDayPosition idp(*pos[0]);
             for (size_t i = 1; i<pos.size(); ++i) {

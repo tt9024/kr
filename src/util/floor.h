@@ -17,21 +17,29 @@ namespace utils {
     public:
         // TODO - maybe protect the buf/buf_capacity
         // as private if needed in the future usage cases
-        struct Message {
+        class Message {
+        public:
             // a stateless message that doesn't demand response
             int type;
             uint64_t ref;
             char* buf;
             size_t data_size;
+        private: 
             size_t buf_capacity;
 
+        public:
             //uint64_t id;
             Message() : type(0), ref(NOREF), buf(nullptr), data_size(0), buf_capacity(0) {}
 
             Message(int type_, const char* data_, size_t size_, uint64_t ref_=NOREF)
             : type(type_), ref(ref_), buf((char*)malloc(size_)), data_size(size_), buf_capacity(size_) 
             {
-                memcpy(buf, data_, size_);
+                if (!data_) 
+                    data_size = 0;
+                else {
+                    if (data_size)
+                        memcpy(buf, data_, size_);
+                }
             }
 
             Message(const Message& msg)

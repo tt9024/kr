@@ -112,8 +112,8 @@ public:
     }
 
     std::vector<std::string> getStringArr(const char* key, bool* found = NULL) const {
-		std::vector<std::string> ret;
-		bool bf;
+        std::vector<std::string> ret;
+        bool bf;
     	std::string valStr = getString(key, &bf);
     	if (!bf) {
     		if (found) *found=false;
@@ -144,12 +144,6 @@ private:
     std::string m_configFileName;
     FILE* m_configFile;
     ConfigMapType m_configMap;
-
-
-/*    std::string getConfigString(std::string key) {
-        return m_configFile[key];
-    }
-*/
 
     void skipWhiteSpace(char* str) {
         char* wptr = str;

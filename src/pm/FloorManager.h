@@ -29,6 +29,7 @@ namespace pm {
         volatile bool m_started, m_loaded, m_should_run, m_eod_pending;
         time_t m_loaded_time;
         std::string m_recovery_file;
+        std::vector<FloorBase::PositionInstruction> m_posInstr;
 
         explicit FloorManager(const std::string& name);
         FloorManager(const FloorManager& mgr) = delete;
@@ -43,6 +44,10 @@ namespace pm {
         void handleExecutionReport(const MsgType& msg);
         void handleUserReq(const MsgType& msg);
         void handlePositionReq(const MsgType msg);
+        void handlePositionInstructions();
+        std::string sendOrderByString(const char* bsstr, int size);
+        std::string sendOrder(const bool isBuy, const char* algo, 
+            const char* symbol, int64_t qty, double px);
 
         // helpers to send requests
         bool requestReplay(const std::string& loadUtc, std::string* errstr = nullptr);

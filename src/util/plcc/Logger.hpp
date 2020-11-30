@@ -1,10 +1,3 @@
-/*
- * Logger.hpp
- *
- *  Created on: May 26, 2014
- *      Author: zfu
- */
-
 #include <stdarg.h>
 #include "time_util.h"
 
@@ -75,7 +68,7 @@ namespace utils {
     };
 
     static int prepare_log_string(LogLevel level, const char* file, int line, char* char_buffer, int buf_size) {
-      int len = TimeUtil::cur_time_string_nanos_SOD(char_buffer, buf_size);
+      int len = TimeUtil::frac_UTC_to_string(0, char_buffer, buf_size, 3);
       len += sprintf(char_buffer+len, ",%s,%s:%d,", getLevelStr(level),file,line);
       return len;
     }

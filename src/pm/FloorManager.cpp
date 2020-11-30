@@ -47,6 +47,7 @@ namespace pm {
 
         setInitialSubscriptions();
         while (m_should_run) {
+            handlePositionInstructions();
             bool has_message = this->run_one_loop(*this);
             if (! has_message) {
                 // idle, don't spin
@@ -216,11 +217,11 @@ namespace pm {
                     case 'S':
                     {
                         // send a req and return
-                        std::string bsstr(cmd+1);
-                        FloorBase::MsgType req(FloorBase::SendOrderReq, bsstr.c_str(), bsstr.size()+1);
-                        FloorBase::MsgType resp;
-                        if (!m_channel->requestAndCheckAck(req, resp, 1, FloorBase::SendOrderAck)) {
-                            respstr = "problem sending order: " + std::string(resp.buf);
+                        //"!B|S algo_name, symbol, qty, price 
+                        const char* bsstr = cmd+1;
+                        auto errstr = sendOrderByString(bsstr, std::strlen(bsstr));
+                        if (errstr.size()>0) {
+                            respstr = errstr;
                         }
                         break;
                     }
@@ -236,41 +237,96 @@ namespace pm {
     }
 
     void FloorManager::handlePositionReq(const MsgType msg) {
+        // handles both GetPositionReq and SetPositionReq
         m_msgout.ref = msg.ref;
-        std::map<std::string, std::string> key_map;
-        if (!parseKeyValue(std::string(msg.buf), key_map)) {
-            m_msgout.copyString("Parse Error!");
-            m_msgout.type = (EventType) ((int)msg.type + 1);
-            return;
-        }
-
         if (msg.type == FloorBase::GetPositionReq) {
-            // expect a string in format of algo=algo_name,symbol=symbol_name
+            // expect a FloorBase::PositionRequest
             // the algo_name is allowed to be "ALL", but symbol has to be specified
-            // returns two int64_t as qty and oqty.
-            // If algo is "ALL", aggreated qty and oqtya
+            // returns another PositionRequest struct populated with
+            // two int64_t as (aggregated) qty_done and qty_open in m_msgout.buf
+
             m_msgout.type = FloorBase::GetPositionResp;
-            int64_t qty[2];
-            memset(qty, 0, sizeof(qty));
-            qty[0]=m_pm.getPosition(key_map["algo"], key_map["symbol"], nullptr, nullptr, &(qty[1]));
-            m_msgout.copyData((char*)qty, sizeof(qty));
+            m_msgout.copyData(msg.buf, msg.data_size);
+            FloorBase::PositionRequest* prp = (FloorBase::PositionRequest*)m_msgout.buf;
+            prp->qty_done = m_pm.getPosition(prp->algo, prp->symbol, nullptr, nullptr, &(prp->qty_open));
             return;
         }
 
         if(msg.type == FloorBase::SetPositionReq) {
-            // expect a string in format of algo=algo_name, symbol=symbol_name, pos=+/-number
+            // expect a FloorBase::PositionInstruction
+            // queue a instruction and ack the request
             m_msgout.type = FloorBase::SetPositionAck;
-            if (key_map.find("algo") == key_map.end() ||
-                key_map.find("symbol") == key_map.end() ||
-                key_map.find("pos") == key_map.end()) {
-                fprintf(stderr, "Setposition parse error: %s\n", msg.buf);
-                m_msgout.copyString(std::string("SetPosition parse error: ") + msg.buf);
-                return ;
-            }
-            // TODO - add the trader code here
+            FloorBase::PositionInstruction* pip = (FloorBase::PositionInstruction*)msg.buf;
+            m_posInstr.push_back(*pip);
             m_msgout.copyString("Ack");
         }
     }
+
+    void FloorManager::handlePositionInstructions() {
+        for (auto& pi : m_posInstr) {
+            fprintf(stderr, "Got instruction: %s\n", pi.toString().c_str());
+
+            switch ( (FloorBase::PositionInstruction::TYPE) pi.type ) {
+            case INVALID: 
+                {
+                    fprintf(stderr, "ignore the invalid instruction type\n");
+                    break;
+                }
+            case MARKET:
+                {
+                    // to be implemented
+                    break;
+                }
+            case TARGET_PX:
+                {
+                    int64_t done_qty, open_qty, trade_qty;
+                    done_qtr = m_pm.getPosition(pi.algo, pi.symbol, nullptr, nullptr, &(open_qty));
+                    trade_qty = pi.qty - (done_qty + open_qty);
+                    if (trade_qty != 0) {
+                        bool isBuy = (trade_qty > 0);
+                        trade_qty = (isBuy? trade_qty : -trade_qty);
+                        auto errstr = sendOrder(isBuy, pi.algo, pi.symbol, trade_qty, pi.px);
+                        if (errstr.size() > 0) {
+                            fprintf(stderr, "Error sending order: %s\n", errstr.c_str());
+                        }
+                    }
+                    break;
+                }
+            case PASSIVE:
+                {
+                    fprintf(stderr, " PASSIVE not implemented yet!"); 
+                    break;
+                }
+            default:
+                {
+                    fprintf(stderr, "unknown instruction type: %s\n", pi.toString().c_str());
+                    break;
+                }
+            }
+        }
+        m_posInstr.clear();
+    }
+
+    std::string FloorManager::sendOrderByString(const char* bsstr, int str_size) {
+        // an order string: B|S algo,symbol,qty,px
+        FloorBase::MsgType req(FloorBase::SendOrderReq, bsstr, str_size+1);
+        FloorBase::MsgType resp;
+        if (!m_channel->requestAndCheckAck(req, resp, 1, FloorBase::SendOrderAck)) {
+            return std::string("problem sending order: ") + std::string(resp.buf);
+        }
+        return "";
+    }
+
+    std::string FloorManager::sendOrder(const bool isBuy, 
+            const char* algo, const char* symbol,
+            int64_t qty, double px) {
+        char buf[256];
+        size_t bytes = snprintf(buf, sizeof(buf), "%c %s,%s,%lld,%.7lf",
+                isBuy?'B':'S', algo, symbol,
+                qty, px);
+        return sendOrderByString(buf, bytes);
+    }
+
 
     bool FloorManager::requestReplay(const std::string& loadUtc, std::string* errstr) {
         m_recovery_file = loadUtc+"_"+utils::TimeUtil::frac_UTC_to_string(0,3)+"_replay.csv";

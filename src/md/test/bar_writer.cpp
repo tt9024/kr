@@ -19,7 +19,7 @@ int main() {
     std::signal(SIGTERM, signal_handler);
 
     // TODO - create bconfig
-    md::BookConfig bcfg("CNE", "CLF1", "L1");
+    md::BookConfig bcfg("CME", "CLF1", "L1");
 
     bthread.add(bcfg);
     bthread.start();

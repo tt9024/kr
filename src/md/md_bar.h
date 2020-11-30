@@ -75,16 +75,17 @@ public:
         return ret;
     }
 
-    void update(long long cur_micro, double price, uint32_t volume, int update_type) {
+    void update(long long cur_micro, double price, int32_t volume, int update_type) {
         // update at this time with type of update
         // type: 0 - bid update, 1 - ask update, 2 - trade update
 
+        /* this check is not necessary
         if (cur_micro == 0) {
             logError("bar update with zero timestamp!");
             return;
         }
+        */
 
-        last_micro = cur_micro;
     	switch (update_type) {
     	case 2 : 
             {
@@ -108,6 +109,11 @@ public:
     	default :
     	    logError("unknown book update type %d", update_type);
     	}
+        if (__builtin_expect(last_micro==0, 0)) {
+            // the very first update
+            open = price;
+        }
+        last_micro = cur_micro;
     }
 };
 
@@ -150,6 +156,17 @@ public:
         return std::string(buf);
     }
 
+    BarReader(const BarReader&br)
+    : bcfg(br.bcfg), barsec(br.barsec), fn(br.fn), fp(nullptr)
+    {
+        fp = fopen(fn.c_str(), "rt");
+        if (!fp) {
+            logError("failed to open bar file %s", fn.c_str());
+            throw std::runtime_error(std::string("faile to open bar file ") + fn);
+        }
+        bp = getLatestBar();
+    }
+
 public:
     const BookConfig bcfg;
     const int barsec;
@@ -171,6 +188,8 @@ private:
         }
         return BarPrice();
     }
+
+    void operator = (const BarReader&) = delete;
 };
 
 class BarWriter {
@@ -184,7 +203,7 @@ public:
             BarInfo binfo;
             binfo.fn = m_bcfg.bfname(bs);
             binfo.fp = fopen(binfo.fn.c_str(), "at");
-            binfo.due = (time_t)((int)(cur_micro/1000000LL)/bs*(bs+1));
+            binfo.due = (time_t)((int)((cur_micro/1000000LL)/bs+2)*bs);
             m_bar[bs] = binfo;
         }
         checkUpdate();
@@ -204,6 +223,8 @@ public:
             double px = m_book.getMid();
             int update_type = m_book.update_type;
             int volume = m_book.trade_size;
+            int trade_attr = m_book.trade_attr; // 0-buy, 1-sell
+            volume *= (1-2*trade_attr);
             if (update_type == 2) {
                 px = m_book.trade_price;
             }
@@ -284,8 +305,7 @@ public:
     void start() {
         m_should_run = true;
         uint64_t cur_micro = TimerType::cur_micro();
-        uint64_t next_sec = (cur_micro/1000000LL + 1LL) * 1000000LL;
-        struct timespec req;
+        uint64_t next_sec = (cur_micro/1000000ULL + 2ULL) * 1000000ULL;
         const int64_t max_sleep_micro = 1000*50;
         const int64_t min_sleep_micro = 200;
         while (m_should_run) {
@@ -294,7 +314,8 @@ public:
             for (auto& bw : m_writers) {
                 has_update |= bw.checkUpdate();
             }
-            int64_t due_micro = next_sec - TimerType::cur_micro();
+            cur_micro = TimerType::cur_micro();
+            int64_t due_micro = next_sec - cur_micro;
             if (!has_update) {
                 if (due_micro > min_sleep_micro) {
                     if (due_micro > max_sleep_micro) {
@@ -302,7 +323,11 @@ public:
                     }
                     due_micro -= min_sleep_micro;
                     TimerType::micro_sleep(due_micro);
-                    due_micro = next_sec - TimerType::cur_micro(); 
+                    due_micro = next_sec - TimerType::cur_micro();
+                    if (__builtin_expect( due_micro < 0, 0)) {
+                        logError("Bar writer: negative due_micro detected! %lld",
+                                (long long) due_micro);
+                    }
                 }
             }
             if (due_micro < min_sleep_micro/2) {

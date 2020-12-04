@@ -34,7 +34,7 @@ int main() {
 
     //sleep for 10 second before start
     //to test the empty book cases
-    utils::TimeUtil::micro_sleep(10*1000*1000);
+    //utils::TimeUtil::micro_sleep(10*1000*1000);
 
     double midpx = 40.5;
     while (should_run) {
@@ -43,6 +43,8 @@ int main() {
         bool is_bid = (cur_micro%2);
         double price = midpx + ((double)(cur_micro%10+1)/10.0) * (is_bid?-1:1);
         midpx += ((price-midpx)/2);
+        if (midpx < 20) midpx = 20.0;
+        if (midpx > 60) midpx = 60.0;
 
         double size = 1;
 

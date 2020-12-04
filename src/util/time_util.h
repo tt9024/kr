@@ -43,6 +43,13 @@ public:
        // returns the utc * frac_mul + fraction * frac_mul,
        // where frac_mul = 10**frac_decimals
        // set frac_decimals to be 0 to get a whole second (fraction dropped, NOT rounded)
+       // For example, 
+       // 1. string_to_frac_UTC( "20201123-09:30:00.987654", 3)
+       //         returns utc of "20201123-09:30:00" * 1000 + 987
+       // 2. string_to_frac_UTC( "20201123-09:30:00.987654", 0)
+       //         returns utc of "20201123-09:30:00"
+       // 3. string_to_frac_UTC( "20201123-09:30:00", 3)
+       //         returns utc of "20201123-09:30:00" * 1000
 
        if (frac_decimals<0 || frac_decimals>9) {
            throw std::runtime_error("frac_decimals out-of-range: " + std::to_string(frac_decimals));
@@ -155,7 +162,7 @@ public:
           }
       }
 
-      // its a weekend, check if it is out side of trading hours
+      // its a weekday, check if it is out side of trading hours
       int tmin = tm_data.tm_hour*60 + tm_data.tm_min;
       int tend = end_hour*60 + end_min;
       int tstart = (start_hour%24)*60 + start_min;
@@ -224,5 +231,4 @@ public:
        return 0;
    }
 };
-
 }

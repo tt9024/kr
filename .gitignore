@@ -8,7 +8,6 @@ rb
 pyres
 hist
 bar
-main.cfg
-config/main.cfg
-config/*
 repo*
+*.swp
+*.swo

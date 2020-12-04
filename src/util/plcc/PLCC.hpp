@@ -10,7 +10,7 @@
 #include "plcc/ConfigureReader.hpp"
 #include <map>
 
-static const char* LoggerConfigKey = "logger";
+static const char* LoggerConfigKey = "Logger";
 static const char* ConfigFilePath =  "config/main.cfg";
 
 #define logDebug(a...)

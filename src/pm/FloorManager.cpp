@@ -130,14 +130,14 @@ namespace pm {
         type_set.insert((int)FloorBase::ExecutionReport);
         type_set.insert((int)FloorBase::UserReq);
         type_set.insert((int)FloorBase::ExecutionReplayDone);
-        m_channel->addSubscription(type_set);
+        subscribeMsgType(type_set);
     }
 
     void FloorManager::addPositionSubscriptions() {
         std::set<int> type_set;
         type_set.insert((int)FloorBase::SetPositionReq);
         type_set.insert((int)FloorBase::GetPositionReq);
-        m_channel->addSubscription(type_set);
+        subscribeMsgType(type_set);
     }
 
     void FloorManager::handleExecutionReport(const MsgType& msg) {

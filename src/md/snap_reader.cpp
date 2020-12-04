@@ -29,17 +29,17 @@ int main(int argc, char**argv) {
         std::vector<std::string> l1 = plcc_getStringArr("SubL1");
         printf("L1 subscriptions: ");
         for (auto s : l1) {
-        	printf(" %s ", s.c_str());
+                printf(" %s ", s.c_str());
         }
         std::vector<std::string> l1n = plcc_getStringArr("SubL1n");
         printf("\nL1 back contract subscriptions: ");
         for (auto s : l1n) {
-        	printf(" %s ", s.c_str());
+                printf(" %s ", s.c_str());
         }
         printf("\nL2 subscriptions: ");
         std::vector<std::string> l2 = plcc_getStringArr("SubL2");
         for (auto s : l2) {
-        	printf(" %s ", s.c_str());
+                printf(" %s ", s.c_str());
         }
         printf("\n");
         return 0;
@@ -53,7 +53,7 @@ int main(int argc, char**argv) {
     BookConfig bcfg(argv[1],argv[2]);
     bool trade_only=false;
     if (argc>3 && strcmp(argv[3], "-t")==0) {
-    	trade_only = true;
+        trade_only = true;
     }
     bool dump_all = false;
     if (argc>3 && strcmp(argv[3], "-d")==0) {
@@ -68,7 +68,7 @@ int main(int argc, char**argv) {
     while (!user_stopped) {
         if (dump_all) {
             if (book_reader->getNextUpdate(myBook)) {
-        	    printf("%s\n", myBook.prettyPrint().c_str());
+                    printf("%s\n", myBook.prettyPrint().c_str());
             } else {
                 usleep(1000);
             }

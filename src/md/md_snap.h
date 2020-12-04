@@ -66,6 +66,118 @@ struct PriceEntry {
     }
 };
 
+class VenueConfig {
+public:
+    static const VenueConfig& get() {
+        static VenueConfig vc;
+        return vc;
+    }
+
+    int start_hour(const std::string& venue) const { 
+        return findValue(venue, 0) % 24;
+    }
+
+    int start_min (const std::string& venue) const {
+        return findValue(venue, 1);
+    }
+
+    int end_hour(const std::string& venue) const {
+        return findValue(venue, 2);
+    }
+
+    int end_min(const std::string& venue) const {
+        return findValue(venue, 3);
+    }
+
+    bool isTradingTime(const std::string& venue, const time_t cur_utc) const {
+        const auto iter = venue_map.find(venue);
+        if (iter == venue_map.end()) {
+            logError("Venue not found: %s", venue.c_str());
+            throw std::runtime_error("Venue not found!");
+        }
+        const auto& hm = venue_map[venue];
+        return utils::TimeUtil::isTradingTime(cur_utc, hm[0], hm[1], hm[2], hm[3]);
+    }
+
+    std::pair<time_t, time_t> startEndUTC(const std::string& venue, const time_t cur_utc, int snap) const {
+        // getting the venue's starting and ending time given the current time.  
+        // If the current time is a trading time, getting the current trading day's starting time
+        // If the current time is not a trading time, 
+        //    snap = 0: return 0
+        //    snap = 1: return previous trading day's starting time
+        //    snap = 2: return next trading day's starting time
+        // Note for over-night venues, the trading day of over-night session is the next day.
+        // For example, CME starting at 18:00, ends at 17:00.  
+        // If current time is 20:00, then trading day is next day, startUTC is today's 18:00.
+        // If current time is 17:55pm on Sunday, snap = 2, then trading day is Monday,
+        // and startUTC is today's 18:00.
+        //
+        // Return: a pair of utc time stamp in seconds for starting and ending time of the
+        //         trading day.
+
+        const auto iter = venue_map.find(venue);
+        if (iter == venue_map.end()) {
+            logError("Venue not found: %s", venue.c_str());
+            throw std::runtime_error("Venue not found!");
+        }
+        const auto& hm = venue_map[venue];
+        const auto curDay = utils::TimeUtil::tradingDay(cur_utc, hm[0], hm[1], hm[2], hm[3]);
+        time_t sutc = string_to_frac_UTC(curDay.c_str(), 0, "%Y%m%d");
+        return std::pair<time_t, time_t>( 
+                sutc + hm[0]*3600 + hm[1]*60, 
+                sutc + hm[2]*3600 + hm[3]*60
+               ) ;
+    }
+
+    time_t sessionLength(const std::string& venue) const {
+        // return number of seconds in a trading day
+        const auto iter = venue_map.find(venue);
+        if (iter == venue_map.end()) {
+            logError("Venue not found: %s", venue.c_str());
+            throw std::runtime_error("Venue not found!");
+        }
+        const auto& hm = venue_map[venue];
+        return hm[2]*3600 + hm[3]*60 - hm[0]*3600 - hm[1]*60;
+    }
+
+private:
+    std::map<std::string, std::vector<int> > venue_map;
+    VenueConfig() {
+        const auto cfg = plcc_getString("Venue");
+        auto vc = utils::ConfigureReader(cfg.c_str());
+        auto vl = vc.getStringArr("VenueList");
+        for (const auto& v : vi) {
+            auto hm = vc.getStringArr(v.c_str());
+            // hm in [ start_hour, start_min, end_hour, end_min ]
+            if (hm.size() != 4) {
+                logError("Venue Reading Error for %s: wrong size.", v.c_str());
+                throw std::runtime_error("Venue Reading Error!");
+            }
+            int sh = (std::stoi(hm[0]) % 24);
+            int sm = std::stoi(hm[1]);
+            int eh = (std::stoi(hm[2]) % 24);
+            int em = std::stoi(hm[3]);
+            if (em < 0 || sm < 0) {
+                logError("Venue %s minutes negative!", v.c_str());
+                throw std::runtime_error("Venue minutes negative!");
+            }
+
+            if (sh > eh) { sh = 24 - sh ; }
+            venue_map.emplace(v, {sh, sm, eh, em});
+        }
+    };
+
+    int findValue(const std::string& venue, int offset) const {
+        const atuo iter = venue_map.find(venue);
+        if (iter == venue_map.end()) {
+            logError("Venue not found: %s", venue.c_str());
+            throw std::runtime_error("Venue not found: " + venue);
+        }
+        return iter->second[offset];
+    }
+}
+
+
 struct BookConfig {
     std::string venue;
     std::string symbol;
@@ -963,15 +1075,17 @@ public:
         }
 
     };
-
 };
+
+using BookQType = BookQ<utils::ShmCircularBuffer> ;
+using BookQReader = BookQType::Reader;
 
 // query book by venue/symbol and a book type: "L1 or L2"
 static inline
 bool LatestBook(const std::string& symbol, const std::string& levelStr, BookDepot& myBook) {
     BookConfig bcfg(symbol, levelStr);
-    BookQ<utils::ShmCircularBuffer> bq(bcfg, true);
-    BookQ<utils::ShmCircularBuffer>::Reader* book_reader = bq.newReader();
+    BookQType bq(bcfg, true);
+    BookQReader* book_reader = bq.newReader();
     if (!book_reader) {
         logError("Couldn't get book reader!");
         return false;
@@ -981,4 +1095,4 @@ bool LatestBook(const std::string& symbol, const std::string& levelStr, BookDepo
     return ret;
 }
 
-}  // namespace tp
+}  // namespace md

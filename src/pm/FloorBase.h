@@ -5,6 +5,7 @@
 #include <memory>
 #include <stdexcept>
 #include <map>
+#include <set>
 
 #include "csv_util.h"
 #include "floor.h"
@@ -85,8 +86,8 @@ namespace pm {
                                 int64_t qty_desired_,
                                 double px_limit_ = 0,
                                 int target_utc_ = 0,
-                                int type_ = MARKET) 
-            : qty (qty_desired_), px(px_limit_), target_utc(target_utc_), type(type_)
+                                TYPE type_ = MARKET) 
+            : qty (qty_desired_), px(px_limit_), target_utc(target_utc_), type((int)type_)
             {
                 if ( (algo_.size() > sizeof(algo)-1) ||
                      (symbol_.size() > sizeof(symbol)-1) ) {
@@ -151,6 +152,10 @@ namespace pm {
         // ServerType is expected to implement a function
         // void handleMessage(MsgType& msg_in)
         // returns true if processed a request, false if idle
+
+        void subscribeMsgType(const std::set<int> type_set) {
+            m_channel->addSubscription(type_set);
+        }
 
         const std::string m_name;
         static std::shared_ptr<FloorBase> getFloor(const std::string& name, bool is_server, const std::string& floor_name);

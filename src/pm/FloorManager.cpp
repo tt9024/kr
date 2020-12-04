@@ -277,7 +277,7 @@ namespace pm {
                     // to be implemented
                     break;
                 }
-            case FloorBase::PositionInstruction::TARGET_PX:
+            case FloorBase::PositionInstruction::LIMIT:
                 {
                     int64_t done_qty, open_qty, trade_qty;
                     done_qty = m_pm.getPosition(pi.algo, pi.symbol, nullptr, nullptr, &(open_qty));

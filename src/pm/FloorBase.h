@@ -71,7 +71,7 @@ namespace pm {
             enum TYPE {
                 INVALID = 0,
                 MARKET = 1,
-                TARGET_PX = 2,
+                LIMIT = 2,
                 PASSIVE = 3,
                 TOTAL_TYPES
             };
@@ -113,7 +113,7 @@ namespace pm {
                 qty = std::stoll(tk[2]);
                 px = std::stod(tk[3]);
                 target_utc = 0;
-                type = TARGET_PX;
+                type = LIMIT;
             }
 
             std::string toString() const {
@@ -129,8 +129,8 @@ namespace pm {
                     return "INVALID";
                 case MARKET: 
                     return "MARKET";
-                case TARGET_PX:
-                    return "TARGET_PX";
+                case LIMIT:
+                    return "LIMIT";
                 case PASSIVE:
                     return "PASSIVE";
                 default :
@@ -158,6 +158,8 @@ namespace pm {
         }
 
         const std::string m_name;
+        ChannelType m_channel;
+
         static std::shared_ptr<FloorBase> getFloor(const std::string& name, bool is_server, const std::string& floor_name);
         // this operates on a different floor by the name of floor_name.  Usually used as simulation
         // clients/server can only communicates on the same floor.
@@ -166,7 +168,6 @@ namespace pm {
     protected:
 
         FloorBase(const std::string& name, bool is_server, const std::string& floor_name);
-        ChannelType m_channel;
         MsgType m_msgin, m_msgout;
         bool parseKeyValue (const std::string& cmd, std::map<std::string, std::string>& key_map) const;
     };

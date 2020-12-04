@@ -8,8 +8,9 @@ namespace algo {
         auto vc = utils::ConfigureReader(cfg.c_str());
         auto al = vc.getStringArr("RunList");
         for (const auto& a : al) {
-            auto ac = vc.getString(a);
-            addAlgo(a, ac);
+            const auto ac = vc.getStringArr(a.c_str());
+            // expect [class_name, config_file]
+            addAlgo(a, ac[0], ac[1]);
         }
         logInfo("AlgoThread %s created!", inst.c_str());
     }
@@ -83,7 +84,7 @@ namespace algo {
                 if (diff_time > max_sleep_micro) {
                     diff_time = max_sleep_micro;
                 }
-                TimeType::micro_sleep(diff_time);
+                TimerType::micro_sleep(diff_time);
             }
         }
     }
@@ -100,7 +101,7 @@ namespace algo {
             {
                 std::string respstr("Ack");
                 const char* cmd = msg_in.buf;
-                const auto tk = utils::CSVUtil::read_line(cmd, delimiter=' ');
+                const auto tk = utils::CSVUtil::read_line(cmd, ' ');
                 const auto& sn(tk[0]);
                 const auto& c(tk[1]);
 
@@ -152,14 +153,14 @@ namespace algo {
         }
     }
 
-    void AlgoThread::addAlgo(const std::string& name, const std::string& objname, const std::string& cfg) {
+    void AlgoThread::addAlgo(const std::string& name, const std::string& class_name, const std::string& cfg) {
         std::shared_ptr<AlgoBase> algp;
         
         // create algo based on object name
-        if (objname == "AR1") {
-            algp = std::make_shared<AR1>(name, cfg, m_floor);
+        if (class_name == "AR1") {
+            algp = std::make_shared<AR1>(name, cfg, m_floor.m_channel, TimerType::cur_micro());
         } else {
-            logError("Unknown object name (%s) when createing strategy %s", objname.c_str(), name.c_str());
+            logError("Unknown object name (%s) when createing strategy %s", class_name.c_str(), name.c_str());
         }
         m_algo_map.emplace(name, algp);
     }
@@ -169,4 +170,5 @@ namespace algo {
         type_set.insert((int)FloorBase::AlgoUserCommand);
         subscribeMsgType(type_set);
     }
+
 }

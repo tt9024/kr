@@ -115,6 +115,10 @@ public:
         }
         last_micro = cur_micro;
     }
+
+    std::string toString() const {
+        return toCSVLine();
+    }
 };
 
 class BarReader{
@@ -169,7 +173,7 @@ public:
                     (unsigned long) start_bartime, (unsigned long) end_bartime);
             return false;
         }
-        FILE* fp_ = open(fn, "rt");
+        FILE* fp_ = fopen(fn.c_str(), "rt");
         if (!fp_) {
             logError("Failed to read bar file %s", fn.c_str());
             return false;
@@ -194,7 +198,7 @@ public:
     bool forwardBackwardFill(const std::vector<std::shared_ptr<BarPrice> >& allbars,
                              time_t start_bartime,
                              time_t end_bartime,
-                             const std::vector<std::shared_ptr<BarPrice> >& bars) const
+                             std::vector<std::shared_ptr<BarPrice> >& bars) const
     {
         // forward and backward fill the bars for given start_bartime and end_bartime
         // if missing starting bars, the first bar available is backward filled with
@@ -242,11 +246,11 @@ public:
                     );
             // create a bar filled with bp0's open price
             
-            fill->close = fill->open;
+            fill.close = fill.open;
             while (bt < bp0->bar_time) {
                 fill.writeAndRoll(bt);
                 bars.emplace_back( new BarPrice(fill) );
-                bt = nextBartime(bt);
+                bt = nextBar(bt);
             }
         }
 
@@ -282,7 +286,7 @@ public:
                         bcfg.toString().c_str(), fn.c_str(), barsec, 
                         (unsigned long) bt, utils::TimeUtil::frac_UTC_to_string(bt, 0).c_str(),
                         bp0->toCSVLine().c_str());
-                throw runtime_error("BarReader barsec mismatch " + bcfg.toString());
+                throw std::runtime_error("BarReader barsec mismatch " + bcfg.toString());
             }
         }
         return true;
@@ -293,7 +297,7 @@ public:
         time_t bt = bartime;
         int bs_ = barsec;
         if (offset<0) {
-            bs_=-bs;
+            bs_=-bs_;
             offset = -offset;
         };
         while (offset > 0) {
@@ -378,7 +382,7 @@ public:
         for (auto bs : bsv) {
             std::shared_ptr<BarInfo> binfo(new BarInfo());
             binfo->fn = m_bcfg.bfname(bs);
-            binfo->fp = fopen(binfo.fn.c_str(), "at");
+            binfo->fp = fopen(binfo->fn.c_str(), "at");
             if (!binfo->fp) {
                 logError("%s BarWriter failed to create bar file %s!", m_bcfg.toString().c_str(), binfo->fn.c_str());
                 throw std::runtime_error("BarWriter failed to create bar file " + binfo->fn);
@@ -393,18 +397,18 @@ public:
         auto bsv = m_bcfg.barsec_vec();
 
         // get the start stop utc for current trading day, snap to future
-        if (!VenueConfig::get().isTradingTime(bcfg.venue, cur_second)) {
-            logInfo("%s not currently trading, wait to the next open", bcfg.venue.c_str());
+        if (!VenueConfig::get().isTradingTime(m_bcfg.venue, cur_second)) {
+            logInfo("%s not currently trading, wait to the next open", m_bcfg.venue.c_str());
         }
-        const auto start_end_pair = VenueConfig::get().startEndUTC(bcfg.venue, cur_second, 2);
+        const auto start_end_pair = VenueConfig::get().startEndUTC(m_bcfg.venue, cur_second, 2);
         time_t sutc = start_end_pair.first;
         time_t eutc = start_end_pair.second;
 
         logInfo("%s BarWriter got trading hours [%lu (%s), %lu (%s)]", m_bcfg.venue.c_str(),
                 (unsigned long) sutc,
-                utils::TimeUtil::frac_to_string_UTC(sutc, 0).c_str(),
+                utils::TimeUtil::frac_UTC_to_string(sutc, 0).c_str(),
                 (unsigned long) eutc, 
-                utils::TimeUtil::frac_to_string_UTC(eutc, 0).c_str());
+                utils::TimeUtil::frac_UTC_to_string(eutc, 0).c_str());
 
         for (auto bs : bsv) {
             auto& binfo = m_bar[bs];
@@ -419,9 +423,9 @@ public:
                         "skip to next open %lu (%s)",
                         m_bcfg.venue.c_str(), bs, 
                         (unsigned long) due, 
-                        utils::TimeUtil::frac_to_string_UTC(due, 0).c_str(),
+                        utils::TimeUtil::frac_UTC_to_string(due, 0).c_str(),
                         sutc + 3600*24 + bs,
-                        utils::TimeUtil::frac_to_string_UTC(sutc+3600*24 + bs, 0).c_str());
+                        utils::TimeUtil::frac_UTC_to_string(sutc+3600*24 + bs, 0).c_str());
                 due = sutc + 3600*24 + bs;
                 sutc += (3600*24);
                 eutc += (3600*24);
@@ -431,7 +435,7 @@ public:
             binfo->end = eutc;
             logInfo("%s %d Second BarWriter next due %lu (%s)", m_bcfg.venue.c_str(),
                     (unsigned long) binfo->due,
-                    utils::TimeUtil::frac_to_string_UTC(binfo->due, 0).c_str());
+                    utils::TimeUtil::frac_UTC_to_string(binfo->due, 0).c_str());
         }
     }
 
@@ -478,7 +482,7 @@ public:
         // To avoid delay on each whole second,
         // it is recommended that the thread
         // updates the state periodically.
-        while (checkUpdate());
+        while (checkUpdate(cur_sec));
 
         for (auto& bitem: m_bar) {
             auto& binfo = bitem.second;
@@ -488,18 +492,18 @@ public:
             const auto& bsec = bitem.first;
 
             // if we are passed last bar of current trading day
-            if (cur_sec > binfo->eutc) {
-                logInfo("%s BarWriter roll trading day into next", m_bcfg.c_str());
+            if (cur_sec > binfo->end) {
+                logInfo("%s BarWriter roll trading day into next", m_bcfg.toString().c_str());
                 resetTradingDay(cur_sec);
                 return;
             }
 
             // if we are at the start of trading day
             // reset the bar state without writing it
-            if (cur_sec == binfo->sutc) {
+            if (cur_sec == binfo->start) {
                 const std::string line = binfo->bar.writeAndRoll(cur_sec);
                 logInfo("%s BarWriter reset bar state at trading day open.  It was %s", 
-                        m_bcfg.c_str(), line.c_str());
+                        m_bcfg.toString().c_str(), line.c_str());
                 continue;
             }
 
@@ -533,7 +537,7 @@ private:
             : fn(binfo.fn), fp(nullptr), due(binfo.due), end(binfo.due), 
               bar(binfo.bar) 
             {
-                fp = fopne(fn.c_str(), "at+");
+                fp = fopen(fn.c_str(), "at+");
                 if (!fp) {
                     logError("Failed to open bar file %s", fn.c_str());
                     throw std::runtime_error("Failed to open bar file " + fn);
@@ -542,7 +546,7 @@ private:
             ~BarInfo() {
                 if (fp) {
                     fclose(fp);
-                    tp = nullptr;
+                    fp = nullptr;
                 }
             }
 
@@ -575,8 +579,9 @@ public:
         while (m_should_run) {
             // do update for all
             bool has_update = false;
+            cur_micro = TimerType::cur_micro();
             for (auto& bw : m_writers) {
-                has_update |= bw.checkUpdate();
+                has_update |= bw->checkUpdate(cur_micro/1000000ULL);
             }
             cur_micro = TimerType::cur_micro();
             int64_t due_micro = next_sec - cur_micro;
@@ -597,7 +602,7 @@ public:
             if (due_micro < min_sleep_micro/2) {
                 // due for onSec
                 for (auto& bw : m_writers) {
-                    bw.onOneSecond((time_t)(next_sec/1000000LL));
+                    bw->onOneSecond((time_t)(next_sec/1000000LL));
                 }
                 next_sec += 1000000LL;
             }

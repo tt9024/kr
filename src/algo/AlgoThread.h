@@ -2,7 +2,7 @@
 
 #include "AlgoBase.h"
 #include "FloorBase.h"
-#include "timer_util.h"
+#include "time_util.h"
 
 namespace algo {
 
@@ -10,7 +10,7 @@ namespace algo {
     public:
 
         // create algos from the given config, add to algo map
-        AlgoThread(const std::string& cfg);
+        AlgoThread(const std::string& inst, const std::string& cfg);
 
         // call onReload to force read of config
         void reload(const std::string& alg); 
@@ -32,19 +32,21 @@ namespace algo {
         void run();
 
         // to be called by run_one_loop
-        void handleMessage(MsgType& msg_in);
+        void handleMessage(const MsgType& msg_in);
 
-        using TimerType = utils::TimerUtil;
+        using TimerType = utils::TimeUtil;
 
     private:
         const std::string m_inst;
-        pm::FloorBase m_floor;
         std::map<std::string, std::shared_ptr<AlgoBase> > m_algo_map;
+        pm::FloorBase m_floor;
         volatile bool m_should_run;
 
         // create algo and add to the map
-        void addAlgo(const std::string& name, const std::string& cfg);
+        void addAlgo(const std::string& name, 
+                     const std::string& class_name, 
+                     const std::string& cfg);
         void setSubscriptions();
-    }
+    };
 
 }

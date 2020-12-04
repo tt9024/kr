@@ -5,10 +5,11 @@
 
 namespace algo {
 
-    class AR1 : public: AlgoBase {
+    class AR1 : public AlgoBase {
+    public:
 
         // create the algo in stopped state, config not read
-        AR1(const std::string& name, const std::string& cfg, pm::FloorBase& floor);
+        AR1(const std::string& name, const std::string& cfg, pm::FloorBase::ChannelType& channel, uint64_t cur_micro);
         ~AR1();
 
         void onStop(uint64_t cur_micro) override; 
@@ -20,43 +21,55 @@ namespace algo {
         // check to see what to do for algo
         void onOneSecond(uint64_t cur_micro) override;
 
-        std::string onDump(uint64_t cur_micro) const override; 
+        std::string onDump() const override; 
 
     protected:
         struct AR1Param {
-            explicit AR1Param(const std::string& cfg);
-            AR1Param();
-            std::vector<int> _A1Coef;
+            explicit AR1Param(const std::string& cfg, time_t cur_utc=0);
+            std::shared_ptr<md::BookConfig> _bcfg;
             int _barsec;
+            std::vector<double> _A1Coef;
+            size_t _lookback;
             time_t _start_utc;
             time_t _end_utc;
-        }
+            int64_t _max_pos;
+            time_t _last_loaded;
+
+            std::string toString() const;
+        };
 
         struct AR1State {
             md::BookDepot _bookL1;
-            std::vector<int> _barHist;
-            int _curPos;
-        }
+            std::vector<std::shared_ptr<md::BarPrice> > _barHist;
+            int64_t _curPos;
+            time_t _last_updated;
+
+            std::string toString() const;
+        };
 
         struct AR1Forecast {
             double _logRet;
             double _variance;
-        }
+        };
 
         // update state with new market data
-        bool update();
+        bool initState(uint64_t cur_micro);
+        bool updateState(uint64_t cur_micro);
 
         // perform forecast based on current state
-        bool forecast(const AR1State& state, AR1Forecast& fcst);
+        bool forecast(AR1Forecast& fcst);
 
         // position optimization code
-        int pop(const AR1Forecast& forecast);
+        int pop(const AR1Forecast& fcst);
 
-        std::string _cfg;
-        AR1Param _param;
-        AR1State _state;
-        std::vector<time_t> _trigger_time;
-        int _next_trigger_idx;
-        int _symid;
-    }
+        // setup trigger times
+        bool setupTriggerTime(uint64_t cur_micro);
+
+        std::string m_cfg;
+        std::shared_ptr<AR1Param> m_param;
+        AR1State m_state;
+        std::vector<time_t> m_trigger_time;
+        size_t m_next_trigger_idx;
+        int m_symid;
+    };
 }

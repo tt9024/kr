@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS "-Wall -g")
 add_definitions(-DENV="DEV")
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 
-
 add_subdirectory(util)
-#add_subdirectory(pm)
+add_subdirectory(pm)
 add_subdirectory(md)
+add_subdirectory(algo)

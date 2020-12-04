@@ -2,8 +2,8 @@
 
 namespace algo {
 
-    AlgoBase::AlgoBase(const std::string& name, pm::FloorBase& floor)
-    : m_name(name), m_floor(floor), m_should_run(false) {
+    AlgoBase::AlgoBase(const std::string& name, pm::FloorBase::ChannelType& channel)
+    : m_name(name), m_channel(channel), m_should_run(false) {
     }
 
     AlgoBase::~AlgoBase() {
@@ -21,7 +21,7 @@ namespace algo {
             ret += sym->toString();
             ret += " ";
         }
-        ret += "] state=[ "
+        ret += "] state=[ ";
         ret += onDump();
         ret += " ]";
         return ret;
@@ -29,17 +29,17 @@ namespace algo {
 
     // out-going updates
     bool AlgoBase::getPosition(int symid, int64_t& qty_done, int64_t& qty_open) {
-        static FloorBase::MsgType msgreq(FloorBase::GetPositionReq, nullptr, 0, 0), msgresp;
+        static pm::FloorBase::MsgType msgreq(pm::FloorBase::GetPositionReq, nullptr, 0, 0), msgresp;
 
         const auto& sinfo (m_symbols[symid]);
-        const FloorBase::PositionReuqest pr(m_name, sinfo->_bcfg.symbol, 0, 0);
-        msgreq.copyData((const char*)&pr, sizeof(FloorBase::PositionRequest));
+        const pm::FloorBase::PositionRequest pr(m_name, sinfo->_bcfg.symbol, 0, 0);
+        msgreq.copyData((const char*)&pr, sizeof(pm::FloorBase::PositionRequest));
         msgresp.copyString("");
         if (! m_channel->request(msgreq, msgresp)) {
             logError("%s cannot get position: %s", m_name.c_str(), msgresp.buf);
             return false;
         }
-        const auto* prr((const FloorBase::PositionReuqest*)msgresp.buf);
+        const auto* prr((const pm::FloorBase::PositionRequest*)msgresp.buf);
         qty_done = prr->qty_done;
         qty_open = prr->qty_open;
         return true;
@@ -47,47 +47,49 @@ namespace algo {
 
     bool AlgoBase::setPositionMarket(int symid, int64_t tgt_qty) {
         const auto& sinfo (m_symbols[symid]);
-        return setPosition(FloorBase::PositionInstruction(
+        return setPosition(pm::FloorBase::PositionInstruction(
                     m_name, 
                     sinfo->_bcfg.symbol, 
                     tgt_qty, 
                     0, 
                     0, 
                     pm::FloorBase::PositionInstruction::MARKET
-                );
+                )
+            );
     }
 
     bool AlgoBase::setPositionLimit(int symid, int64_t tgt_qty, double tgt_px) {
         const auto& sinfo (m_symbols[symid]);
-        return setPosition(FloorBase::PositionInstruction(
+        return setPosition(pm::FloorBase::PositionInstruction(
                     m_name, 
                     sinfo->_bcfg.symbol, 
                     tgt_qty, 
                     tgt_px, 
                     0, 
                     pm::FloorBase::PositionInstruction::LIMIT
-                );
+                )
+            );
     }
 
     bool AlgoBase::setPositionPassive(int symid, int64_t tgt_qty, double tgt_px,  time_t tgt_utc) {
         const auto& sinfo (m_symbols[symid]);
-        return setPosition(FloorBase::PositionInstruction(
+        return setPosition(pm::FloorBase::PositionInstruction(
                     m_name, 
                     sinfo->_bcfg.symbol, 
                     tgt_qty, 
                     tgt_px, 
                     tgt_utc, 
                     pm::FloorBase::PositionInstruction::PASSIVE
-                );
+                )
+            );
     }
 
-    bool AlgoBase::setPosition(const FloorBase::PositionInstruction& pi) {
-        static FloorBase::MsgType msgreq(FloorBase::SetPositionReq, nullptr, 0, 0), msgresp;
+    bool AlgoBase::setPosition(const pm::FloorBase::PositionInstruction& pi) {
+        static pm::FloorBase::MsgType msgreq(pm::FloorBase::SetPositionReq, nullptr, 0, 0), msgresp;
 
-        const auto& sinfo (m_symbols[symid]);
-        msgreq.copyData((const char*)&pi, sizeof(FloorBase:::PositionInstruction));
+        msgreq.copyData((const char*)&pi, sizeof(pm::FloorBase::PositionInstruction));
         msgresp.copyString("");
-        if (!m_channel->requestAndCheckAck(msgreq, msgresp, 1, FloorBase::SetPositionAck)) {
+        if (!m_channel->requestAndCheckAck(msgreq, msgresp, 1, pm::FloorBase::SetPositionAck)) {
             logError("%s failed to set position: %s", m_name.c_str(), msgresp.buf);
             return false;
         }
@@ -125,13 +127,13 @@ namespace algo {
             return 1;
         }
         // a bit slower operation, needs to read the bar file and do gap fills
-        return sinfo->_bar_reader.readPeriod(bp, since + sinfo->_barsec, bar.bar_time);
+        return sinfo->_bar_reader->readPeriod(bp, since + sinfo->_barsec, bar.bar_time);
     }
 
     int AlgoBase::addSymbol(const std::string& venue, const std::string& symbol,
                             const std::string& snap_level, int barsec) {
         m_symbols.emplace_back(
-                make_shared<SymbolInfo>(
+                std::make_shared<SymbolInfo>(
                     md::BookConfig(venue, symbol, snap_level), 
                     barsec
                 )
@@ -140,12 +142,16 @@ namespace algo {
         return (int)m_symbols.size()-1;
     }
 
-    AlgoBase::SymbolInfo::SymbolInfo(BookConfig&& bcfg, int barsec)
+    void AlgoBase::removeSymbol(int symid) {
+        m_symbols.erase(m_symbols.begin() + symid);
+    }
+
+    AlgoBase::SymbolInfo::SymbolInfo(md::BookConfig&& bcfg, int barsec)
     : _bcfg(std::move(bcfg)),
       _barsec(barsec), 
-      _bq(std::make_shared<md::BookQType>(bcfg, true)),
-      _snap_reader(_bq.newReader()),
-      _bar_reader(std::make_shared<md::BarReader>(_bcfg, barsec)),
+      _bq(std::make_shared<md::BookQType>(_bcfg, true)),
+      _snap_reader(_bq->newReader()),
+      _bar_reader(std::make_shared<md::BarReader>(_bcfg, barsec))
     {
     }
 

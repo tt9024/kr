@@ -14,8 +14,9 @@ namespace algo {
     class AlgoBase {
     public:
 
-        // create the algo in stopped state, config not read
-        AlgoBase(const std::string& name, const std::string& cfg, pm::FloorBase& floor);
+        // create the algo in stopped state, config not read, channel is
+        // out-going to the floor, and is share by strategies in AlgoThread
+        AlgoBase(const std::string& name, pm::FloorBase::ChannelType& channel);
         virtual ~AlgoBase();
 
         // ==== functions used by Algo =====
@@ -53,11 +54,10 @@ namespace algo {
         // for register symbols
         int addSymbol(const std::string& venue, const std::string& symbol, 
                       const std::string& snap_level, int barsec);
+        void removeSymbol(int symid);
 
         // utilities
-        template <typename ParamType>
-        bool getAlgoParameter(const char* param_file_name, ParamType& param) const;
-        bool setShouldRun(bool should_run) { m_should_run = should_run; };
+        void setShouldRun(bool should_run) { m_should_run = should_run; };
         bool shouldRun() const { return m_should_run;};
         std::string toString() const;
 
@@ -71,12 +71,12 @@ namespace algo {
         // check to see what to do for algo
         virtual void onOneSecond(uint64_t cur_micro);
 
-        virtual std::string onDump() const
+        virtual std::string onDump() const;
 
     protected:
         const std::string m_name;
+        pm::FloorBase::ChannelType& m_channel;
         std::string m_cfg;
-        pm::FloorBase& m_floor;
         volatile bool m_should_run;
 
         struct SymbolInfo {
@@ -86,11 +86,11 @@ namespace algo {
             std::shared_ptr<md::BookQReader> _snap_reader;
             std::shared_ptr<md::BarReader> _bar_reader;
 
-            // utilities
-            SymbolInfo(BookConfig&& bcfg, int barsec);
+            SymbolInfo( md::BookConfig&& bcfg, int barsec);
             std::string toString() const;
         };
         std::vector< std::shared_ptr<SymbolInfo> > m_symbols;
-        bool setPosition(const FloorBase::PositionInstruction& pi);
-    }
+
+        bool setPosition(const pm::FloorBase::PositionInstruction& pi);
+    };
 }

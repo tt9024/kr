@@ -95,7 +95,7 @@ public:
             logError("Venue not found: %s", venue.c_str());
             throw std::runtime_error("Venue not found!");
         }
-        const auto& hm = venue_map[venue];
+        const auto& hm = iter->second;
         return utils::TimeUtil::isTradingTime(cur_utc, hm[0], hm[1], hm[2], hm[3]);
     }
 
@@ -120,9 +120,9 @@ public:
             logError("Venue not found: %s", venue.c_str());
             throw std::runtime_error("Venue not found!");
         }
-        const auto& hm = venue_map[venue];
+        const auto& hm = iter->second;
         const auto curDay = utils::TimeUtil::tradingDay(cur_utc, hm[0], hm[1], hm[2], hm[3]);
-        time_t sutc = string_to_frac_UTC(curDay.c_str(), 0, "%Y%m%d");
+        time_t sutc = utils::TimeUtil::string_to_frac_UTC(curDay.c_str(), 0, "%Y%m%d");
         return std::pair<time_t, time_t>( 
                 sutc + hm[0]*3600 + hm[1]*60, 
                 sutc + hm[2]*3600 + hm[3]*60
@@ -136,7 +136,7 @@ public:
             logError("Venue not found: %s", venue.c_str());
             throw std::runtime_error("Venue not found!");
         }
-        const auto& hm = venue_map[venue];
+        const auto& hm = iter->second;
         return hm[2]*3600 + hm[3]*60 - hm[0]*3600 - hm[1]*60;
     }
 
@@ -146,7 +146,7 @@ private:
         const auto cfg = plcc_getString("Venue");
         auto vc = utils::ConfigureReader(cfg.c_str());
         auto vl = vc.getStringArr("VenueList");
-        for (const auto& v : vi) {
+        for (const auto& v : vl) {
             auto hm = vc.getStringArr(v.c_str());
             // hm in [ start_hour, start_min, end_hour, end_min ]
             if (hm.size() != 4) {
@@ -163,19 +163,20 @@ private:
             }
 
             if (sh > eh) { sh = 24 - sh ; }
-            venue_map.emplace(v, {sh, sm, eh, em});
+            std::vector<int> hv {sh, sm, eh, em};
+            venue_map.emplace(v, hv);
         }
     };
 
     int findValue(const std::string& venue, int offset) const {
-        const atuo iter = venue_map.find(venue);
+        const auto iter = venue_map.find(venue);
         if (iter == venue_map.end()) {
             logError("Venue not found: %s", venue.c_str());
             throw std::runtime_error("Venue not found: " + venue);
         }
         return iter->second[offset];
     }
-}
+};
 
 
 struct BookConfig {

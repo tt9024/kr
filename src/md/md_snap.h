@@ -325,12 +325,12 @@ struct BookDepot {
         if (&book == this) {
             return *this;
         }
-        memcpy (this, &book, sizeof(BookDepot));
+        memcpy ((char*)this, (char*)&book, sizeof(BookDepot));
         return *this;
     }
 
     void reset() {
-        memset(this, 0, sizeof(BookDepot));
+        memset((char*)this, 0, sizeof(BookDepot));
     }
 
     Price getVWAP(int level, bool isBid, Quantity* q=NULL) const {
@@ -541,7 +541,7 @@ struct BookDepot {
         PriceEntry pe[2*BookLevel];
         updateFromEntry(book_.pe, pe, book_.avail_level[0]);
         updateFromEntry(book_.pe+BookLevel, pe+BookLevel, book_.avail_level[1]);
-        memcpy(this, &book_, sizeof(BookDepot));
+        memcpy((char*)this, (char*)&book_, sizeof(BookDepot));
         memcpy(this->pe, pe, sizeof(pe));
     }
 
@@ -940,9 +940,12 @@ public:
             return &_bookL2;
         }
 
-        const std::vector<BookConfig> & getBookConfig() const {
+
+        /*
+        BookConfig getBookConfig() const {
             return _bq._cfg;
         }
+        */
 
         ~Writer() {};
     private:

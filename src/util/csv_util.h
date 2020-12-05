@@ -81,7 +81,7 @@ namespace utils {
                      write_line(line, csvfile, delimiter);
                 }
                 return true;
-            } catch (const std::exception e) {
+            } catch (const std::exception& e) {
                 fprintf(stderr, "csv file %s write failed: %s\n", filename.c_str(), e.what());
             } catch (...) {
                 fprintf(stderr, "csv file %s write failed for unknown reason\n", filename.c_str());

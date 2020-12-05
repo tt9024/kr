@@ -263,4 +263,8 @@ namespace algo {
             );
         return std::string(buf);
     }
+
+    std::string AR1::cfgFile() const {
+        return m_cfg;
+    }
 }

@@ -34,6 +34,8 @@ namespace algo {
         // to be called by run_one_loop
         void handleMessage(const MsgType& msg_in);
 
+        std::string toString() const;
+
         using TimerType = utils::TimeUtil;
 
     private:

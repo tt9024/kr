@@ -59,19 +59,23 @@ namespace algo {
         // utilities
         void setShouldRun(bool should_run) { m_should_run = should_run; };
         bool shouldRun() const { return m_should_run;};
-        std::string toString() const;
+        std::string toString(bool dump_state = true) const;
 
         // ===== functions provided by Algo =====
-        virtual void onStop(uint64_t cur_micro);
-        virtual void onStart(uint64_t cur_micro);
+        virtual void onStop(uint64_t cur_micro) = 0;
+        virtual void onStart(uint64_t cur_micro) = 0;
 
         // read config, remove all subscriptions, add all subscriptions
-        virtual void onReload(uint64_t cur_micro, const std::string& config_file = "");
+        virtual void onReload(uint64_t cur_micro, const std::string& config_file = "") = 0;
 
         // check to see what to do for algo
-        virtual void onOneSecond(uint64_t cur_micro);
+        virtual void onOneSecond(uint64_t cur_micro) = 0;
 
-        virtual std::string onDump() const;
+        // dump current parameters and states
+        virtual std::string onDump() const = 0;
+
+        // return current config file name
+        virtual std::string cfgFile() const = 0;
 
     protected:
         const std::string m_name;

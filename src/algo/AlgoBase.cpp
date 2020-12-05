@@ -10,11 +10,15 @@ namespace algo {
         logInfo("%s Base destructed", m_name.c_str());
     }
 
-    std::string AlgoBase::toString() const {
+    std::string AlgoBase::toString(bool dump_state) const {
         char buf[256];
-        snprintf(buf, sizeof(buf), "name=%s, should_run=%s", 
-                m_name.c_str(), (m_should_run?"Y":"N"));
+        snprintf(buf, sizeof(buf), "name=%s, cfg=%s, should_run=%s", 
+                m_name.c_str(), cfgFile().c_str(), (m_should_run?"Y":"N"));
         std::string ret (buf);
+
+        if (!dump_state) {
+            return ret;
+        }
 
         ret += " subscriptions=[ ";
         for (const auto& sym: m_symbols) {

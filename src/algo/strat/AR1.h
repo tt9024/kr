@@ -22,6 +22,7 @@ namespace algo {
         void onOneSecond(uint64_t cur_micro) override;
 
         std::string onDump() const override; 
+        std::string cfgFile() const override;
 
     protected:
         struct AR1Param {

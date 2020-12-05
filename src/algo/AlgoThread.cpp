@@ -91,6 +91,7 @@ namespace algo {
 
     void AlgoThread::handleMessage(const MsgType& msg_in) {
         // the algo command is expected to be
+        // 'L': list loaded strategies
         // 'strat_name S' : start 
         // 'strat_name R config_file' : reload
         // 'strat_name E' : stop 
@@ -111,6 +112,13 @@ namespace algo {
                     break;
                 } else {
                     switch (c[0]) {
+                    case 'L':
+                    {
+                        respstr = toString();
+                        logInfo("List loaded: %s", respstr.c_str());
+                        break;
+                    }
+
                     case 'S':
                     {
                         logInfo("Starting strategy %s", sn.c_str());
@@ -169,6 +177,17 @@ namespace algo {
         std::set<int> type_set;
         type_set.insert((int)FloorBase::AlgoUserCommand);
         subscribeMsgType(type_set);
+    }
+
+    std::string AlgoThread::toString() const {
+        std::string ret = "Loaded=[ ";
+        for (const auto& m : m_algo_map) {
+            ret += "(";
+            ret += m.second->toString(false);
+            ret += ") ";
+        }
+        ret += "]";
+        return ret;
     }
 
 }

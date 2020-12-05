@@ -156,8 +156,16 @@ namespace pm {
                     "!A position_line\n\tadjust the position and pnl using the given csv line\n"
                     "!R limit_line\n\tset limit according to the given csv line\n"
                     "!E \n\tinitiate the reconcile process, if good, persist currrent position to EoD file\n"
-                    "!D \n\t dump the state of Floor Manager\n"
+                    "!D \n\tdump the state of Floor Manager\n"
                     "!!K \n\tstop the message processing and done\n"
+                    // Below commands have message type
+                    // "FloorBase::AlgoUserCommand"
+                    // They are handled by AlgoThread
+                    "@L \n\tlist loaded strategies"
+                    "@strat_name S\n\tstart strat_name"
+                    "@strat_name E\n\tstop strat_name"
+                    "@strat_name D\n\tdump pmarameters and state of strat_name"
+                    "@state_name R config_file\n\tstop, reload with config_file and start"
                     "H\n\tlist of commands supported\n");
 
         switch (cmd[0]) {

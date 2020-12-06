@@ -4,6 +4,7 @@
 #include "time_util.h"
 #include <cmath>
 #include <iostream>
+#include "gtest/gtest.h"
 
 utils::CSVUtil::FileTokens erlines = {
     {"sym1", "algo1","cid1", "eid1", "0","-10","2.1218", "20201004-18:33:02","", "1601850782023138"},
@@ -24,7 +25,7 @@ bool check(const pm::IntraDayPosition& idp, int64_t qty, double vap) {
     return true;
 };
 
-bool load_save() {
+TEST (IDPTest, LoadSave) {
     // creat initial idp from list a er
     pm::IntraDayPosition idp("sym1","algo1");
     for (const auto& line : erlines) {
@@ -36,20 +37,12 @@ bool load_save() {
     }
 
     double vapref = 2.1275399999999998;
-    if (!check(idp, -10, vapref)) {
-        std::cout << "loaded idp from erlines, mismatch!" << std::endl;
-        return false;
-    }
+    EXPECT_TRUE(check(idp, -10, vapref)) << "loaded idp from erlines, mismatch!";
 
     auto oolist = idp.listOO();
-    if (oolist.size()!=1) {
-        std::cout << "oolist size mismatch! " << idp.dumpOpenOrder() << std::endl;
-        return false;
-    }
-    if ((oolist[0]->m_open_qty != 5) || (std::fabs(oolist[0]->m_open_px - 2.1219)>1e-10)) {
-        std::cout << "oolist mismatch: " << idp.dumpOpenOrder() << std::endl;
-        return false;
-    }
+    EXPECT_EQ(oolist.size(), 1) << "oolist size mismatch! " << idp.dumpOpenOrder();
+
+    EXPECT_FALSE((oolist[0]->m_open_qty != 5) || (std::fabs(oolist[0]->m_open_px - 2.1219)>1e-10)) << "oolist mismatch: " << idp.dumpOpenOrder();
 
     // save to csv and load from csv
     auto posline = idp.toCSVLine();
@@ -77,20 +70,12 @@ bool load_save() {
     double vap, pnl;
     qty = idp_newday.getPosition(&vap, &pnl);
 
-    if ((qty != -9) || (std::fabs(vap-vapref)>1e-10) || (std::fabs(pnl-(vapref-3.0))>1e-10)) {
-        std::cout << "position update mismatch with reference!" << std::endl;
-        return false;
-    }
+    EXPECT_FALSE ((qty != -9) || (std::fabs(vap-vapref)>1e-10) || (std::fabs(pnl-(vapref-3.0))>1e-10)) << "position update mismatch with reference!";
 
     oolist = idp_newday.listOO();
-    if ( (oolist.size()!=2) || 
+    EXPECT_FALSE ( (oolist.size()!=2) ||
          (oolist[0]->m_open_qty!=9) || (std::fabs(oolist[0]->m_open_px- 3.0) > 1e-10) ||
-         (oolist[1]->m_open_qty!=5) || (std::fabs(oolist[1]->m_open_px-2.1219)>1e-10)
-       ) 
-    {
-        std::cout << "oolist mismatch!" << std::endl;
-        return false;
-    }
+         (oolist[1]->m_open_qty!=5) || (std::fabs(oolist[1]->m_open_px-2.1219)>1e-10) ) <<  "oolist mismatch!" << std::endl;
 
     idp_newday = idp; // idp has one more oo at cid3
 
@@ -105,18 +90,11 @@ bool load_save() {
         std::cout << "new day copy: " << idpcopy.toString() << std::endl;
 
         std::string difflog = idpload.diff(idpcopy);
-        if (difflog.size()>0) {
-            std::cout << "load mismatch with copy!" << std::endl;
-            std::cout << difflog << std::endl;
-            return false;
-        }
+        EXPECT_FALSE (difflog.size()>0) << "load mismatch with copy!" << std::endl << difflog << std::endl;
 
         double pnlm2m = idpcopy.getMtmPnl(3.1);
         double pnlref = (vapref-3.0 + 9*(vapref-3.1));
-        if (std::fabs(pnlm2m-pnlref)) {
-            std::cout << "expect Mtm pnl "<< pnlref << " got " << pnlm2m << std::endl;
-            return false;
-        }
+        EXPECT_FALSE (std::fabs(pnlm2m-pnlref)) << "expect Mtm pnl "<< pnlref << " got " << pnlm2m;
 
         // update idpcopy with the coverings, but 
         utils::CSVUtil::FileTokens erlines_cover = {
@@ -132,39 +110,21 @@ bool load_save() {
 
         qty = idpcopy.getPosition(&vap, &pnl);
         pnlref = vapref-3.0 + 9*(vapref-2.13);
-        if ( (qty!=0) || (std::fabs(pnl - pnlref)>1e-10) ) {
-            std::cout << "qty or pnl mismatch after cover qty: " << qty << " pnl: " << pnl << "(" << pnlref << std::endl;;
-            return false;
-        }
+        EXPECT_FALSE ( (qty!=0) || (std::fabs(pnl - pnlref)>1e-10) ) << "qty or pnl mismatch after cover qty: " << qty << " pnl: " << pnl << "(" << pnlref;
 
-        if (std::fabs(pnlref - idpcopy.getRealizedPnl())>1e-10) {
-            std::cout << "realized pnl wrong after cover pnl: " << pnl << " pnlref " << pnlref << std::endl;
-            return false;
-        }
+        EXPECT_FALSE(std::fabs(pnlref - idpcopy.getRealizedPnl())>1e-10) << "realized pnl wrong after cover pnl: " << pnl << " pnlref " << pnlref;
 
-        if (idpload.hasPosition() || idpcopy.hasPosition()) {
-            std::cout << "hasPosition() returned true after cover" << std::endl;
-            return false;
-        }
+        EXPECT_FALSE (idpload.hasPosition() || idpcopy.hasPosition()) << "hasPosition() returned true after cover";
 
-        if (idpcopy.listOO().size() != 1) {
-            std::cout << "copied idp OO size wrong " << std::endl;
-            return false;
-        }
+        EXPECT_FALSE (idpcopy.listOO().size() != 1) << "copied idp OO size wrong ";
 
-        if (idp.listOO().size() != 1) {
-            std::cout << "original idp OO size wrong " << std::endl;
-            return false;
-        }
+        EXPECT_FALSE (idp.listOO().size() != 1) << "original idp OO size wrong ";
 
         // test construct
         pm::IntraDayPosition idptest2("sym1","algo1",10, (3.0+9*2.13)/10.0,10,vapref);
 
         difflog = idpcopy.diff(idptest2, true);
-        if (difflog.size() > 0) {
-            std::cout << "constructed idp mismatch the final cover: " << difflog << std::endl;
-            return false;
-        }
+        EXPECT_FALSE (difflog.size() > 0) << "constructed idp mismatch the final cover: " << difflog;
 
         // test the oo updaet on copy would be reflected on original
         utils::CSVUtil::FileTokens erlines_oo = {
@@ -181,23 +141,12 @@ bool load_save() {
     delete idp_newday_ptr;
 
     oolist = idp.listOO();
-    if (oolist.size()!=1) {
-        std::cout << "oolist size mismatch! " << idp.dumpOpenOrder() << std::endl;
-        return false;
-    }
-    if ((oolist[0]->m_open_qty != 1) || (std::fabs(oolist[0]->m_open_px - 2.1)>1e-10)) {
-        std::cout << "oolist mismatch: " << idp.dumpOpenOrder() << std::endl;
-        return false;
-    }
-    if (oolist[0].use_count() != 2) {
-        std::cout << "open order reference count mismatch! " << oolist[0].use_count() 
-            << std::endl;
-    }
+    EXPECT_FALSE (oolist.size()!=1) << "oolist size mismatch! " << idp.dumpOpenOrder();
+    EXPECT_FALSE  ((oolist[0]->m_open_qty != 1) || (std::fabs(oolist[0]->m_open_px - 2.1)>1e-10)) << "oolist mismatch: " << idp.dumpOpenOrder();
+    EXPECT_FALSE (oolist[0].use_count() != 2) << "open order reference count mismatch! " << oolist[0].use_count();
+};
 
-    return true;
-}
-
-bool add_copy() {
+TEST (IDPTest, AddLoad) {
     pm::IntraDayPosition idp("sym1","algo1");
     utils::CSVUtil::FileTokens erlines_update1 = {
         {"sym1", "algo1","cid1", "eid1", "0","10","3.0", "20201004-18:33:02","", "1601850782023138"},
@@ -222,33 +171,18 @@ bool add_copy() {
     idp+=idp_newday;
     delete idp_newday_ptr;
 
-    if (idp.getPosition() != -1) {
-        std::cout << "add_copy position mismatch! " << std::endl;
-        std::cout << idp.toString() << "\n" << idp.dumpOpenOrder() << std::endl;
-        return false;
-    }
+    EXPECT_FALSE (idp.getPosition() != -1) << "add_copy position mismatch! " << std::endl << idp.toString() << "\n" << idp.dumpOpenOrder();
 
     auto oovec = idp.listOO();
-    if (oovec.size() != 3) {
-        std::cout << "add_copy oo list size mismatch! 3 expected " << std::endl;
-        std::cout << idp.toString() << "\n" << idp.dumpOpenOrder() << std::endl;
-        return false;
-    }
+    EXPECT_FALSE (oovec.size() != 3) << "add_copy oo list size mismatch! 3 expected " << std::endl << idp.toString() << "\n" << idp.dumpOpenOrder();
 
-    if ((oovec[0]->m_open_qty != 9) ||
+    EXPECT_FALSE ((oovec[0]->m_open_qty != 9) ||
         (oovec[1]->m_open_qty != -7) ||
-        (oovec[2]->m_open_qty != 5)) {
-        std::cout << "add_copy oo open qty mistmach!" << std::endl;
-        std::cout << idp.toString() << "\n" << idp.dumpOpenOrder() << std::endl;
-        return false;
-    }
-    return true;
-}
+        (oovec[2]->m_open_qty != 5)) << "add_copy oo open qty mistmach!" << std::endl << idp.toString() << "\n" << idp.dumpOpenOrder() ;
+};
 
 
-int main() {
-    if (load_save() && add_copy()) {
-        std::cout << "all good!" << std::endl;
-    }
-    return 0;
+int main(int argc, char** argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

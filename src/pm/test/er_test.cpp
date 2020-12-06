@@ -1,17 +1,19 @@
 #include "ExecutionReport.h"
 #include <iostream>
 #include <cmath>
+#include "gtest/gtest.h"
 
-const std::string erfname = "/tmp/test_er.csv";
-utils::CSVUtil::FileTokens erlines = {
-    {"sym1", "algo1","cid1", "eid1", "0","-10","2.1218", "20201004-18:33:02","", "1601850782023138"},
-    {"sym1", "algo1","cid1", "eid2", "1","-3" ,"2.1218", "20201004-18:33:02","", "1601850782823033"},
-    {"sym1", "algo1","cid2", "eid3", "0","5"  ,"2.1219", "20201004-18:33:08","", "1601850788504031"},
-    {"sym1", "algo1","cid2", "eid4", "4","0"  ,"0"     , "20201004-18:33:08","", "1601850788591032"},
-    {"sym1", "algo1","cid1", "eid5", "2","-7" ,"2.13"  , "20201004-18:33:09","", "1601850789504031"}
-};
+TEST (ExecutionReportTest, TestER) {
+    const std::string erfname = "/tmp/test_er.csv";
+    utils::CSVUtil::FileTokens erlines = {
+        {"sym1", "algo1","cid1", "eid1", "0","-10","2.1218", "20201004-18:33:02","", "1601850782023138"},
+        {"sym1", "algo1","cid1", "eid2", "1","-3" ,"2.1218", "20201004-18:33:02","", "1601850782823033"},
+        {"sym1", "algo1","cid2", "eid3", "0","5"  ,"2.1219", "20201004-18:33:08","", "1601850788504031"},
+        {"sym1", "algo1","cid2", "eid4", "4","0"  ,"0"     , "20201004-18:33:08","", "1601850788591032"},
+        {"sym1", "algo1","cid1", "eid5", "2","-7" ,"2.13"  , "20201004-18:33:09","", "1601850789504031"}
+    };
 
-bool testER(bool verbose = false) {
+    bool verbose = true;
     utils::CSVUtil::write_file(erlines, erfname, false);
     const auto& lines = utils::CSVUtil::read_file(erfname);
 
@@ -59,17 +61,12 @@ bool testER(bool verbose = false) {
     // compare the two
     for (size_t i=0; i<erlist.size(); ++i) {
         std::string difflog;
-        if (!erlist[i].compareTo(erlist_derived[i], &difflog)) {
-            std::cout << difflog << std::endl;
-            return false;
-        }
+        EXPECT_TRUE(erlist[i].compareTo(erlist_derived[i], &difflog)) << difflog;
     }
-    return true;
 }
 
-int main() {
-    bool ret = testER(true);
-    std::cout << (ret?"Matched!":"Mismatch!") << std::endl;
-    return 0;
+int main(int argc, char** argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }
 

@@ -14,6 +14,8 @@
 #include <string>
 #include <cmath>
 
+#define SMOD(a,b) (((a) % (b) + (b)) % (b)) // C modulo could get negative
+
 namespace utils {
 
 class TimeUtil {
@@ -134,8 +136,8 @@ public:
          return false;
       }
       else if (tm_data.tm_wday == 5) {
-         if ((tm_data.tm_hour > (end_hour % 24)) ||
-               ((tm_data.tm_hour == (end_hour % 24)) &&
+         if ((tm_data.tm_hour > SMOD(end_hour, 24)) ||
+               ((tm_data.tm_hour == SMOD(end_hour, 24)) &&
                 (tm_data.tm_min >= end_min))) {
              return false;
          };
@@ -145,8 +147,8 @@ public:
               return false;
           } else {
               // sunday open
-              if ((tm_data.tm_hour < (start_hour % 24)) ||
-                  ((tm_data.tm_hour == (start_hour % 24)) && 
+              if ((tm_data.tm_hour < SMOD(start_hour, 24)) ||
+                  ((tm_data.tm_hour == SMOD(start_hour, 24)) && 
                    (tm_data.tm_min < start_min))) {
                   return false;
               };
@@ -165,8 +167,8 @@ public:
       // its a weekday, check if it is out side of trading hours
       int tmin = tm_data.tm_hour*60 + tm_data.tm_min;
       int tend = end_hour*60 + end_min;
-      int tstart = (start_hour%24)*60 + start_min;
-      return ((tmin - tstart) % (60*24)) < ((tend - tstart) % (60*24));
+      int tstart = SMOD(start_hour, 24) *60 + start_min;
+      return SMOD(tmin-tstart, 60*24) < SMOD(tend-tstart, 60*24);
    };
 
    static bool isTradingTime(time_t ts, int start_hour = -6, int start_min = 0, int end_hour = 17, int end_min = 0) {
@@ -190,7 +192,7 @@ public:
        while (! isTradingTime(utc_second, start_hour, start_min, end_hour, end_min)) {
            if (snap == 0) 
                return "";
-           utc_second += ((3-snap*2)*3600);
+           utc_second += ((snap*2-3)*3600);
        }
 
        if (day_offset != 0) {
@@ -205,7 +207,7 @@ public:
        // if start_hour is negative, i.e. over-night session
        // trading day goes forward during over-night period
        struct tm tmsec = int_to_tm_UTC(utc_second);
-       if (tmsec.tm_hour*tmsec.tm_min > end_hour*end_min) {
+       if (tmsec.tm_hour*60+tmsec.tm_min > end_hour*60+end_min) {
            utc_second += (24*3600);
        }
        return frac_UTC_to_string(utc_second, 0, "%Y%m%d");

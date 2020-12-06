@@ -9,6 +9,8 @@ set(CMAKE_CXX_FLAGS "-Wall -g")
 add_definitions(-DENV="DEV")
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 
+enable_testing()
+
 add_subdirectory(util)
 add_subdirectory(pm)
 add_subdirectory(md)

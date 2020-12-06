@@ -3,6 +3,7 @@
 #include "time_util.h"
 #include <iostream>
 #include <cmath>
+#include "gtest/gtest.h"
 
 utils::CSVUtil::FileTokens erlines = {
     {"sym1", "algo1","cid1", "eid1", "0","-10","3.0", "20201004-18:33:02","", "1601850782023138"},
@@ -17,26 +18,26 @@ utils::CSVUtil::FileTokens erlines = {
     //,{"sym1", "algo2","cid3", "eid10", "4","0"  ,"0", "20201004-18:33:08","", "1601850788504031"}
 };
 
-bool load_save() {
-    utils::CSVUtil::FileTokens erlines0;
-    utils::CSVUtil::write_file(erlines0, "./eod_pos.csv",false);
+const char* RecoveryCSV="recovery.csv";
+const char* EODCSV = "eod_pos.csv";
+const std::string RecoverPath = "/tmp";
 
-    pm::PositionManager pmgr("testpm", ".");
-    utils::CSVUtil::write_file(erlines, "recovery.csv",false);
-    pmgr.loadRecovery("recovery.csv");
+TEST(PMTest,  LoadSave) {
+    utils::CSVUtil::FileTokens erlines0;
+    utils::CSVUtil::write_file(erlines0, RecoverPath+"/"+EODCSV, false);
+
+    pm::PositionManager pmgr("testpm", RecoverPath);
+    utils::CSVUtil::write_file(erlines, RecoverPath+"/"+RecoveryCSV, false);
+    pmgr.loadRecovery(RecoveryCSV);
 
     pmgr.persist();
-    pm::PositionManager pmgr2("testpm2", ".");
+    pm::PositionManager pmgr2("testpm2", RecoverPath);
 
     std::cout << pmgr.toString() << std::endl;
     std::cout << pmgr2.toString() << std::endl;
 
     std::string difflog = pmgr.diff(pmgr2);
-    if (difflog.size() != 0) {
-        std::cout << "save-load mismatch!" << std::endl;
-        std::cout << difflog << std::endl;
-        return false;
-    }
+    EXPECT_FALSE (difflog.size() != 0) << "save-load mismatch!" << std::endl << difflog;
 
     utils::CSVUtil::FileTokens erlines_update = {
     {"sym1", "algo1","cid5", "eid11", "0","10","3.0", "20201004-18:33:02","", "1601850782023138"},
@@ -51,52 +52,40 @@ bool load_save() {
     double vap, pnl;
     int64_t oqty;
     int64_t qty = pmgr.getPosition("algo1", "sym1", &vap, &pnl, &oqty);
-    if ((qty != -5) || (std::fabs(vap-2.0)>1e-10) || (std::fabs(pnl+5.0)>1e-10) || (oqty != 5)) {
-        std::cout << "getPosition algo1 sym1 mismatch!" << std::endl;
-        std::cout << pmgr.toString() << std::endl;
-        return false;
-    }
+    EXPECT_FALSE ((qty != -5) || (std::fabs(vap-2.0)>1e-10) || (std::fabs(pnl+5.0)>1e-10) || (oqty != 5)) << "getPosition algo1 sym1 mismatch!" << std::endl << pmgr.toString();
 
     // get Position of sym1
     // algo1: short 5 @ 2.0, 
     // algo2: long 1 @ 3.0
     oqty=0;
     qty = pmgr.getPosition("sym1", &vap, &pnl, &oqty);
-    if ( (qty!=-4) || (std::fabs(vap-2.0)>1e-10) || (std::fabs(pnl+6)>1e-10) || (oqty != 9) ) {
-        std::cout << "getPosition sym1 mismatch!" << std::endl;
-        std::cout << pmgr.toString() << std::endl;
-        return false;
-    }
+    EXPECT_FALSE ( (qty!=-4) || (std::fabs(vap-2.0)>1e-10) || (std::fabs(pnl+6)>1e-10) || (oqty != 9) ) << "getPosition sym1 mismatch!" << std::endl << pmgr.toString();
 
     // list Positions of algo1
     // sym1: -5, 2.0 -5.0  oo(5, 3.0)
     // sym2: -1  10.1 0.0  oo(-4, 10.1)
     const std::string algo1 ("algo1");
     auto idpvec = pmgr.listPosition(&algo1);
-    if ((idpvec.size()!=2) || 
-        (idpvec[0]->getPosition() != -5) || 
-        (idpvec[1]->getPosition() != -1)) {
-        std::cout << "listPoisition mismatch!" << std::endl;
-        for (auto& idp:idpvec) {
-            std::cout << idp->toString() << std::endl;
-        }
-        return false;
+    std::string idpvec_str;
+    for (auto& idp:idpvec) {
+        idpvec_str += (idp->toString() + "\n");
     }
+    EXPECT_FALSE ((idpvec.size()!=2) || 
+        (idpvec[0]->getPosition() != -5) || 
+        (idpvec[1]->getPosition() != -1)) << "listPoisition mismatch!" << std::endl << idpvec_str;
 
-    // 
     // list OO (2)
     
     auto oovec = pmgr.listOO(&algo1);
-    if ( (oovec.size()!= 2)  ||
+    std::string oovec_str;
+    for (auto& oo : oovec) {
+        oovec_str += (oo->toString() + "\n");
+    }
+    EXPECT_FALSE ( (oovec.size()!= 2)  ||
          (oovec[0]->m_open_qty != 5) ||
          (oovec[1]->m_open_qty != -4) ||
-         std::fabs((oovec[1]->m_open_px - 10.1) > 1e-10) ) {
-        std::cout << "listOO mismatch!" << std::endl;
-        for (auto& oo : oovec) {
-            std::cout << oo->toString() << std::endl;
-        }
-        return false;
-    }
+         std::fabs((oovec[1]->m_open_px - 10.1) > 1e-10) ) << "listOO mismatch!" << std::endl << oovec_str;
+
 
     // reconcile
     utils::CSVUtil::FileTokens erlines_update2 = {
@@ -104,67 +93,52 @@ bool load_save() {
     {"sym2", "algo1","cid4", "eid13", "2","-4","10.1", "20201004-18:33:02","", "1601850782023138"}
     };
 
-    utils::CSVUtil::write_file(erlines_update, "./recovery.csv",false);
-    utils::CSVUtil::write_file(erlines_update2,"./recovery.csv",true);
+    utils::CSVUtil::write_file(erlines_update, RecoverPath+"/"+RecoveryCSV, false);
+    utils::CSVUtil::write_file(erlines_update2, RecoverPath+"/"+RecoveryCSV, true);
 
 
-    bool ret=pmgr.reconcile("recovery.csv", difflog, true);
+    // expect reconcile to fail
+    bool ret=pmgr.reconcile(RecoveryCSV, difflog, true);
     std::cout << "reconcile diff: " << difflog << std::endl;
-    if (ret) {
-        std::cout << "reconcile mismatch!" << std::endl;
-        return false;
-    }
+    EXPECT_FALSE (ret) << "reconcile mismatch!";
 
     // list Positions of algo1
     // sym1: -5, 2.0 -5.0  oo(5, 3.0)
     // sym2: -5  10.1 0.0  oo()
     idpvec = pmgr.listPosition(&algo1);
-    if ((idpvec.size()!=2) || 
+    EXPECT_FALSE ((idpvec.size()!=2) || 
         (idpvec[0]->getPosition() != -5) || 
-        (idpvec[1]->getPosition() != -5)) {
-        std::cout << "reconciled listPoisition mismatch!" << std::endl;
-        for (auto& idp:idpvec) {
-            std::cout << idp->toString() << std::endl;
-        }
-        return false;
+        (idpvec[1]->getPosition() != -5)) << "reconciled listPoisition mismatch!";
+
+    for (auto& idp:idpvec) {
+        std::cout << idp->toString() << std::endl;
     }
 
     // 
     // list OO (1)
     
     oovec = pmgr.listOO(&algo1);
-    if ( (oovec.size()!= 1)  ||
+    EXPECT_FALSE ( (oovec.size()!= 1)  ||
          (oovec[0]->m_open_qty != 5) ||
-         std::fabs((oovec[0]->m_open_px - 3.0) > 1e-10) ) {
-        std::cout << "listOO mismatch!" << std::endl;
-        for (auto& oo : oovec) {
-            std::cout << oo->toString() << std::endl;
-        }
-        return false;
+         std::fabs((oovec[0]->m_open_px - 3.0) > 1e-10) ) << "listOO mismatch!";
+
+    for (auto& oo : oovec) {
+        std::cout << oo->toString() << std::endl;
     }
 
     // get pnl
     pnl = pmgr.getPnl(&algo1);
-    if (std::fabs(pnl+5.0)>1e-10) {
-        std::cout << "reconcile pnl mismatch! " << pnl << std::endl;
-        return false;
-    }
-
+    EXPECT_FALSE (std::fabs(pnl+5.0)>1e-10) << "reconcile pnl mismatch! " << pnl;
 
     idpvec = pmgr.listPosition();
-    if (idpvec.size()!= 3) {
-        std::cout << "reconcile position mismatch! " << std::endl;
-        for (auto& idp : idpvec) {
-            std::cout << idp->toString() << std::endl;
-        }
-        return false;
+    EXPECT_FALSE (idpvec.size()!= 3) << "reconcile position mismatch! ";
+
+    for (auto& idp : idpvec) {
+        std::cout << idp->toString() << std::endl;
     }
-    return true;
 };
 
-int main() {
-    if (load_save()) {
-        std::cout << "all good!" << std::endl;
-    }
-    return 0;
+int main(int argc, char** argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

@@ -74,7 +74,7 @@ public:
     }
 
     int start_hour(const std::string& venue) const { 
-        return findValue(venue, 0) % 24;
+        return SMOD(findValue(venue, 0), 24);
     }
 
     int start_min (const std::string& venue) const {
@@ -153,16 +153,15 @@ private:
                 logError("Venue Reading Error for %s: wrong size.", v.c_str());
                 throw std::runtime_error("Venue Reading Error!");
             }
-            int sh = (std::stoi(hm[0]) % 24);
+            int sh = std::stoi(hm[0]);
             int sm = std::stoi(hm[1]);
-            int eh = (std::stoi(hm[2]) % 24);
+            int eh = std::stoi(hm[2]);
             int em = std::stoi(hm[3]);
-            if (em < 0 || sm < 0) {
+            if (eh < 0 || em < 0 || sm < 0 ||
+                (eh-sh > 24) || (sh > eh)) {
                 logError("Venue %s minutes negative!", v.c_str());
                 throw std::runtime_error("Venue minutes negative!");
             }
-
-            if (sh > eh) { sh = 24 - sh ; }
             std::vector<int> hv {sh, sm, eh, em};
             venue_map.emplace(v, hv);
         }

@@ -167,12 +167,21 @@ public:
     bool readPeriod(std::vector<std::shared_ptr<BarPrice> >& bars, time_t start_bartime, time_t end_bartime) const {
         // getting bars from start_bartime to end_bartime, inclusive
         // Note the bars are appended to the given vector of bars
-        
+
         if (start_bartime > end_bartime) {
             logError("bad period given to readPeriod: %lu - %lu", 
                     (unsigned long) start_bartime, (unsigned long) end_bartime);
             return false;
         }
+
+        // times have to be a bar time
+        if ((start_bartime/barsec*barsec != start_bartime) ||
+            (end_bartime/barsec*barsec != end_bartime)) {
+            logError("start_time %d or end_time %d not a bar time of %d", 
+                    (int) start_bartime, (int) end_bartime, barsec);
+            return false;
+        }
+
         FILE* fp_ = fopen(fn.c_str(), "rt");
         if (!fp_) {
             logError("Failed to read bar file %s", fn.c_str());
@@ -213,10 +222,21 @@ public:
             return false;
         }
 
+        // times have to be a bar time
+        if ((start_bartime/barsec*barsec != start_bartime) ||
+            (end_bartime/barsec*barsec != end_bartime)) {
+            logError("start_time %d or end_time %d not a bar time of %d", 
+                    (int) start_bartime, (int) end_bartime, barsec);
+            return false;
+        }
+
         // remove all bars outside of venue's trading time
         std::vector<std::shared_ptr<BarPrice> > allb;
         for (auto& bp: allbars) {
-            if (VenueConfig::get().isTradingTime(bcfg.venue, bp->bar_time)) {
+            // this is a hack to avoid excluding the last bar at end time
+            // and to avoid including first bar at start time
+            time_t bar_time_ = bp->bar_time-1;
+            if (VenueConfig::get().isTradingTime(bcfg.venue, bar_time_)) {
                 allb.emplace_back(bp);
             }
         }
@@ -231,7 +251,7 @@ public:
         }
 
         size_t bcnt = 0;
-        auto& bp0 = allb[0];
+        auto bp0 = allb[0];
         time_t bt = start_bartime;
         BarPrice fill(*bp0);
 
@@ -261,7 +281,7 @@ public:
                 bp0 = allb[++bcnt];
             }
             if (bp0->bar_time > bt) {
-                auto& bp1 = allb[bcnt-1];
+                auto bp1 = allb[bcnt-1];
                 // fill with bp1 from bt to (not including) bp0->bar_time
                 fill = *bp1;
                 fill.writeAndRoll(bt);
@@ -289,6 +309,17 @@ public:
                 throw std::runtime_error("BarReader barsec mismatch " + bcfg.toString());
             }
         }
+
+        // forward fill into bar times not covered by allb
+        if (bt <= end_bartime) {
+            fill = *allb[allb.size()-1];
+            while (bt <= end_bartime) {
+                fill.writeAndRoll(bt);
+                bars.emplace_back(new BarPrice(fill));
+                bt += barsec;
+            }
+        }
+
         return true;
     }
 

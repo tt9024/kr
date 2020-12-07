@@ -2,7 +2,7 @@
 add_executable(time_test time_test.cpp)
 target_link_libraries(time_test PRIVATE gtest gtest_main rt pthread)
 set_target_properties(time_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
-add_test(NAME time_est COMMAND 
+add_test(NAME time_test COMMAND 
     $<TARGET_FILE:time_test>
 )
 

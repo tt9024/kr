@@ -185,7 +185,6 @@ struct BookConfig {
 
     BookConfig(const std::string& v, const std::string& s, const std::string& bt) :
         venue(v), symbol(s), type(bt) {
-        logInfo("BookConfig %s", toString().c_str());
     };
 
     // construct by venue/symbol and a book type: "L1 or L2"

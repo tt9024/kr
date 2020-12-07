@@ -40,6 +40,10 @@ public:
                 std::string(".txt");
     }
 
+    static void setConfigPath(const char* cfg_path) {
+        ConfigFilePath = cfg_path;
+    }
+
     static PLCC& instance(const char* instname=NULL) {
         // note this is NOT thread safe
         static std::map<std::string, PLCC*>plcc_map;

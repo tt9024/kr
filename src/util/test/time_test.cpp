@@ -147,6 +147,13 @@ TEST (TimeTest, TradingDayETFOffset) {
     }
 }
 
+TEST (TimeTest, FmtStr) {
+    const char* td = "20201207";
+    time_t utc_td = utils::TimeUtil::string_to_frac_UTC(td, 0, "%Y%m%d");
+    auto td_str = utils::TimeUtil::frac_UTC_to_string(utc_td, 0, "%Y%m%d");
+    EXPECT_STREQ(td, td_str.c_str());
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

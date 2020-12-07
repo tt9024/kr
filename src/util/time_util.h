@@ -59,6 +59,7 @@ public:
        uint64_t frac_mul = 1;
        for (int i=frac_decimals; i>0; --i, frac_mul*=10);
        struct tm time_tm;
+       memset(&time_tm, 0, sizeof(struct tm));
        char* p = strptime(str_buf, fmt_str, &time_tm);
        if (!p) {
            return 0;
@@ -100,6 +101,7 @@ public:
 
        time_t sec = (time_t) (utc_frac_mul/frac_mul);
        struct tm t;
+       memset(&t, 0, sizeof(struct tm));
        size_t bytes = 0;
 
        if (localtime_r(&sec, &t)) {

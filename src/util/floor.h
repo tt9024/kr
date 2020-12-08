@@ -21,7 +21,7 @@ namespace utils {
         public:
             // a stateless message that doesn't demand response
             int type;
-            uint64_t ref;
+            mutable uint64_t ref;
             char* buf;
             size_t data_size;
         private: 
@@ -89,6 +89,10 @@ namespace utils {
 
             bool refSet() const {
                 return ref != NOREF;
+            }
+
+            void removeRef() const {
+                ref = NOREF;
             }
 
             void reserve(size_t data_size_) {
@@ -262,7 +266,7 @@ namespace utils {
                 // create a new reader (position sync'ed), send the request, record the sending 
                 // position as reference, scan through the read queue for a message matching with referece
                 // return true if found within timeout, otherwise, false
-                
+                req.removeRef();
                 std::shared_ptr<QType::Reader> reader(_qin->newReader());  //this sync the read position to latest
                 utils::QPos pos_ref = update(req);
 
@@ -306,8 +310,6 @@ namespace utils {
                     QStatus status = reader->takeNextPtr(buf, bytes);
                     if (status == utils::QStat_OK) {
                         msg->type = readMessage(buf, &(msg->ref));
-
-                        // enforce the refid assignment on all incoming messags
                         if (! msg->refSet()) {
                             msg->ref = reader->getReadPos();
                         }

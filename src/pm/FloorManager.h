@@ -2,6 +2,11 @@
 
 #include "FloorBase.h"
 #include "PositionManager.h"
+#include "rate_limiter.h"
+#include <unordered_map>
+
+#define RateLimitTimeWindow 10
+#define RateLimitCount 5
 
 namespace pm {
     class FloorManager: public FloorBase {
@@ -30,6 +35,7 @@ namespace pm {
         time_t m_loaded_time;
         std::string m_recovery_file;
         std::vector<FloorBase::PositionInstruction> m_posInstr;
+        std::unordered_map<std::string, utils::RateLimiter<RateLimitCount-1> > m_rateLimiter;
 
         explicit FloorManager(const std::string& name);
         FloorManager(const FloorManager& mgr) = delete;
@@ -52,6 +58,9 @@ namespace pm {
         // helpers to send requests
         bool requestReplay(const std::string& loadUtc, std::string* errstr = nullptr);
         bool requestOpenOrder(std::string* errstr=nullptr);
+
+        // helpers to check order sending rate
+        uint64_t rateCheck(const std::string& algo);
 
         // this allows for base to call handleMessage
         friend class FloorBase;

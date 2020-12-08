@@ -271,6 +271,8 @@ namespace pm {
     }
 
     void FloorManager::handlePositionInstructions() {
+        std::vector<FloorBase::PositionInstruction> delayed_pi;
+
         for (auto& pi : m_posInstr) {
             fprintf(stderr, "Got instruction: %s\n", pi.toString().c_str());
 
@@ -293,6 +295,18 @@ namespace pm {
                     if (trade_qty != 0) {
                         bool isBuy = (trade_qty > 0);
                         trade_qty = (isBuy? trade_qty : -trade_qty);
+
+                        if (rateCheck(pi.algo) > 0) {
+                            // trade too hot, wait
+                            //fprintf(stderrr, "Position Instruction %s breached rate limit", pi.toString());
+                            delayed_pi.emplace_back(std::move(pi));
+                            break;
+                        }
+                        /*
+                        if (riskCheck(pi.algo, pi.symbol, pi.qty, trade_qty)) {
+                        }
+                        */
+
                         auto errstr = sendOrder(isBuy, pi.algo, pi.symbol, trade_qty, pi.px);
                         if (errstr.size() > 0) {
                             fprintf(stderr, "Error sending order: %s\n", errstr.c_str());
@@ -313,6 +327,19 @@ namespace pm {
             }
         }
         m_posInstr.clear();
+        for (auto& pi:delayed_pi) {
+            m_posInstr.emplace_back(std::move(pi));
+        }
+    }
+
+    uint64_t FloorManager::rateCheck(const std::string& algo) {
+        auto iter = m_rateLimiter.find(algo);
+        if (__builtin_expect(iter == m_rateLimiter.end(), 0)) {
+            // TODO - put to configure
+            m_rateLimiter.emplace(algo, RateLimitTimeWindow);
+            iter = m_rateLimiter.find(algo);
+        }
+        return iter->second.check(0,true);
     }
 
     std::string FloorManager::sendOrderByString(const char* bsstr, int str_size) {

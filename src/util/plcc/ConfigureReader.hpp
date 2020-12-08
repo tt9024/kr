@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string>
 #include <stdexcept>
+#include <vector>
 #include <map>
 
 namespace utils {

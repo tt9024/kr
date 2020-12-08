@@ -43,7 +43,7 @@ namespace pm {
         void addPositionSubscriptions();
         void handleExecutionReport(const MsgType& msg);
         void handleUserReq(const MsgType& msg);
-        void handlePositionReq(const MsgType msg);
+        void handlePositionReq(const MsgType& msg);
         void handlePositionInstructions();
         std::string sendOrderByString(const char* bsstr, int size);
         std::string sendOrder(const bool isBuy, const char* algo, 

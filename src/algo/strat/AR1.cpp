@@ -63,7 +63,7 @@ namespace algo {
             logError("%s failed to setup trigger time or"
                     "update state, not started!", m_name.c_str());
             onStop(cur_micro);
-            setShouldRun(false);
+            setShouldRun(true);
             return;
         }
     }
@@ -110,7 +110,8 @@ namespace algo {
         // update snap
         getSnap(m_symid, m_state._bookL1);
         getNextBar(m_symid, m_state._last_updated, m_state._barHist);
-        m_state._last_updated = (time_t)(cur_micro/1000000ULL);
+        size_t sz = m_state._barHist.size();
+        m_state._last_updated = m_state._barHist[sz-1]->bar_time;
 
         int64_t qty_done, qty_open;
         if (!getPosition(m_symid, qty_done, qty_open)) {
@@ -125,7 +126,13 @@ namespace algo {
         // initialize the bar history
         m_state._barHist.clear();
         getHistBar(m_symid, m_param->_lookback, m_state._barHist);
-        m_state._last_updated = (time_t)(cur_micro/1000000ULL);
+        size_t sz = m_state._barHist.size();
+        if (sz==0) {
+            m_state._last_updated = (time_t)(cur_micro/1000000ULL)/m_param->_barsec*m_param->_barsec;
+            logError("AR1 failed to get any history data!");
+        } else {
+            m_state._last_updated = m_state._barHist[sz-1]->bar_time;
+        }
         m_state._curPos = 0;
         return true;
     }
@@ -219,6 +226,25 @@ namespace algo {
             f0 += (m_param->_A1Coef[i] * lr);
         }
         fcst._logRet = f0;
+        
+        // dump the ru
+
+        char buf[512];
+        size_t bytes = 0;
+        for (size_t i = 0; i<  m_param->_lookback; ++i) {
+            bytes += snprintf(buf+bytes, sizeof(buf)-bytes, " (%lu, %lf, %lf) ", 
+                    (unsigned long)m_state._barHist[sz-i-1]->bar_time, 
+                                   m_state._barHist[sz-i-1]->close, 
+                                   std::log
+                                   (
+                                       (double)m_state._barHist[sz-1-i]->open /
+                                       (double)m_state._barHist[sz-1-i]->close
+                                   )
+                              );
+        }
+        logInfo("AR1 got bar: %s", buf);
+        logInfo("AR1 got forecast: %lf\n", fcst._logRet);
+
         return true;
     }
 

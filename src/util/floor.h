@@ -306,6 +306,8 @@ namespace utils {
                     QStatus status = reader->takeNextPtr(buf, bytes);
                     if (status == utils::QStat_OK) {
                         msg->type = readMessage(buf, &(msg->ref));
+
+                        // enforce the refid assignment on all incoming messags
                         if (! msg->refSet()) {
                             msg->ref = reader->getReadPos();
                         }

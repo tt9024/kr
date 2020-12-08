@@ -606,7 +606,7 @@ public:
         uint64_t cur_micro = TimerType::cur_micro();
         uint64_t next_sec = (cur_micro/1000000ULL + 2ULL) * 1000000ULL;
         const int64_t max_sleep_micro = 1000*50;
-        const int64_t min_sleep_micro = 200;
+        const int64_t min_sleep_micro = 400;
         while (m_should_run) {
             // do update for all
             bool has_update = false;

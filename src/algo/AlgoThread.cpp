@@ -104,21 +104,17 @@ namespace algo {
                 const char* cmd = msg_in.buf;
                 const auto tk = utils::CSVUtil::read_line(cmd, ' ');
                 const auto& sn(tk[0]);
-                const auto& c(tk[1]);
-
-                if (m_algo_map.find(sn) == m_algo_map.end()) {
-                    logError("Strategy %s not found!", sn.c_str());
-                    respstr = "Strategy " + sn + " not found!";
-                    break;
+                if (strcmp(sn.c_str(), "L")==0) {
+                    respstr = toString();
+                    logInfo("List loaded: %s", respstr.c_str());
                 } else {
-                    switch (c[0]) {
-                    case 'L':
-                    {
-                        respstr = toString();
-                        logInfo("List loaded: %s", respstr.c_str());
+                    if (m_algo_map.find(sn) == m_algo_map.end()) {
+                        logError("Strategy %s not found!", sn.c_str());
+                        respstr = "Strategy " + sn + " not found!";
                         break;
-                    }
-
+                    };
+                    const auto& c(tk[1]);
+                    switch (c[0]) {
                     case 'S':
                     {
                         logInfo("Starting strategy %s", sn.c_str());
@@ -155,6 +151,7 @@ namespace algo {
                 m_msgout.ref = msg_in.ref;
                 m_msgout.copyString(respstr);
                 m_channel->update(m_msgout);
+                break;
             }
             default :
                 logError("Unknown message type received: %s", msg_in.toString().c_str());

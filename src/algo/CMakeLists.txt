@@ -27,3 +27,9 @@ add_executable(strat_run
     )
 target_link_libraries(strat_run PUBLIC rt pthread algolib ar1)
 
+add_executable(floor_pos_test  test/test_base.cpp)
+target_link_libraries(floor_pos_test PRIVATE gtest gtest_main rt pthread algolib)
+set_target_properties(floor_pos_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
+#add_test(NAME floor_pos_test COMMAND 
+#    $<TARGET_FILE:floor_pos_test>
+#)

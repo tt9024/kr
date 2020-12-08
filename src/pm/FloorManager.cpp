@@ -161,11 +161,11 @@ namespace pm {
                     // Below commands have message type
                     // "FloorBase::AlgoUserCommand"
                     // They are handled by AlgoThread
-                    "@L \n\tlist loaded strategies"
-                    "@strat_name S\n\tstart strat_name"
-                    "@strat_name E\n\tstop strat_name"
-                    "@strat_name D\n\tdump pmarameters and state of strat_name"
-                    "@state_name R config_file\n\tstop, reload with config_file and start"
+                    "@L \n\tlist loaded strategies\n"
+                    "@strat_name S\n\tstart strat_name\n"
+                    "@strat_name E\n\tstop strat_name\n"
+                    "@strat_name D\n\tdump pmarameters and state of strat_name\n"
+                    "@state_name R config_file\n\tstop, reload with config_file and start\n"
                     "H\n\tlist of commands supported\n");
 
         switch (cmd[0]) {
@@ -244,7 +244,7 @@ namespace pm {
         }
     }
 
-    void FloorManager::handlePositionReq(const MsgType msg) {
+    void FloorManager::handlePositionReq(const MsgType& msg) {
         // handles both GetPositionReq and SetPositionReq
         m_msgout.ref = msg.ref;
         if (msg.type == FloorBase::GetPositionReq) {

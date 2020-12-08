@@ -33,7 +33,7 @@ namespace algo {
 
     // out-going updates
     bool AlgoBase::getPosition(int symid, int64_t& qty_done, int64_t& qty_open) {
-        static pm::FloorBase::MsgType msgreq(pm::FloorBase::GetPositionReq, nullptr, 0, 0), msgresp;
+        static pm::FloorBase::MsgType msgreq(pm::FloorBase::GetPositionReq, nullptr, 0), msgresp;
 
         const auto& sinfo (m_symbols[symid]);
         const pm::FloorBase::PositionRequest pr(m_name, sinfo->_bcfg.symbol, 0, 0);
@@ -89,7 +89,7 @@ namespace algo {
     }
 
     bool AlgoBase::setPosition(const pm::FloorBase::PositionInstruction& pi) {
-        static pm::FloorBase::MsgType msgreq(pm::FloorBase::SetPositionReq, nullptr, 0, 0), msgresp;
+        static pm::FloorBase::MsgType msgreq(pm::FloorBase::SetPositionReq, nullptr, 0), msgresp;
 
         msgreq.copyData((const char*)&pi, sizeof(pm::FloorBase::PositionInstruction));
         msgresp.copyString("");

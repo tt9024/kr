@@ -121,7 +121,7 @@ public:
             throw std::runtime_error("Venue not found!");
         }
         const auto& hm = iter->second;
-        const auto curDay = utils::TimeUtil::tradingDay(cur_utc, hm[0], hm[1], hm[2], hm[3]);
+        const auto curDay = utils::TimeUtil::tradingDay(cur_utc, hm[0], hm[1], hm[2], hm[3], 0, snap);
         time_t sutc = utils::TimeUtil::string_to_frac_UTC(curDay.c_str(), 0, "%Y%m%d");
         return std::pair<time_t, time_t>( 
                 sutc + hm[0]*3600 + hm[1]*60, 

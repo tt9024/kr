@@ -431,6 +431,8 @@ public:
     }
 
     void resetTradingDay(time_t cur_second) {
+        logInfo("reset trading day on %lu (%s)", (unsigned long) cur_second, 
+                utils::TimeUtil::frac_UTC_to_string(cur_second, 0).c_str());
         auto bsv = m_bcfg.barsec_vec();
 
         // get the start stop utc for current trading day, snap to future
@@ -456,7 +458,7 @@ public:
                 due = sutc+bs;
             } else if (due > eutc) {
                 // this should never happen!
-                logError("%s %d second BarWriter next due %ld (%s) outside trading session,"
+                logError("%s %d second BarWriter next due %lu (%s) outside trading session,"
                         "skip to next open %lu (%s)",
                         m_bcfg.venue.c_str(), bs, 
                         (unsigned long) due, 
@@ -471,6 +473,7 @@ public:
             binfo->start = sutc;
             binfo->end = eutc;
             logInfo("%s %d Second BarWriter next due %lu (%s)", m_bcfg.venue.c_str(),
+                    (int) bs,
                     (unsigned long) binfo->due,
                     utils::TimeUtil::frac_UTC_to_string(binfo->due, 0).c_str());
         }

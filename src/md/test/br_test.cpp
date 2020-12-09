@@ -26,9 +26,10 @@ public:
             // write the venue config to /tmp/venue.cfg
             std::ofstream ofs;
             ofs.open (VENUEFile, std::ofstream::out | std::ofstream::trunc);
-            ofs << "VenueList = [ CME, ICE]" << std::endl;
+            ofs << "VenueList = [ CME, ICE, NYSE]" << std::endl;
             ofs << "CME   = [ -6, 0, 17, 0 ]" << std::endl;
             ofs << "ICE   = [ -4, 30, 17, 15 ]" << std::endl;
+            ofs << "NYSE   = [ 9, 30, 16, 15 ]" << std::endl;
         }
 
         // set the config path NOW!
@@ -115,6 +116,54 @@ TEST_F (BRFixture, ReadBackwardForward) {
     EXPECT_DOUBLE_EQ(barHist[11]->close, px);
     EXPECT_DOUBLE_EQ(barHist[10]->close, px);
     EXPECT_DOUBLE_EQ(barHist[9]->close, px-0.1);
+};
+
+TEST_F (BRFixture, VenueConfig) {
+    auto& vc = md::VenueConfig::get();
+
+    // CME at Friday's 16:59:59
+    {
+        time_t t1 = utils::TimeUtil::string_to_frac_UTC("20201204-16:59:59", 0);
+        time_t ts = utils::TimeUtil::string_to_frac_UTC("20201203-18:00:00", 0);
+        time_t te = utils::TimeUtil::string_to_frac_UTC("20201204-17:00:00", 0);
+        auto se_pair = vc.startEndUTC("CME", t1, 2);
+        EXPECT_TRUE(vc.isTradingTime("CME", t1));
+        EXPECT_EQ(ts, se_pair.first);
+        EXPECT_EQ(te, se_pair.second);
+    }
+
+    // CME at Friday's 17:00:01
+    {
+        time_t t1 = utils::TimeUtil::string_to_frac_UTC("20201204-17:00:01", 0);
+        time_t ts = utils::TimeUtil::string_to_frac_UTC("20201206-18:00:00", 0);
+        time_t te = utils::TimeUtil::string_to_frac_UTC("20201207-17:00:00", 0);
+        auto se_pair = vc.startEndUTC("CME", t1, 2);
+        EXPECT_FALSE(vc.isTradingTime("CME", t1));
+        EXPECT_EQ(ts, se_pair.first);
+        EXPECT_EQ(te, se_pair.second);
+    }
+
+    // NYSE at Monday's 09:29:59
+    {
+        time_t t1 = utils::TimeUtil::string_to_frac_UTC("20201207-09:29:59", 0);
+        time_t ts = utils::TimeUtil::string_to_frac_UTC("20201204-09:30:00", 0);
+        time_t te = utils::TimeUtil::string_to_frac_UTC("20201204-16:15:00", 0);
+        auto se_pair = vc.startEndUTC("NYSE", t1, 1);  // snap back
+        EXPECT_FALSE(vc.isTradingTime("NYSE", t1));
+        EXPECT_EQ(ts, se_pair.first);
+        EXPECT_EQ(te, se_pair.second);
+    }
+
+    // NYSE at Monday's 16:14:59
+    {
+        time_t t1 = utils::TimeUtil::string_to_frac_UTC("20201207-16:14:59", 0);
+        time_t ts = utils::TimeUtil::string_to_frac_UTC("20201207-09:30:00", 0);
+        time_t te = utils::TimeUtil::string_to_frac_UTC("20201207-16:15:00", 0);
+        auto se_pair = vc.startEndUTC("NYSE", t1, 0); // snap current
+        EXPECT_TRUE(vc.isTradingTime("NYSE", t1));
+        EXPECT_EQ(ts, se_pair.first);
+        EXPECT_EQ(te, se_pair.second);
+    }
 }
 
 int main(int argc, char** argv) {

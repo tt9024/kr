@@ -383,17 +383,23 @@ private:
     BarPrice bp;
 
     BarPrice getLatestBar() {
-        char buf[2][256];
-        buf[0][0] = 0;
-        buf[1][0] = 0;
-        int i = 0;
+        char buf[512];
+        buf[0] = 0;
         try {
-            while (fgets(buf[i]  , sizeof(buf[i])-1, fp)) {
-                i = (i+1)%2 ; 
-            };
-            i = (i+1)%2;
-            if (strlen(buf[i]) > 0)
-                return BarPrice(std::string(buf[i]));
+            // For non-traditional Linux device,
+            // such as AWS, fseek/ftell
+            // is necessary to refresh read stream
+            auto pos = ftell(fp);
+            fseek(fp, 0, SEEK_END);
+            auto pos_end = ftell(fp);
+            if (pos_end > pos) {
+                // new updates
+                fseek(fp, pos, SEEK_SET);
+                while (fgets(buf, sizeof(buf)-1, fp));
+                return BarPrice(std::string(buf));
+            } else if (pos_end < pos) {
+                logError("Bar file %s truncated!", fn.c_str());
+            }
         } catch (const std::exception & e) {
             logError("failed to get last bar price from %s: %s", fn.c_str(), e.what());
         }

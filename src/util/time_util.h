@@ -39,7 +39,9 @@ public:
      return len;
    };
 
-   static uint64_t string_to_frac_UTC(const char* str_buf, int frac_decimals=0, const char* fmt_str="%Y%m%d-%H:%M:%S") {
+   static uint64_t string_to_frac_UTC(const char* str_buf, int frac_decimals=0, 
+           const char* fmt_str="%Y%m%d-%H:%M:%S", 
+           bool string_as_gmt = false) {
        // expects a UTC time string like YYYYMMDD-HH:MM:SS.ssssss
        // the .ssssss part, if found, is taken as a fraction.
        // returns the utc * frac_mul + fraction * frac_mul,
@@ -52,9 +54,16 @@ public:
        //         returns utc of "20201123-09:30:00"
        // 3. string_to_frac_UTC( "20201123-09:30:00", 3)
        //         returns utc of "20201123-09:30:00" * 1000
+       //
+       // If string_as_gmt is true, take string as a gmt time,
+       // otherwise, take the string as a local time.
 
        if (frac_decimals<0 || frac_decimals>9) {
            throw std::runtime_error("frac_decimals out-of-range: " + std::to_string(frac_decimals));
+       }
+       if (__builtin_expect(fmt_str==NULL,0)) {
+           // allow NULL as default
+           fmt_str = "%Y%m%d-%H:%M:%S";
        }
        uint64_t frac_mul = 1;
        for (int i=frac_decimals; i>0; --i, frac_mul*=10);
@@ -65,7 +74,13 @@ public:
            return 0;
        }
        time_tm.tm_isdst = -1;
-       uint64_t tsf = (uint64_t)mktime(&time_tm) * frac_mul;
+       uint64_t tsf;
+       if (__builtin_expect(string_as_gmt, 0)) {
+           tsf = (uint64_t) timegm(&time_tm) * frac_mul;
+       } else {
+           tsf = (uint64_t) mktime(&time_tm) * frac_mul;
+       }
+
        if(*p=='.') {
            double f = std::stod("0"+std::string(p));
            tsf+=(uint64_t)(f*(double)frac_mul);
@@ -73,14 +88,22 @@ public:
        return tsf;
    };
 
-   static size_t frac_UTC_to_string(uint64_t utc_frac_mul, char* char_buf, int buf_size, int frac_decimals=0, const char* fmt_str="%Y%m%d-%H:%M:%S") {
+   static size_t frac_UTC_to_string(uint64_t utc_frac_mul, char* char_buf, int buf_size, int frac_decimals=0, 
+           const char* fmt_str="%Y%m%d-%H:%M:%S", 
+           bool string_as_gmt = false) {
        // expects utc_frac_mul = whole_seconds * frac_mul + frac_seconds
        // where frac_mul=10**frac_decimals
        // ret YYYYMMDD-HHMMSS.sss, where 0.sss = frac_seconds/frac_mul
        // set the utc_frac_mul to 0 for the current time
+       // return local time string if string_as_gmt is false, 
+       // otherwise, return gmt time string
 
        if (frac_decimals<0 || frac_decimals>9) {
            throw std::runtime_error("frac_decimals out-of-range: " + std::to_string(frac_decimals));
+       }
+       if (__builtin_expect(fmt_str==NULL,0)) {
+           // allow NULL as default
+           fmt_str = "%Y%m%d-%H:%M:%S";
        }
        uint64_t frac_mul = 1;
        for (int i=frac_decimals; i>0; --i, frac_mul*=10);
@@ -103,8 +126,15 @@ public:
        struct tm t;
        memset(&t, 0, sizeof(struct tm));
        size_t bytes = 0;
+       char_buf[0] = 0;
 
-       if (localtime_r(&sec, &t)) {
+       bool ok;
+       if (__builtin_expect(string_as_gmt, 0)) {
+           ok = gmtime_r(&sec, &t) != NULL;
+       } else {
+           ok = localtime_r(&sec, &t) != NULL;
+       }
+       if (ok) {
            bytes = strftime(char_buf, buf_size, fmt_str, &t);
            double frac = (double)(utc_frac_mul%frac_mul)/(double)frac_mul;
            std::string fmt = "%.0"+std::to_string(frac_decimals)+"lf";
@@ -115,9 +145,12 @@ public:
        return bytes;
    };
 
-   static std::string frac_UTC_to_string(uint64_t utc_frac_mul=0, int frac_decimals=0, const char* fmt_str="%Y%m%d-%H:%M:%S") {
+   static std::string frac_UTC_to_string(uint64_t utc_frac_mul=0, int frac_decimals=0, 
+           const char* fmt_str="%Y%m%d-%H:%M:%S", 
+           bool string_as_gmt = false) {
+       // see notes above
        char buf[32];
-       frac_UTC_to_string(utc_frac_mul, buf, sizeof(buf), frac_decimals, fmt_str);
+       frac_UTC_to_string(utc_frac_mul, buf, sizeof(buf), frac_decimals, fmt_str, string_as_gmt);
        return std::string(buf);
    }
     

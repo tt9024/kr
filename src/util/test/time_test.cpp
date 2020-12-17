@@ -154,6 +154,23 @@ TEST (TimeTest, FmtStr) {
     EXPECT_STREQ(td, td_str.c_str());
 }
 
+TEST (TimeTest, GMTTime) {
+    time_t ts0[] = { 1604214000, 1583650800 };
+    const char* ts1[] = {
+        "20201101-07:00:00",
+        "20200308-07:00:00.126",
+    };
+    EXPECT_EQ(ts0[0],
+            utils::TimeUtil::string_to_frac_UTC(ts1[0],0,NULL,true));
+    EXPECT_EQ(ts0[1] * 100 + 12,
+            utils::TimeUtil::string_to_frac_UTC(ts1[1],2,NULL,true));
+
+    EXPECT_STREQ(utils::TimeUtil::frac_UTC_to_string(ts0[0],0,NULL,true).c_str(),
+            ts1[0]);
+    EXPECT_STREQ(utils::TimeUtil::frac_UTC_to_string(ts0[1]*1000+126, 3, NULL, true).c_str(),
+            ts1[1]);
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

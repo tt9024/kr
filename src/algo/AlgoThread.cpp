@@ -6,9 +6,9 @@ namespace algo {
     AlgoThread::AlgoThread(const std::string& inst, const std::string& cfg)
     : FloorBase(inst, true), m_inst(inst), m_floor(inst+"_client", false), m_should_run(false) {
         auto vc = utils::ConfigureReader(cfg.c_str());
-        auto al = vc.getStringArr("RunList");
+        auto al = vc.getArr<std::string>("RunList");
         for (const auto& a : al) {
-            const auto ac = vc.getStringArr(a.c_str());
+            const auto ac = vc.getArr<std::string>(a.c_str());
             // expect [class_name, config_file]
             addAlgo(a, ac[0], ac[1]);
         }

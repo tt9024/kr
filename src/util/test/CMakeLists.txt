@@ -21,6 +21,13 @@ add_test(NAME rate_test COMMAND
     $<TARGET_FILE:rate_test>
 )
 
+add_executable(config_test  config_test.cpp)
+target_link_libraries(config_test PRIVATE gtest gtest_main utils rt pthread)
+set_target_properties(config_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
+add_test(NAME config_test COMMAND 
+    $<TARGET_FILE:config_test>
+)
+
 # qtest is a manual test
 add_executable(qtest qtest_shm.cpp)
 target_include_directories(qtest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -139,14 +139,14 @@ namespace algo {
 
     AR1::AR1Param::AR1Param(const std::string& cfg, time_t cur_utc) {
         auto vc = utils::ConfigureReader(cfg.c_str());
-        auto vl = vc.getStringArr("A1");
+        auto vl = vc.getArr<std::string>("A1");
         // expect to be in format, i.e. [ NYM, CLF1, L1, 300 ]
         _bcfg = std::make_shared<md::BookConfig>(vl[0], vl[1], vl[2]);
         _barsec = std::stoi(vl[3]);
 
         // getting the start/stop time for current (or next) trading day
-        auto start_str = utils::CSVUtil::read_line(vc.getString("StartTime"), ':');
-        auto end_str   = utils::CSVUtil::read_line(vc.getString("EndTime"), ':');
+        auto start_str = utils::CSVUtil::read_line(vc.get<std::string>("StartTime"), ':');
+        auto end_str   = utils::CSVUtil::read_line(vc.get<std::string>("EndTime"), ':');
         int sh = std::stoi(start_str[0]);
         int sm = std::stoi(start_str[1]);
         int eh = std::stoi(end_str[0]);
@@ -164,9 +164,9 @@ namespace algo {
         time_t day_utc = (time_t) utils::TimeUtil::string_to_frac_UTC(day.c_str(), 0, "%Y%m%d");
         _start_utc = day_utc + ((sh*60) + sm)*60;
         _end_utc = day_utc + ((eh*60) + em)*60;
-        _max_pos = vc.getInt("MaxPos");
+        _max_pos = vc.get<int>("MaxPos");
 
-        auto cl = vc.getStringArr("Coef");
+        auto cl = vc.getArr<std::string>("Coef");
         for (const auto& c : cl) {
             _A1Coef.push_back(std::stod(c));
         }

@@ -7,7 +7,7 @@ add_library(floorlib STATIC
     FloorManager.cpp
     )
 
-target_link_libraries(floorlib PUBLIC rt pthread)
+target_link_libraries(floorlib PUBLIC utils rt pthread)
 target_include_directories(floorlib PUBLIC ${CMAKE_SOURCE_DIR}/util)
 
 # floor

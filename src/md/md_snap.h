@@ -145,9 +145,9 @@ private:
     VenueConfig() {
         const auto cfg = plcc_getString("Venue");
         auto vc = utils::ConfigureReader(cfg.c_str());
-        auto vl = vc.getStringArr("VenueList");
+        auto vl = vc.getArr<std::string>("VenueList");
         for (const auto& v : vl) {
-            auto hm = vc.getStringArr(v.c_str());
+            auto hm = vc.getArr<std::string>(v.c_str());
             // hm in [ start_hour, start_min, end_hour, end_min ]
             if (hm.size() != 4) {
                 logError("Venue Reading Error for %s: wrong size.", v.c_str());

@@ -17,10 +17,11 @@ static const char* ConfigFilePath =  "config/main.cfg";
 #define logInfo(a...) utils::PLCC::instance().logInfo(__FILE__,__LINE__,a)
 #define logError(a...) utils::PLCC::instance().logError(__FILE__,__LINE__,a)
 
-#define plcc_getInt(a...) utils::PLCC::instance().getInt(a)
-#define plcc_getDouble(a...) utils::PLCC::instance().getDouble(a)
-#define plcc_getString(a...) utils::PLCC::instance().getString(a)
-#define plcc_getStringArr(a...) utils::PLCC::instance().getStringArr(a)
+#define plcc_getInt(a)       utils::PLCC::instance().get<int>(a)
+#define plcc_getLongLong(a)  utils::PLCC::instance().get<long long>(a)
+#define plcc_getDouble(a)    utils::PLCC::instance().get<double>(a)
+#define plcc_getString(a)    utils::PLCC::instance().get<std::string>(a)
+#define plcc_getStringArr(a) utils::PLCC::instance().getArr<std::string>(a)
 
 namespace utils {
 
@@ -72,7 +73,7 @@ private:
 
     explicit PLCC(const char* configFileName, const std::string& instname) :
         ConfigureReader(configFileName),
-        FileLogger(getLogFileName(getString(LoggerConfigKey),instname).c_str()),
+        FileLogger(getLogFileName(plcc_getString(LoggerConfigKey),instname).c_str()),
         m_configFileName(configFileName)
     {}
     ~PLCC() {

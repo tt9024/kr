@@ -3,11 +3,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../util)
 
 # bar_reader
 add_executable(booktap snap_reader.cpp)
-target_link_libraries(booktap PRIVATE rt pthread)
+target_link_libraries(booktap PRIVATE utils rt pthread)
 
 # bar_reader
 add_executable(bar_reader bar_reader.cpp)
-target_link_libraries(bar_reader PRIVATE rt pthread)
+target_link_libraries(bar_reader PRIVATE utils rt pthread)
 
 ## test
 add_subdirectory(test)

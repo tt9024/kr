@@ -4,7 +4,7 @@ add_library(algolib STATIC
     AlgoThread.cpp
     )
 
-target_link_libraries(algolib PUBLIC rt pthread)
+target_link_libraries(algolib PUBLIC utils rt pthread)
 target_include_directories(algolib PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../util

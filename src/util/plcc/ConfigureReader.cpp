@@ -74,13 +74,24 @@ bool ConfigureReader::Value::getKeyItems(const std::string& key, std::vector<Con
         // get the index
         size_t cbp;
         int idx;
+        const auto& sstr(key.substr(1));
         try {
-            idx = std::stoi(key.substr(1), &cbp);
+            idx = std::stoi(sstr, &cbp);
+            // look for the close bracket
+            while (cbp < sstr.size()) {
+                if (sstr[cbp] == ' ') ++cbp;
+                if (sstr[cbp] == ']') break;
+                throw std::invalid_argument("invalid char in index brackets");
+            }
+            if (cbp >= sstr.size()) {
+                throw std::invalid_argument("no close bracket found");
+            }
         } catch (const std::invalid_argument& e) {
-            fprintf(stderr, "close bracket not found in the query: %s\n", key.c_str());
+            fprintf(stderr, "Failed to parse query %s:  %s\n", 
+                    key.c_str(), e.what());
             return false;
         }
-        std::string next_key = key.substr(cbp+2);
+        std::string next_key = sstr.substr(cbp+1);
         ki.emplace_back("", idx);
         return getKeyItems(next_key, ki);
     }

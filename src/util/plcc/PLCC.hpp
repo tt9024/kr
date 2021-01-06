@@ -73,7 +73,7 @@ private:
 
     explicit PLCC(const char* configFileName, const std::string& instname) :
         ConfigureReader(configFileName),
-        FileLogger(getLogFileName(plcc_getString(LoggerConfigKey),instname).c_str()),
+        FileLogger(getLogFileName(get<std::string>(LoggerConfigKey),instname).c_str()),
         m_configFileName(configFileName)
     {}
     ~PLCC() {

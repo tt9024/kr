@@ -41,7 +41,7 @@ TEST (ConfigTest, ReadWrite) {
     EXPECT_TRUE(r2.get<long long>("k2[1]") == (long long)3);
     EXPECT_DOUBLE_EQ(r2.get<double>("k3.k31[0]"), 2.1);
     EXPECT_TRUE(r2.get<int>("k4[0].k41[1].k412[2]") ==  3); 
-    EXPECT_STREQ(r2.get<std::string>("k4[1].k43.k432[0][1]").c_str(), ",");
+    EXPECT_STREQ(r2.get<std::string>("k4[1].k43.k432[ 0][ 1]").c_str(), ",");
 
     const auto v = r2.getReader("k4[1].k43");
     const auto ks = v.listKeys();
@@ -72,7 +72,7 @@ TEST (ConfigTest, ReadWrite) {
     std::vector<std::string> arr3 = {" { = ] ", " \\\nmore \n bad char, "};
     r2.set<int>("k3.k31[3].k313[1]", 1);
     r2.set<int>("k3.k31[3].k313[0]", 0);
-    r2.setArr<std::string>("k3.k31[2][0]", arr3);
+    r2.setArr<std::string>("k3.k31[ 2 ][0]", arr3);
 
     // set some values with escaped values
     fp = fopen(cfg, "w");

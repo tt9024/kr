@@ -21,7 +21,10 @@ TEST (ConfigTest, ReadWrite) {
         "          \n"
         "    # \n"
         "          k44 = \\ abc\\\\d\\  \n"
-        "        }]\n";
+        "        }]\n"
+        "\n"
+        "#kk = [ 1, 2 ]\n"
+        "#kk = [ 1, 2 ]";
     const char* cfg = "/tmp/cfgtest.cfg";
 
     FILE* fp = fopen(cfg, "w");
@@ -70,9 +73,9 @@ TEST (ConfigTest, ReadWrite) {
 
     // set some values 
     std::vector<std::string> arr3 = {" { = ] ", " \\\nmore \n bad char, "};
-    r2.set<int>("k3.k31[3].k313[1]", 1);
-    r2.set<int>("k3.k31[3].k313[0]", 0);
-    r2.setArr<std::string>("k3.k31[ 2 ][0]", arr3);
+    r2.set("k3.k31[3].k313[1]", 1);
+    r2.set("k3.k31[3].k313[0]", 0);
+    r2.setArr("k3.k31[ 2 ][0]", arr3);
 
     // set some values with escaped values
     fp = fopen(cfg, "w");

@@ -380,7 +380,15 @@ char* ConfigureReader::scan(char* bs, char* be, bool ignore_special_char) const 
         ++bs;
         continue;
     }
-    return p-1;
+    char *ret = p-1;
+    while (ret > ps) {
+        if (isSpace(*ret)) {
+            --ret;
+            continue;
+        }
+        break;
+    }
+    return ret;
 }
 
 std::string ConfigureReader::toConfigString (const char* ks, const char* ke) const {
@@ -542,6 +550,14 @@ bool ConfigureReader::parseValue(const char* s, const char* e, ConfigureReader::
 
 bool ConfigureReader::parseKeyValue(const char* s, const char* e, ConfigMapType& kv) const {
     // iteratively gets key, and value 
+
+    while (s<e) {
+        if (isSpace(*s)) {
+            ++s;
+            continue;
+        }
+        break;
+    }
     if (s>=e) {
         kv.clear();
         return true;

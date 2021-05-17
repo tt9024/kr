@@ -6,7 +6,7 @@ import time
 class IBGatewayMonitor :
     def __init__(self) :
         #self.start_cmd = '/cygdrive/c/zfu/IBController/IBControllerGatewayStart.bat'
-        self.start_cmd = '/cygdrive/c/zfu/IBC/StartGateway.bat'
+        self.start_cmd = '/cygdrive/c/IBC/StartGateway.bat'
         self.ibg_proc='IB Gateway'
         self.ibc_proc='IBC (GATEWAY'
 

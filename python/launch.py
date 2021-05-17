@@ -25,7 +25,7 @@ procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','python/ibg_mon.py',
 #procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','bin/floor.exe']
 cfg=ibbar.CFG_FILE
 proc_map={}
-RESET_WAIT_SECOND = 80
+RESET_WAIT_SECOND = 120
 
 ### data machine settings
 USER='bfu'
@@ -33,6 +33,30 @@ DATA_MACHINE = 'huan'
 BAR_PATH  = '/home/bfu/kisco/bar'
 HIST_PATH = '/home/bfu/kisco/hist'
 REPO_PATH = '/home/bfu/kisco/repo'
+
+GET_HIST_LOG = './gethist.log'
+GET_HIST_LOG_SIZE = [0, 0, 0]
+def hist_updated( stop_seconds = 15 ) :
+    global GET_HIST_LOG_SIZE
+    try :
+        cur_sz = os.stat(GET_HIST_LOG).st_size;
+    except :
+        cur_sz = 0
+    dtnow = datetime.datetime.now()
+    cur_utc=l1.TradingDayIterator.local_dt_to_utc(dtnow)
+    prev_sz, prev_utc, prev_bounce_utc = GET_HIST_LOG_SIZE;
+
+    if cur_utc - prev_bounce_utc > RESET_WAIT_SECOND :
+        GET_HIST_LOG_SIZE = [ prev_sz, cur_utc, cur_utc ]
+        return True
+
+    if cur_sz == prev_sz :
+        if cur_utc - prev_utc > stop_seconds:
+            GET_HIST_LOG_SIZE = [ cur_sz, cur_utc, cur_utc ]
+            return True
+    else :
+        GET_HIST_LOG_SIZE = [ cur_sz, cur_utc, prev_bounce_utc ]
+    return False
 
 class TPMon :
     def __init__(self, stale_sec=60) :
@@ -173,8 +197,10 @@ def launch_sustain() :
     while not should_run() and dtnow.weekday() != 6 :
         print 'wait for Sunday open...'
         #reset_network()
-        bounce_ibg()
-        time.sleep( RESET_WAIT_SECOND )
+        time.sleep(1)
+        if not hist_updated() :
+            bounce_ibg()
+            #time.sleep( RESET_WAIT_SECOND )
         dtnow = datetime.datetime.now()
     while dtnow.weekday() == 6 and not should_run() :
         utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
@@ -182,8 +208,9 @@ def launch_sustain() :
         while utcnow < utcstart -  RESET_WAIT_SECOND - 10 :
             print 'wait for Sunday open...', utcnow, utcstart, utcstart-utcnow
             #reset_network()
-            bounce_ibg()
-            time.sleep( RESET_WAIT_SECOND )
+            time.sleep(1)
+            if not hist_updated() :
+                bounce_ibg()
             utcnow = l1.TradingDayIterator.cur_utc()
 
         print 'getting on-line, updating roll ', datetime.datetime.now()
@@ -233,8 +260,9 @@ def launch_sustain() :
             while  cur_utc <= utcstart - RESET_WAIT_SECOND - 10 :
                 print 'reset network', cur_utc, utcstart
                 #reset_network()
-                bounce_ibg()
-                time.sleep( RESET_WAIT_SECOND )
+                time.sleep(1)
+                if not hist_updated() :
+                    bounce_ibg()
                 cur_utc = l1.TradingDayIterator.cur_utc()
             print 'getting on-line, updating roll ', datetime.datetime.now()
             ibbar.update_ib_config(cfg_file=cfg)
@@ -270,8 +298,8 @@ def launch_sustain() :
             tdi = l1.TradingDayIterator(eday)
             sday = tdi.prev_n_trade_day(5).yyyymmdd()
             #ibbar.weekly_get_hist(sday, eday)
-            os.system("nohup python/ibbar.py " + sday + " " + eday + " 2>&1 >> ./gethist.log &")
-            print "started nohup python/ibbar.py " + sday + " " + eday + " 2>&1 >> ./gethist.log &", datetime.datetime.now()
+            os.system("nohup python/ibbar.py " + sday + " " + eday + " 2>&1 >> " + GET_HIST_LOG + " &")
+            print "started nohup python/ibbar.py " + sday + " " + eday + " 2>&1 >> " + GET_HIST_LOG + " &", datetime.datetime.now()
             time.sleep( 30 )
 
 if __name__ == "__main__":

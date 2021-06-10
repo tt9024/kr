@@ -10,6 +10,7 @@ import ibbar
 import l1
 import traceback
 import glob
+import numpy as np
 
 _should_run = True
 def signal_handler(signal, frame) :
@@ -25,7 +26,6 @@ procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','python/ibg_mon.py',
 #procs=['bin/tpib.exe','bin/tickrec.exe','bin/tickrecL2.exe','bin/floor.exe']
 cfg=ibbar.CFG_FILE
 proc_map={}
-RESET_WAIT_SECOND = 120
 
 ### data machine settings
 USER='bfu'
@@ -34,29 +34,62 @@ BAR_PATH  = '/home/bfu/kisco/bar'
 HIST_PATH = '/home/bfu/kisco/hist'
 REPO_PATH = '/home/bfu/kisco/repo'
 
-GET_HIST_LOG = './gethist.log'
-GET_HIST_LOG_SIZE = [0, 0, 0]
-def hist_updated( stop_seconds = 15 ) :
+GET_HIST_LOG = '/cygdrive/e/ib/kisco/gethist.log'
+GET_HIST_LOG_SIZE = [0, 0, 0] # prev_sz, prev_utc, prev_bounce_utc
+RESET_WAIT_SECOND_Current = 150
+RESET_WAIT_SECOND_Max = 300
+RESET_WAIT_SECOND_Decay = 0.8
+GET_HIST_LOG_SIZE_INC = 200
+
+def hist_updated( check_sec = 3 ) :
     global GET_HIST_LOG_SIZE
-    try :
-        cur_sz = os.stat(GET_HIST_LOG).st_size;
-    except :
-        cur_sz = 0
+    global RESET_WAIT_SECOND_Current
+    global RESET_WAIT_SECOND_Max
+    global RESET_WAIT_SECOND_Decay 
+    global GET_HIST_LOG_SIZE_INC 
+
     dtnow = datetime.datetime.now()
     cur_utc=l1.TradingDayIterator.local_dt_to_utc(dtnow)
     prev_sz, prev_utc, prev_bounce_utc = GET_HIST_LOG_SIZE;
 
-    if cur_utc - prev_bounce_utc > RESET_WAIT_SECOND :
+    if cur_utc - prev_bounce_utc > RESET_WAIT_SECOND_Current :
         GET_HIST_LOG_SIZE = [ prev_sz, cur_utc, cur_utc ]
+        print "reset!"
+        RESET_WAIT_SECOND_Current = RESET_WAIT_SECOND_Max/2
+        return False
+
+    if cur_utc - prev_utc < check_sec:
         return True
 
-    if cur_sz == prev_sz :
-        if cur_utc - prev_utc > stop_seconds:
-            GET_HIST_LOG_SIZE = [ cur_sz, cur_utc, cur_utc ]
-            return True
+    try :
+        cur_sz = os.stat(GET_HIST_LOG).st_size;
+    except :
+        # fall back to maximum wait if
+        # gethist is not found, i.e. during the
+        # week, or run by ipython
+        cur_sz = prev_sz + GET_HIST_LOG_SIZE_INC 
+
+    size_delta = cur_sz - prev_sz
+    #if size_delta == 0 and RESET_WAIT_SECOND_Current == RESET_WAIT_SECOND_Max/2:
+    if size_delta == 0 :
+        # no updates for the first check, need to report
+        #print "no updates for the first run"
+        print "no updates"
+        GET_HIST_LOG_SIZE = [ cur_sz, cur_utc, cur_utc ]
+        RESET_WAIT_SECOND_Current = RESET_WAIT_SECOND_Max/2
+        return False
+
+    if size_delta >= GET_HIST_LOG_SIZE_INC :
+        # got updates, increase reset linearly upto max
+        RESET_WAIT_SECOND_Current = min(RESET_WAIT_SECOND_Current + (size_delta//GET_HIST_LOG_SIZE_INC)* check_sec + 1, RESET_WAIT_SECOND_Max)
+        print "size delta ", size_delta, " increase to ", RESET_WAIT_SECOND_Current
     else :
-        GET_HIST_LOG_SIZE = [ cur_sz, cur_utc, prev_bounce_utc ]
-    return False
+        # got stuck into some slow updates, try resetting
+        decay = RESET_WAIT_SECOND_Decay * np.clip(float(size_delta)/float(GET_HIST_LOG_SIZE_INC), 0.4, 1)
+        RESET_WAIT_SECOND_Current *= decay
+        print "size delta ", size_delta, " decrease to ", RESET_WAIT_SECOND_Current
+    GET_HIST_LOG_SIZE = [ cur_sz, cur_utc, prev_bounce_utc]
+    return True
 
 class TPMon :
     def __init__(self, stale_sec=60) :
@@ -195,22 +228,31 @@ def launch_sustain() :
     alive = False
     dtnow = datetime.datetime.now()
     while not should_run() and dtnow.weekday() != 6 :
-        print 'wait for Sunday open...'
+        #print 'wait for Sunday open...'
         #reset_network()
         time.sleep(1)
         if not hist_updated() :
+            print 'bouncing while wait for Sunday open...'
             bounce_ibg()
-            #time.sleep( RESET_WAIT_SECOND )
+            time.sleep( 15 )
+            if not hist_updated() :
+                time.sleep(15)
+
         dtnow = datetime.datetime.now()
     while dtnow.weekday() == 6 and not should_run() :
         utcnow=l1.TradingDayIterator.local_dt_to_utc(dtnow)
         utcstart=get_utcstart()
-        while utcnow < utcstart -  RESET_WAIT_SECOND - 10 :
-            print 'wait for Sunday open...', utcnow, utcstart, utcstart-utcnow
+        while utcnow < utcstart -  RESET_WAIT_SECOND_Max - 10 :
+            #print 'wait for Sunday open...', utcnow, utcstart, utcstart-utcnow
             #reset_network()
             time.sleep(1)
             if not hist_updated() :
+                print 'bouncing while wait for open...', utcnow, utcstart, utcstart-utcnow
                 bounce_ibg()
+                time.sleep(15)
+                if not hist_updated() :
+                    time.sleep(15)
+
             utcnow = l1.TradingDayIterator.cur_utc()
 
         print 'getting on-line, updating roll ', datetime.datetime.now()
@@ -257,12 +299,16 @@ def launch_sustain() :
             dtnow = datetime.datetime.now()
             utcstart=get_utcstart()
             cur_utc = l1.TradingDayIterator.cur_utc()
-            while  cur_utc <= utcstart - RESET_WAIT_SECOND - 10 :
+            while  cur_utc <= utcstart - RESET_WAIT_SECOND_Max - 10 :
                 print 'reset network', cur_utc, utcstart
                 #reset_network()
-                time.sleep(1)
+                time.sleep(10)
                 if not hist_updated() :
+                    print 'boucing in between trading days ', cur_utc, utcstart
                     bounce_ibg()
+                    time.sleep(15)
+                    if not hist_updated() :
+                        time.sleep(15)
                 cur_utc = l1.TradingDayIterator.cur_utc()
             print 'getting on-line, updating roll ', datetime.datetime.now()
             ibbar.update_ib_config(cfg_file=cfg)
@@ -298,8 +344,8 @@ def launch_sustain() :
             tdi = l1.TradingDayIterator(eday)
             sday = tdi.prev_n_trade_day(5).yyyymmdd()
             #ibbar.weekly_get_hist(sday, eday)
-            os.system("nohup python/ibbar.py " + sday + " " + eday + " 2>&1 >> " + GET_HIST_LOG + " &")
-            print "started nohup python/ibbar.py " + sday + " " + eday + " 2>&1 >> " + GET_HIST_LOG + " &", datetime.datetime.now()
+            os.system("nohup python/ibbar.py " + sday + " " + eday + " >> " + GET_HIST_LOG + " 2>&1 &")
+            print "started nohup python/ibbar.py " + sday + " " + eday + " >> " + GET_HIST_LOG + " &", datetime.datetime.now()
             time.sleep( 30 )
 
 if __name__ == "__main__":

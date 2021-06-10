@@ -57,7 +57,6 @@ namespace utils {
         }
 
     private:
-        volatile QPos *getPtrReadyBytes() const { return (volatile QPos*) m_buffer.getHeaderStart(); } ;
         const std::string m_name;
         static const int HeaderLen = 64;   // one 64-bit counter for next writer position
         BufferType<QLen, HeaderLen> m_buffer;
@@ -65,6 +64,7 @@ namespace utils {
         // in case the compiler uses c++03
         friend class Reader;
         friend class Writer;
+        volatile QPos *getPtrReadyBytes() const { return (volatile QPos*) m_buffer.getHeaderStart(); } ;
 
     public:
         // only one writer will have shared access to the queue
@@ -73,14 +73,19 @@ namespace utils {
             // just put the content to the queue, slow readers
             // could get overflow.  C++ ensures the order of operation on
             // two volatile pointers are honored.
-            void putNoSpin(const char* content) {
-                m_buffer->template copyBytes<true>(*m_ready_bytes, content, DataLen);
+            // returns the writer position before the put
+            QPos putNoSpin(const char* content) {
+                const QPos ready_bytes = *m_ready_bytes;
+                m_buffer->template copyBytesNoCross<true>(ready_bytes, content, DataLen);
+                asm volatile("" ::: "memory");
                 *m_ready_bytes += DataLen;
+                return ready_bytes;
             }
 
             // for interface with the spin writer
-            void put(const char* content) {
-                putNoSpin(content);
+            // return the writer position before the put
+            QPos put(const char* content) {
+                return putNoSpin(content);
             }
 
             // for in context writers. It's for performance
@@ -95,6 +100,13 @@ namespace utils {
                 return (*m_ready_bytes += DataLen);
             }
 
+            static const int data_len = DataLen;
+            static const int q_len = QLen;
+
+            inline QPos getWritePos() const {
+                return *m_ready_bytes;
+            }
+
         private:
             explicit Writer(SwQueue<QLen, DataLen, BufferType>& queue, bool init_to_zero=true)
             : m_buffer(&queue.m_buffer),
@@ -102,7 +114,13 @@ namespace utils {
             {
                 if (init_to_zero)
                     *m_ready_bytes = 0;
+
+                // the head format is 
+                // ready_bytes(8), item_size(8), total_items(8)
+                m_ready_bytes[1] = DataLen;
+                m_ready_bytes[2] = QLen / DataLen; //total items
             };
+
             explicit Writer(const Writer& writer);
             volatile BufferType<QLen, SwQueue<QLen, DataLen, BufferType>::HeaderLen>* const m_buffer;
             volatile QPos* const m_ready_bytes;
@@ -119,8 +137,15 @@ namespace utils {
                 QPos pos = *m_ready_bytes;
                 long long bytes = (long long) (pos - m_pos);
 
-                if (bytes == 0) {
+                if (__builtin_expect((bytes == 0),0)) {
                     return QStat_EAGAIN;
+                }
+                while (__builtin_expect((bytes < 0),0)) {
+                    // queue was restarted with a lower position
+                    // set it to bottom and start there
+                    seekToBottom();
+                    pos = *m_ready_bytes;
+                    bytes = (long long) (pos - m_pos);
                 }
                 if (__builtin_expect((bytes > QLen - DataLen), 0)) {
                     return QStat_OVERFLOW;
@@ -130,7 +155,7 @@ namespace utils {
                     seekToTop();
                     return copyNextIn(buffer);
                 }
-                m_buffer->template copyBytes<false>(m_pos, buffer, DataLen);
+                m_buffer->template copyBytesNoCross<false>(m_pos, buffer, DataLen);
                 // check overflow after read
                 if (__builtin_expect(((*m_ready_bytes - m_pos) > QLen - DataLen), 0)) {
                     return QStat_OVERFLOW;
@@ -138,27 +163,89 @@ namespace utils {
                 return QStat_OK;
             }
 
-            // this doesn't copy the bytes
-            QStatus takeNextPtr(char*& buffer) {
+            QStatus copyTopIn(char* buffer) {
                 QPos pos = *m_ready_bytes;
-                long long bytes = (long long)(pos - m_pos);
+                if (__builtin_expect( (pos==0),0)) {
+                    return QStat_EAGAIN;
+                }
+
+                pos -= DataLen;
+                m_buffer->template copyBytesNoCross<false>(pos, buffer, DataLen);
+                // check overflow after read
+                if (__builtin_expect(((*m_ready_bytes-pos)>QLen-DataLen),0)){
+                    // try one more time and giev up
+                    pos = *m_ready_bytes - DataLen;
+                    m_buffer->template copyBytesNoCross<false>(pos, buffer, DataLen);
+                    if (((*m_ready_bytes-pos)>QLen-DataLen),0){ 
+                        return QStat_OVERFLOW;
+                    }
+                }
+                return QStat_OK;
+            }
+
+            QStatus copyPosInRandomAccess(char* buffer, QPos pos) {
+                // the return value from put() could be stored 
+                // in associate with the data. 
+                // Usage scenario: out-of-order message stoers
+                if (__builtin_expect((long long)pos < 0, 0)) {
+                    return QStat_ERROR;
+                }
+                QPos qpos = *m_ready_bytes;
+                if (__builtin_expect(qpos <= pos,0)) {
+                    return QStat_EAGAIN;
+                }
+                if (__builtin_expect((qpos - pos >= QLen), 0)) {
+                    return QStat_OVERFLOW;
+                }
+                m_buffer->template CopyBytesFromBufferNoCross(pos, buffer, DataLen);
+
+                // check after copy
+                if (__builtin_expect((*m_ready_bytes - pos >= QLen), 0)) {
+                    return QStat_OVERFLOW;
+                }
+                return QStat_OK;
+            }
+
+            // this doesn't copy the bytes
+            // returns the position for next read
+            QStatus takeNextPtr(volatile char*& buffer, QPos& pos) const {
+                long long bytes = (long long)(*m_ready_bytes - m_pos);
                 if (bytes <= 0) {
                     return QStat_EAGAIN;
                 }
                 if (__builtin_expect((bytes > QLen - DataLen), 0)) {
                     return QStat_OVERFLOW;
                 }
-                if (__builtin_expect(m_buffer->wouldCrossBoundary(m_pos, DataLen, buffer), 0))
-                {
-                    // we cannot just return the pointer to the content since the
-                    // content would cross circular boundary.
-                    // Copy the bytes locally and return;
-                    m_buffer->template copyBytes<false>(m_pos, m_localBuffer, DataLen);
-                    buffer = m_localBuffer;
-                }
+                buffer = m_buffer->getBufferPtr(m_pos);
+                pos = m_pos + DataLen;
                 return QStat_OK;
             }
 
+            // takes the pointer to top item, set pos_top to be after the item
+            QStatus takeTopPtr(volatile char*& buffer, QPos& pos_top) const {
+                QPos pos = *m_ready_bytes;
+                if (__builtin_expect((pos == 0), 0)) {
+                    return QStat_EAGAIN;
+                }
+                pos_top = pos;
+                buffer = m_buffer->getBufferPtr(pos_top - DataLen);
+                return QStat_OK;
+            }
+
+            bool verifyPosValid(const QPos pos) const {
+                long long bytes = (long long) (*m_ready_bytes - pos);
+                if (__builtin_expect((bytes > QLen - DataLen) || (bytes<0), 0)) {
+                    return false;
+                }
+                return true;
+            }
+
+            bool verifyPosTop(const QPos pos) const {
+                return (*m_ready_bytes == pos) ;
+            }
+
+            // set the next read to be at
+            // the latest item in the queue
             void seekToTop() {
                 QPos pos = *m_ready_bytes;
                 if (__builtin_expect((pos == 0), 0)) {
@@ -168,6 +255,10 @@ namespace utils {
                 m_pos = pos - DataLen;
             }
 
+            // set the next read to be at a valid
+            // position, noop if it is already.
+            // Used for catch up from overflow.
+            // Returns number of items lost
             int catchUp() {
                 QPos pos = *m_ready_bytes;
                 QPos prev_pos = m_pos;
@@ -177,21 +268,33 @@ namespace utils {
                 return (m_pos - prev_pos)/DataLen;
             }
 
+            // Same as seekToTop, except when
+            // no updates since last read, 
+            // seekToTop() reduces m_pos to allow next read
+            // of the latest item.  advanceToTop() 
+            // doesn't reduce the m_pos, so next read will
+            // return false, useful if caller doesn't want 
+            // to read same latest item multiple times, such
+            // as bootap
             bool advanceToTop() {
             	QPos pos = m_pos;
             	seekToTop();
-            	if (__builtin_expect(pos == 0, 0)) {
-            		return false;
-            	}
-            	if (__builtin_expect(pos <= m_pos,1)) {
-            		return true;
-            	}
-				if (__builtin_expect( pos == m_pos + DataLen, 0)) {
-					m_pos = pos;  // get back for next read
-				}
-				// note this accounts for loop back
-				// where m_pos could be much less than pos
-				// next read will reflect
+                QPos newPos = m_pos + DataLen;
+
+                if (__builtin_expect(pos > newPos, 0)) {
+                    // queue restarted since last read, reset
+                    // m_pos to reflect the new top read pos
+                    pos = m_pos;
+                }
+                if (pos > m_pos) {
+                    m_pos = pos;
+                    return false;
+                }
+                if (__builtin_expect(*m_ready_bytes == 0, 0)) {
+                    // empty queue
+                    m_pos = 0;
+                    return false;
+                };
 				return false;
             }
 
@@ -203,6 +306,7 @@ namespace utils {
             void advance() { m_pos += DataLen; };
             void syncPos() { m_pos = *m_ready_bytes;};
             QPos getPos() const { return m_pos; };
+            QPos getWritePos() const { return *m_ready_bytes;}
             //void setPos(QPos pos) { m_pos = pos; };
 
         private:
@@ -221,7 +325,6 @@ namespace utils {
             volatile BufferType<QLen, SwQueue<QLen, DataLen, BufferType>::HeaderLen>* const m_buffer;
             const volatile QPos* const m_ready_bytes;
             QPos m_pos;
-            char m_localBuffer [DataLen];
             // for private constructor access
             friend class SwQueue<QLen, DataLen, BufferType>;
         };
@@ -279,10 +382,12 @@ namespace utils {
         public:
             void putSpin(const char* content) {
                 QPos pos = *m_ready_bytes;
+                // spin to wait for the slow reader
                 for (int i=0; i<m_queue.m_numReaders; ++i) {
                     while (__builtin_expect((pos - m_readers[i]->getPos() > QLen - DataLen), 0)) {}
                 }
                 m_buffer->template copyBytes<true>(*m_ready_bytes, content, DataLen);
+                asm volatile("" ::: "memory");
                 *m_ready_bytes += DataLen;
             }
 
@@ -382,59 +487,110 @@ namespace utils {
     // are stored in circular buffer as well
     // the MaxBurstSize is the maximum number of bytes that
     // can be dirty but not sync'ed to be readable
-    template<int QLen>
+    template<int QLen, template<int, int> class BufferType = CircularBuffer>
     class MwQueue
     {
     public:
         class Reader;
         class Writer;
-        MwQueue() {};
-        ~MwQueue() {};
+
+        // this is for multi-threaded environment using heap
+        explicit MwQueue(const char* queue_name = "ThreadMwQueue") : m_name(queue_name) {
+        };
+
+        // this is for multi-process environment using shm
+        // be careful about the init to zero option. If set,
+        // all existing contents are lost.  Usually we should
+        // leave it to be false here.
+        MwQueue(const char* shm_name, bool read_only, bool init_to_zero = false) :
+                m_name(shm_name), m_buffer(shm_name, read_only, init_to_zero) {
+            if (!init_to_zero) {
+                auto ptr_write_pos = getPtrPosWrite();
+                auto ptr_dirty_pos = getPtrPosDirty();
+                auto ptr_ready_pos = getPtrPosReady();
+                if (!read_only) {
+                    *ptr_dirty_pos = 0;
+                    *ptr_ready_pos = *ptr_write_pos;
+                }
+            }
+        };
+
+        ~MwQueue() {
+            for (size_t i = 0; i<_writersToDelete.size(); ++i) {
+                delete (Writer*) (_writersToDelete[i]);
+            }
+            _writersToDelete.clear();
+        };
         Reader* newReader() {
             // the caller responsible for deleting the instance
             return new Reader(*this);
         }
-        Writer* newWriterer() {
+        Writer* newWriter() {
             // the caller responsible for deleting the instance
             return new Writer(*this);
         }
-        volatile QPos *getPtrPosWrite() const { return (volatile QPos*) m_buffer.getHeaderStart() ; };
-        volatile QPos *getPtrPosDirty() const { return (volatile QPos*) (m_buffer.getHeaderStart() + sizeof(QPos)) ; };
-        volatile QPos *getPtrReadyBytes() const { return (volatile QPos*) (m_buffer.getHeaderStart() + 64); } ;
 
-    private:
+        Writer& theWriter() {
+            Writer* wtr = new Writer(*this);
+            _writersToDelete.push_back(wtr);
+            return *wtr;
+        }
+
+        std::vector<Writer*> _writersToDelete;
         static const int HeaderLen = 128;   // three 64-bit counters, occupying 2 cache lines
                                             // one for writers - write + dirty, one for read
                                             // also aligning to the cache line
-        CircularBuffer<QLen, HeaderLen> m_buffer;
+
+        volatile QPos *getPtrPosWrite() const { return (volatile QPos*) m_buffer.getHeaderStart() ; };
+        volatile QPos *getPtrPosDirty() const { return (volatile QPos*) (m_buffer.getHeaderStart() + sizeof(QPos)) ; };
+        volatile QPos *getPtrPosReady() const { return (volatile QPos*) (m_buffer.getHeaderStart() + 64); } ;
+
+    private:
+        const std::string m_name;
+        BufferType<QLen, HeaderLen> m_buffer;
+        using QType = MwQueue<QLen, BufferType>;
+
 
     public:
         // each reader will have have shared access to the queue,
         // has it's own read position
         class Reader {
         public:
-            explicit Reader(MwQueue<QLen>& queue)
+            explicit Reader(QType& queue)
             : m_buffer(queue.m_buffer),
               m_pos_write(queue.getPtrPosWrite()),
-              m_ready_bytes(queue.getPtrReadyBytes),
+              m_ready_bytes(queue.getPtrPosReady()),
               m_pos(0),
               m_localBuffer(NULL),
-              m_localBufferSize(0) {};
+              m_localBufferSize(0) {
+                  syncPos();
+              };
 
-            QStatus copyNextIn(char* buffer, int& bytes) const;
+            QStatus copyNextIn(char* buffer, int& bytes);
+
             // this doesn't copy the bytes in most cases, except the content
             // go across the circular buffer boundary
-            QStatus takeNextPtr(char*& buffer, int& bytes) const;
+            QStatus takeNextPtr(char*& buffer, int& bytes);
+
+            // this reads from a specific location 
+            QStatus copyPosIn(char*buffer, int& bytes, QPos pos);
+
+            // this reads from a specific location without checking ready_bytes
+   	    QStatus copyPosInRandomAccess(char*buffer, int& bytes, QPos pos);
+
             QStatus seekToTop();
-            void advanceReadPos(int bytes);
-            void reset() { m_pos = 0; };
+            void advance(int bytes) { m_pos += (bytes+sizeof(int));};
+            void syncPos() {m_pos = *m_ready_bytes;};
+            std::string dump_state() const;
+
             ~Reader() {
                 if (m_localBuffer) {
-                    free(m_localBuffer); m_localBuffer = NULL ;
+                    free(m_localBuffer); 
+                    m_localBuffer = NULL ;
                 };
             };
         private:
-            const CircularBuffer<QLen, MwQueue::HeaderLen>& m_buffer;
+            const BufferType<QLen, QType::HeaderLen>& m_buffer;
             const volatile QPos* const m_pos_write; // readonly volatile pointer to a ever changing memory location
             const volatile QPos* const m_ready_bytes;
             QPos m_pos;
@@ -445,71 +601,103 @@ namespace utils {
         // each writer will have shared access to the queue
         class Writer {
         public:
-            explicit Writer(MwQueue<QLen>& queue)
+            explicit Writer(QType & queue)
             : m_buffer(queue.m_buffer),
               m_pos_write(queue.getPtrPosWrite()),
               m_pos_dirty(queue.getPtrPosDirty()),
-              m_ready_bytes(queue.getPtrReadyBytes())
-            {
-                reset();
+              m_ready_bytes(queue.getPtrPosReady()) {
+                //reset();
             };
-            void reset() { *m_pos_write = 0; *m_pos_dirty = 0; *m_ready_bytes = 0;};
-            void put(const char* content, int bytes);
 
+            // be very careful calling this
+            //void reset() { *m_pos_write = *m_ready_bytes; *m_pos_dirty = 0};
+            QPos put(const char* content, int bytes);
+            std::string dump() const {
+            	char buf[128];
+            	snprintf(buf, sizeof(buf), "Writer - %lld, %lld, %lld",
+            			(long long) *m_pos_write,
+						(long long) *m_pos_dirty,
+						(long long) *m_ready_bytes);
+            	return std::string(buf);
+            }
         private:
-            CircularBuffer<QLen, MwQueue::HeaderLen>& m_buffer;
+            BufferType<QLen, MwQueue::HeaderLen>& m_buffer;
             volatile QPos* const m_pos_write;
             volatile QPos* const m_pos_dirty;
             volatile QPos* const m_ready_bytes;
             QPos getWritePos(int bytes);
             void finalizeWrite(int bytes);
+            static const QPos SpinThreshold = QLen/2;
         };
     };
 
-
     // it first get the write pos, write a size, write the content
     // and check if it detects a synchronous point and update read
-    template<int QLen>
+    template<int QLen, template<int, int> class BufferType>
     inline
-    void MwQueue<QLen>::Writer::put(const char* content, int bytes) {
+    QPos MwQueue<QLen, BufferType>::Writer::put(const char* content, int bytes) {
         int total_bytes = bytes + sizeof(int);
         QPos pos = getWritePos(total_bytes);
         m_buffer.template copyBytes<true>(pos, (char*) &bytes, sizeof(int));
         m_buffer.template copyBytes<true>(pos + sizeof(int), (char*) content, bytes);
+        asm volatile("" ::: "memory");
         finalizeWrite(total_bytes);
+        return pos;
     }
 
-    template<int QLen>
+    template<int QLen, template<int, int> class BufferType>
     inline
-    QPos MwQueue<QLen>::Writer::getWritePos(int bytes) {
-        if (__builtin_expect(((int)(*m_pos_write - *m_ready_bytes) >= QLen/2), 0)) {
-            while (1) {
-                // spin for too many unfinished write
-                QPos pos = *m_pos_write;
-                while (__builtin_expect(((int)(pos - *m_ready_bytes) >= QLen/2), 0)) {
-                    pos = *m_pos_write;
-                } ;
-                // multiple writers could be released here, release the first one
-                // and put the rest back to spin
+    QPos MwQueue<QLen, BufferType>::Writer::getWritePos(int bytes) {
+        QPos pos;
+        // get a time count and throw if wait for too long
+
+
+        /*
+        {
+            // debug
+            QPos posw = *m_pos_write;
+            QPos posr = *m_ready_bytes;
+            if (posw>posr) {
+                printf("%lld-%lld\n",posw, posw-posr);
+            }
+        }
+        */
+
+        while (1) {
+            pos = *m_pos_write;
+            if (__builtin_expect(((QPos)(pos - *m_ready_bytes) < SpinThreshold), 1)) {
                 QPos newPos = pos + bytes;
                 if (compareAndSwap(m_pos_write, pos, newPos) == pos) {
                     return pos;
                 }
             }
+            // TODO - queue state validation (low priority)
+            // there is a rare possiblity that some writers got killed 
+            // during the write. This would make everyone after it spinning.
+            // To Fix it, demand the write to finish pushing the dirty. 
+            // Otherwise, it just spins.  A spin state is needed  
+            // when spining more than a threshold, say 1 second, in which case writer
+            // try to set the "spin state", with CAS. If it gets it
+            // then it waits for a short while, say 100 milli, 
+            // (for trainsient writes before spin set, in which case it will spin)
+            // reads the current write pos, and then then writes the
+            // total size and zero everything in dirty. It then writes
+            // its own, finalize, and clear spining, and then return.
+            // Additional safety check, when finalize, check if the ready bytes
+            // already more than ready bytes.  This for transient writes (see above)
+            // 
+            // This safety check slows the write a little
+            // but make it safer.
+            // Consider the probability of gone bad during the two memcopy,
+            // it is therefore a low priority fix.
         }
-        // normal case
-        return fetchAndAdd(m_pos_write, bytes);
     }
 
-    // TODO
-    // create a MwQueue for fixed len items, so we don't
-    // need to put len in and don't need to check wouldCrossBoundary.
-    // Useful for passing normalized items like orders and executions
-    template<int QLen>
+    template<int QLen, template<int, int> class BufferType>
     inline
-    void MwQueue<QLen>::Writer::finalizeWrite(int bytes) {
+    void MwQueue<QLen, BufferType>::Writer::finalizeWrite(int bytes) {
         QPos dirty = AddAndfetch(m_pos_dirty, bytes);
-        if (dirty == *m_pos_write) {
+        if (__builtin_expect((dirty == *m_pos_write), 1)) {
             // detected a sync point
             // ready bytes are at least dirty bytes
             // try to update the read position
@@ -522,24 +710,26 @@ namespace utils {
         }
     }
 
-    template<int QLen>
+    template<int QLen, template<int, int> class BufferType>
     inline
-    void MwQueue<QLen>::Reader::advanceReadPos(int bytes) {
-        m_pos += (bytes + sizeof(int));
-    };
-
-    template<int QLen>
-    inline
-    QStatus MwQueue<QLen>::Reader::takeNextPtr(char*& buffer, int& bytes) const {
+    QStatus MwQueue<QLen, BufferType>::Reader::takeNextPtr(char*& buffer, int& bytes) {
+        bytes = 0;
+        if (__builtin_expect((m_pos > *m_pos_write),0)) {
+            // queue restarted, return failure
+            syncPos();
+            return QStat_ERROR;
+        }
         if (__builtin_expect((*m_pos_write - m_pos >= QLen), 0)) {
             return QStat_OVERFLOW;
         }
+
         QPos unread_bytes = *m_ready_bytes - m_pos;
         if (unread_bytes == 0)
             return QStat_EAGAIN;
         // get size
         m_buffer.template copyBytes<false>(m_pos, (char*)&bytes, sizeof(int));
         QPos data_pos = m_pos + sizeof(int);
+        buffer = m_buffer->getBufferPtr(data_pos);
         if (__builtin_expect(m_buffer.wouldCrossBoundary(data_pos, bytes, buffer), 0))
         {
             // we cannot just return the pointer to the content since the
@@ -558,29 +748,106 @@ namespace utils {
         return QStat_OK;
     };
 
-    template<int QLen>
+    template<int QLen, template<int, int> class BufferType>
     inline
-    QStatus MwQueue<QLen>::Reader::copyNextIn(char* buffer, int& bytes) const {
-        if (__builtin_expect((*m_pos_write - m_pos >= QLen), 0)) {
+    QStatus MwQueue<QLen, BufferType>::Reader::copyNextIn(char* buffer, int& bytes) {
+        bytes = 0;
+        if (__builtin_expect((m_pos > *m_pos_write),0)) {
+            // queue restarted, return failure
+            syncPos(); 
+            return QStat_ERROR;
+        }
+        if (__builtin_expect((*m_pos_write - m_pos >= QLen-sizeof(int)), 0)) {
             return QStat_OVERFLOW;
         }
         QPos unread_bytes = *m_ready_bytes - m_pos;
-        if (unread_bytes == 0)
+        if (__builtin_expect((unread_bytes < sizeof(int)), 0)) {
             return QStat_EAGAIN;
+        };
         // get size
         m_buffer.template copyBytes<false>(m_pos, (char*)&bytes, sizeof(int));
+        // this shouldn't happen as we update the update as whole
+        if (__builtin_expect(unread_bytes - sizeof(int) < bytes,0)) {
+            syncPos();
+            return QStat_ERROR;
+        }
         m_buffer.template copyBytes<false>(m_pos + sizeof(int), buffer, bytes);
+        if (__builtin_expect((*m_pos_write - m_pos >= QLen-(bytes+sizeof(int))), 0)) {
+            return QStat_OVERFLOW;
+        }
         return QStat_OK;
     }
 
-    // it traverse all the way to top, and get the position of top update,
-    template<int QLen>
+    template<int QLen, template<int, int> class BufferType>
     inline
-    QStatus MwQueue<QLen>::Reader::seekToTop() {
-        if (__builtin_expect((*m_pos_write - m_pos >= QLen), 0)) {
+    std::string MwQueue<QLen, BufferType>::Reader::dump_state() const {
+    	char buf[128];
+    	snprintf(buf, sizeof(buf), "MwQueue Reader %lld %lld %lld",
+    			(long long) *m_pos_write,
+				(long long) *m_ready_bytes,
+				(long long) m_pos);
+    	return std::string(buf);
+    }
+
+    
+    template<int QLen, template<int, int> class BufferType>
+    inline
+    QStatus MwQueue<QLen, BufferType>::Reader::copyPosIn(char*buffer, int& bytes, QPos pos) {
+        QPos prev_pos = m_pos;
+        m_pos = pos;
+        QStatus qstat = QStat_EAGAIN;
+        int spin = 0;
+        while (qstat == QStat_EAGAIN && ++spin < 10000) {
+            qstat = copyNextIn(buffer, bytes);
+        }
+        m_pos = prev_pos;
+        return qstat;
+    }
+
+    template<int QLen, template<int, int> class BufferType>
+    inline
+	QStatus MwQueue<QLen,BufferType>::Reader::copyPosInRandomAccess(char*buffer, int& bytes, QPos pos) {
+        bytes = 0;
+        if (__builtin_expect((pos > *m_pos_write),0)) {
+            // queue restarted, return failure
+            return QStat_ERROR;
+        }
+    	if (__builtin_expect((*m_pos_write - pos >=QLen-sizeof(int)),0)) {
+    		return QStat_OVERFLOW;
+    	}
+        m_buffer.template copyBytes<false>(pos, (char*)&bytes, sizeof(int));
+        m_buffer.template copyBytes<false>(pos + sizeof(int), buffer, bytes);
+        if (__builtin_expect((*m_pos_write - pos >= QLen-(bytes+sizeof(int))), 0)) {
             return QStat_OVERFLOW;
         }
-        int unread_bytes = *m_ready_bytes - m_pos;
+    	return QStat_OK;
+    }
+
+    // it traverse all the way to top, and get the position of top update
+    // to be ready for the next read. 
+    // The next read could return EAGAIN if nothing is unread, (EAGAIN)
+    // or queue was restarted (ERROR)
+    // or too many unread, (OVERFLOW)
+    // For all above three cases, read position is set to the end, 
+    // as if syncPos()
+    template<int QLen, template<int, int> class BufferType>
+    inline
+    QStatus MwQueue<QLen, BufferType>::Reader::seekToTop() {
+        if (__builtin_expect((m_pos > *m_pos_write), 0)) {
+            // the queue restart case, this could be solved 
+            // by syncPos() to go forward
+            syncPos();
+            return QStat_ERROR;
+        }
+        if (__builtin_expect(*m_ready_bytes == 0, 0)) {
+            m_pos = 0;
+            return QStat_EAGAIN;
+        }
+        if (__builtin_expect((*m_pos_write - m_pos >= QLen), 0)) {
+            syncPos();
+            return QStat_OVERFLOW;
+        }
+        long long unread_bytes = *m_ready_bytes - m_pos;
         if (unread_bytes == 0)
             return QStat_EAGAIN;
 
@@ -612,8 +879,23 @@ namespace utils {
         };
 
         // this is for multi-process environment using shm
-        MwQueue2(const char* shm_name, bool read_only, bool init_to_zero = true) :
-                m_name(shm_name), m_buffer(shm_name, read_only, init_to_zero) {};
+        // be careful about the init to zero option. If set,
+        // all existing contents are lost.  Usually we should
+        // leave it to be false here.
+        MwQueue2(const char* shm_name, bool read_only, bool init_to_zero = false) :
+                m_name(shm_name), m_buffer(shm_name, read_only, init_to_zero) {
+
+            static_assert(QLen == (QLen/DataLen*DataLen), "QLen has to be a multiple of DataLen");
+            if (!init_to_zero) {
+                auto ptr_write_pos = getPtrPosWrite();
+                auto ptr_dirty_pos = getPtrPosDirty();
+                auto ptr_ready_pos = getPtrPosReady();
+                if (!read_only) {
+                    *ptr_dirty_pos = 0;
+                    *ptr_ready_pos = *ptr_write_pos;
+                }
+            }
+        };
 
         ~MwQueue2() {
             for (size_t i = 0; i<_writersToDelete.size(); ++i) {
@@ -638,13 +920,12 @@ namespace utils {
 
         volatile QPos *getPtrPosWrite() const { return (volatile QPos*) m_buffer.getHeaderStart() ; };
         volatile QPos *getPtrPosDirty() const { return (volatile QPos*) (m_buffer.getHeaderStart() + sizeof(QPos)) ; };
-        volatile QPos *getPtrReadyBytes() const { return (volatile QPos*) (m_buffer.getHeaderStart() + 64); } ;
+        volatile QPos *getPtrPosReady() const { return (volatile QPos*) (m_buffer.getHeaderStart() + 64); } ;
         std::vector<Writer*> _writersToDelete;
-
-    private:
         static const int HeaderLen = 128;   // three 64-bit counters, occupying 2 cache lines
                                             // one for writers - write + dirty, one for read
                                             // also aligning to the cache line
+    private:
         const std::string m_name;
         static const int ItemCount = (QLen / DataLen);
         BufferType<QLen, HeaderLen> m_buffer;
@@ -658,7 +939,7 @@ namespace utils {
             explicit Reader(QType& queue)
             : m_buffer(queue.m_buffer),
               m_pos_write(queue.getPtrPosWrite()),
-              m_ready_bytes(queue.getPtrReadyBytes()),
+              m_ready_bytes(queue.getPtrPosReady()),
               m_pos(0)
               {
                 syncPos();
@@ -713,24 +994,27 @@ namespace utils {
             : m_buffer(queue.m_buffer),
               m_pos_write(queue.getPtrPosWrite()),
               m_pos_dirty(queue.getPtrPosDirty()),
-              m_ready_bytes(queue.getPtrReadyBytes())
+              m_ready_bytes(queue.getPtrPosReady())
             {
             	// Just continue to write on the position
             	// of the existing positions
                 // reset();
             };
-            void reset() { *m_pos_write = 0; *m_pos_dirty = 0; *m_ready_bytes = 0;};
+
+            // be very careful calling this, content from all writers lost
+            // void reset() { *m_pos_write = 0; *m_pos_dirty = 0; *m_ready_bytes = 0;};
             QPos put(const char* content);
 
             // this will fail (and return false) if
-            // the immediate write is not possible, i.e.
-            // dirty bytes would exceed QLen
+            // the immediate write is not possible,
+            // when there were too many concurrent writes, 
+            // the "dirty bytes" would exceed SpinThreashold
             bool putNoSpin(const char* content);
             long long get_pos_write() const {
             	return *m_pos_write;
             }
             std::string dump() const {
-            	char buf[1024];
+            	char buf[128];
             	snprintf(buf, sizeof(buf), "%lld, %lld, %lld",
             			(long long) *m_pos_write,
 						(long long) *m_pos_dirty,
@@ -745,7 +1029,7 @@ namespace utils {
             volatile QPos* const m_ready_bytes;
             QPos getWritePos();
             void finalizeWrite();
-            static const int SpinThreshold = QLen/4;
+            static const QPos SpinThreshold = QLen/4;
         };
     };
 
@@ -756,6 +1040,7 @@ namespace utils {
     QPos MwQueue2<QLen, DataLen, BufferType>::Writer::put(const char* content) {
         QPos pos = getWritePos();
         m_buffer.template copyBytes<true>(pos, (char*) content, DataLen);
+        asm volatile("" ::: "memory");
         finalizeWrite();
         return pos;
     }
@@ -765,7 +1050,7 @@ namespace utils {
     template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
     bool MwQueue2<QLen, DataLen, BufferType>::Writer::putNoSpin(const char* content) {
-        if (__builtin_expect(((int)(*m_pos_write - *m_ready_bytes) >= SpinThreshold), 0)) {
+        if (__builtin_expect(((QPos)(*m_pos_write - *m_ready_bytes) >= SpinThreshold), 0)) {
             return false;
         }
         put(content);
@@ -775,23 +1060,43 @@ namespace utils {
     template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
     QPos MwQueue2<QLen, DataLen, BufferType>::Writer::getWritePos() {
-        if (__builtin_expect(((int)(*m_pos_write - *m_ready_bytes) >= SpinThreshold), 0)) {
-            while (1) {
-                // spin for too many unfinished write
-                QPos pos = *m_pos_write;
-                while (__builtin_expect(((int)(pos - *m_ready_bytes) >= SpinThreshold), 0)) {
-                    pos = *m_pos_write;
-                } ;
-                // multiple writers could be released here, release the first one
-                // and put the rest back to spin
+        /*
+        {
+            // debug
+            QPos posw = *m_pos_write;
+            QPos posr = *m_ready_bytes;
+            if (posw>posr) {
+                printf("%lld-%lld\n",posw, posw-posr);
+            }
+        }
+        */
+        QPos pos;
+        // get a time count and throw if wait for too long
+        while (1) {
+            pos = *m_pos_write;
+            if (__builtin_expect(((QPos)(pos - *m_ready_bytes) < SpinThreshold), 1)) {
                 QPos newPos = pos + DataLen;
                 if (compareAndSwap(m_pos_write, pos, newPos) == pos) {
                     return pos;
                 }
             }
+            // TODO -
+            // there is slight possiblity that some writers got killed 
+            // during the write. This would make everyone after it spinning.
+            // Maybe a safer way is to add a check at finalize in case
+            // of not being able to commit. 
+            // Each writer after that would demand the finalization be
+            // finished, if not after a period, then collectively
+            // reset write_pos to ready_bytes and retry everything.
+            // However when resetting the write_pos, there maybe a writer
+            // using stale pos in writing.  The way to guard against that
+            // is to make the spin threshold very small, or even to be 1
+            // But that took away the performance. A similar approach 
+            // is to turn off the signal during the write, again they are
+            // system calls to install handlers on per-write basis.
+            // At minimum should let it fail if waiting for too long.
+            // So the system could reset.
         }
-        // normal case
-        return fetchAndAdd(m_pos_write, DataLen);
     }
 
     // m_pos_dirty is the total bytes written so far
@@ -835,7 +1140,6 @@ namespace utils {
         	return;
         }
         */
-
     }
 
     template<int QLen, int DataLen, template<int, int> class BufferType>
@@ -881,7 +1185,7 @@ namespace utils {
     template<int QLen, int DataLen, template<int, int> class BufferType>
     inline
     std::string MwQueue2<QLen, DataLen, BufferType>::Reader::dump_state() const {
-    	char buf[1024];
+    	char buf[128];
     	snprintf(buf, sizeof(buf), "%lld %lld %lld",
     			(long long) *m_pos_write,
 				(long long) *m_ready_bytes,

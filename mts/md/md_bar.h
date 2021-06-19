@@ -495,7 +495,10 @@ public:
 
     bool snapUpdate() {
         if (m_br->getLatestUpdate(m_book)) {
-            updateState();
+            for (int i=0; i<3; ++i) {
+                m_book.update_type = i;
+                updateState();
+            }
             return true;
         }
         return false;

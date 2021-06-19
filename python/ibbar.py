@@ -512,9 +512,45 @@ def move_bar(rsync_dir_list=None, dt=None) :
                 os.system('rsync -avz ' + bar_path + '/ ' + rsync_dir)
     return prev_yyyymmdd, yyyymmdd
 
-####################
-# History Ingestion 
-####################
+############################
+# History Ingestion To Repo
+############################
+
+def ingest_ib(sday, eday, get_missing = True, ingest_hist=True, ingest_l1=True) :
+    """
+    sday is the first day to write to repo, usually a monday
+    eday is the last day to write to repo, usually a friday
+    get_missing if true, will try to get a missing day from IB,
+    so it assumes the IB connectivity.
+    ingest_hist if true, will read qt/trd files from hist/ and overwrite repo
+    ingest_l1 if true, will read live *B1S.csv files from bar/ and update repo
+
+    In normal case, this is supposed to be run on a ib machine, on a weekly basis.
+    Note, it is not recommended to run while the normal history download
+    is running, since there is some problem with duplicate session id
+    that needs to be fixed.
+    
+    This first gets hist/ to populate the repo, then reads IB_L1 *B1S*.csv
+    to update the trades and other bid/ask columns.
+    """
+    if ingest_hist:
+        print "ingesting history!"
+        import IB_hist as ibh
+        ibh.ingest_all_symb(sday, eday, get_missing=get_missing)
+
+    if ingest_l1:
+        print "ingesting l1!"
+        import IB_L1_Bar as ibl1
+        # figure out the bar_dir_list as fridays during sday to eday
+        # since the bar_dir is the friday containing previous 5 trading days
+
+        tdi = l1.TradingDayIterator(sday)
+        bar_list = []
+        while tdi.yyyymmdd() <= eday:
+            if tdi.weekday() == 4:
+                bar_list.append(tdi.yyyymmdd())
+            tdi.next()
+        ibl1.ingest_all_l1(bar_list)
 
 def all_hist_symbols() :
     sym = []
@@ -530,7 +566,6 @@ def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
             kdb.gen_bar(symbol, year_s = year_s, year_e = year_e, repo=repo)
         except :
             print 'problem with ', symbol
-
 
 
 ######################

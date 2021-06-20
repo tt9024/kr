@@ -110,6 +110,13 @@ def read_cfg(key, cfg_file=CFG_FILE, default_value=None) :
             if da[0].strip() == key.strip() :
                 return da[1].strip()
 
+def file_size(fname) :
+    try :
+        return os.stat(fname).st_size
+    except :
+        return 0
+
+
 def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT, clp='IB',mock_run=False, getqt=True,gettrd=False, cid=100, start_end_hour = [], next_contract=False, reuse_exist_file=False, verbose=False, num_threads=None, wait_thread=True) :
     bar_path = read_cfg('HistPath')
     if num_threads is not None :
@@ -237,6 +244,8 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
                     # get for day d0
                     utc1=tic.to_local_utc(end_hour,0,0)
                     utc0=utc1-(end_hour-start_hour)*3600
+
+                    no_update_cnt = 0
                     while utc0 < utc1 :
                         # get for quote and trade for end_time as utc
                         utc0+=step_sec
@@ -247,9 +256,19 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
                             cmdline=ibclient + ' ' + str(cid) + ' ' + sym + ' ' + '\"'+eday_str+'\"' + ' ' + str(barsec) + ' ' + fn0 + ' ' + ist + ' ' + clp
                             print 'running ', cmdline
                             if not mock_run :
+                                fs0 = file_size(fn0)
                                 os.system( cmdline )
+                                fs1 = file_size(fn0)
+                                if fs0 == fs1 :
+                                    no_update_cnt +=1
+                                else :
+                                    no_update_cnt = 0
+
                                 time.sleep(2)
                                 #os.system( 'sleep 2' 
+                        if no_update_cnt >= 4:
+                            print 'no data on ', d0
+                            break
                     tic.next()
                     d0=tic.yyyymmdd()
             except (KeyboardInterrupt, SystemExit) :
@@ -464,8 +483,14 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_ex
 
     fnarr = []
     for day in trd_day_arr :
-        if day in l1.bad_days :
+        if day in l1.bad_days or l1.is_holiday(day):
             print 'not getting holiday ', day
+            continue
+        cur_day = datetime.datetime.now().strftime('%Y%m%d')
+        tdi = l1.TradingDayIterator(cur_day)
+        tdi.prev_n_trade_day(260) # IB allow 1 year 1S bar
+        if day <= tdi.yyyymmdd() :
+            print 'older than a year, IB not allowed to get ', day
             continue
         if l1.venue_by_symbol(symbol) == 'FX':
             fnarr += get_ib(day, day, cid=cid+3,sym_list=[symbol],reuse_exist_file=reuse_exist_file, verbose=False, ibclient=ibclient)

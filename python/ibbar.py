@@ -501,15 +501,15 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_ex
 
     return fnarr
 
-def move_bar(rsync_dir_list=None, dt=None) :
+def move_bar(rsync_dir_list=None, dt=None, check_friday=True) :
     """
     rsync_dir_list could be ['/cygdrive/e/ib/kisco/bar']
     """
     bar_path = read_cfg('BarPath')
     if dt is None: 
         dt = datetime.datetime.now()
-    if dt.weekday() != 4 :
-        print ('not a friday!')
+    if check_friday and dt.weekday() != 4 :
+        print 'not a friday!'
         return
     yyyymmdd = dt.strftime('%Y%m%d')
     # getting the previous week

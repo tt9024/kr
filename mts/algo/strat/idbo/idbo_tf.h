@@ -97,6 +97,8 @@ namespace algo {
 
         std::string persistFileName(int symid) const;
 
+        double m_weight;
+
     };
 }
 

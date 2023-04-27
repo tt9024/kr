@@ -158,9 +158,9 @@ namespace utils {
         }
         */
 
-    private:
         static const int QLen = 1024*1024*64; // 64M
         using QType = utils::MwQueue<QLen, utils::ShmCircularBuffer>;
+    private:
         std::shared_ptr<QType> _qin, _qout;
 
         explicit Floor(const char* name)
@@ -191,7 +191,16 @@ namespace utils {
                 // Memory allocation wise, caller is responsible to allocate enough memory in the
                 // resp message and set the size as available. Upon return, the resp byte-wise
                 // copied and size updated. It returns false if size is not enough.
-                return sendSync(req, &resp, timeout_sec);
+                auto reader (std::make_shared<QType::Reader>(*_qin));
+                return sendSync(req, &resp, timeout_sec, reader);
+            }
+
+            bool requestWithReader(const Message& req, Message& resp, std::shared_ptr<QType::Reader>& reader, int timeout_sec=5) {
+                // same as request(), also gives the reader and could be used in nextMessage monitoring
+                if (!reader) {
+                    reader = std::make_shared<QType::Reader>(*_qin); 
+                }
+                return sendSync(req, &resp, timeout_sec, reader);
             }
 
             uint64_t update(const Message& upd) {
@@ -200,7 +209,7 @@ namespace utils {
             }
 
             // this reads the next message from the read queue using the 
-            // channel's reader
+            // channel's _reader 
             bool nextMessage(Message& msg) {
                 return nextMessage(&msg, _reader, true);
             }
@@ -262,6 +271,37 @@ namespace utils {
                 return Channel(qin, qout);
             }
 
+            // for monitoring purpose, this gets all message with ref from reader given
+            // if ref is NOREF, then gets all msg.  
+            // non-blocking, returns true if the msg is assigned, otherwise false
+            bool nextMessageRef(Message* msg, std::shared_ptr<QType::Reader> reader=nullptr, uint64_t ref=utils::Floor::Message::NOREF) {
+                volatile char* buf;
+                int bytes;
+                if (!reader) {
+                    reader = _reader;
+                }
+                while (true) {
+                    QStatus status = reader->takeNextPtr(buf, bytes);
+                    if (status == utils::QStat_OK) {
+                        msg->type = readMessage(buf, &(msg->ref));
+                        reader->advance(bytes);
+                        if ((ref==utils::Floor::Message::NOREF) || (msg->ref==ref)) {
+                            msg->copyData((char*)buf, bytes-_hdrsize);
+                            return true;
+                        }
+                        // try next one
+                        continue;
+                    } else {
+                        if (status != utils::QStat_EAGAIN) {
+                            // overflow or error, sync
+                            logError("sendSync got read error from reader queue. %d, %s", (int)status, reader->dump_state().c_str());
+                            reader->syncPos();
+                        }
+                    }
+                    return false;
+                }
+            }
+
         private:
             std::shared_ptr<QType> _qin, _qout;
             std::shared_ptr<QType::Reader> _reader;
@@ -269,12 +309,11 @@ namespace utils {
             std::set<int> _subscribed_types;
             static const int _hdrsize = sizeof(int) + sizeof(uint64_t);
 
-            bool sendSync(const Message& req,  Message* resp, int timeout_sec) {
+            bool sendSync(const Message& req,  Message* resp, int timeout_sec, std::shared_ptr<QType::Reader>& reader) {
                 // create a new reader (position sync'ed), send the request, record the sending 
                 // position as reference, scan through the read queue for a message matching with referece
                 // return true if found within timeout, otherwise, false
                 req.removeRef();
-                std::shared_ptr<QType::Reader> reader(_qin->newReader());  //this sync the read position to latest
                 utils::QPos pos_ref = update(req);
 
                 uint64_t timeout_micro = utils::TimeUtil::cur_micro() + (uint64_t)timeout_sec*1000000ULL;
@@ -293,6 +332,8 @@ namespace utils {
 
             utils::QPos sendMessage(int et, char* msg_data, size_t msg_size, uint64_t ref= utils::Floor::Message::NOREF) {
                 // header has format of type(int), ref(uint64_t)
+                // returns the starting queue position where the message was written to. 
+                // this is used at the reader side to assign reference to a request msg, i.e. a msg with ref=NOREF
                 char buf[_hdrsize];
                 memcpy(buf, &et, sizeof(int));
                 memcpy(buf+sizeof(int), &ref, sizeof(uint64_t));
@@ -311,6 +352,17 @@ namespace utils {
             }
 
             bool nextMessage(Message* msg, std::shared_ptr<QType::Reader> reader, bool filter_on) {
+                // this reads next message from reader with filter.  
+                // If the msg is a request, i.e. a msg with ref to be NOREF
+                //     the msg ref assigned to be the reader position before reading the msg,
+                //     this is the starting queue position of the message.
+                //     the subsequent responses to this request will all have this ref set 
+                // if the msg is a reply, 
+                //     the ref already assigned to be the position of the request msg,
+                //     it is used to match responses to requests
+                // In case multiple reponse to a same request, i.e. multiple floor threads,
+                // all responses have the same ref number of request.
+                //
                 volatile char* buf;
                 int bytes;
                 while (true) {

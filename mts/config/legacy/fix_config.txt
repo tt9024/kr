@@ -42,4 +42,4 @@ DataDictionary=/home/mts/run/config/legacy/TT-FIX44.xml
 ValidateFieldsOutOfOrder=N
 ValidateUnorderedGroupFields=N
 PersistMessages=Y
-
+AllowUnknownMsgFields=Y

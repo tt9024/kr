@@ -1,15 +1,1 @@
-<feed>
-
-  <provider>TT</provider>
-  <class>Mts::Feed::CFeedFIX_TT</class>
-  <name>TT</name>
-
-  <fix>
-    <SenderCompID>massar_fix_data</SenderCompID>
-    <TargetCompID>TT_DATA</TargetCompID>
-    <heartbeat>30</heartbeat>
-    <username>ZFu</username>
-    <password>MassarCapital!@#</password>
-  </fix>
-
-</feed>
+feed_TT_uat.xml

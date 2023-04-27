@@ -9,126 +9,455 @@
 #include <stdexcept>
 #include <fstream>
 #include <cstdlib>
+#include <array>
+#include <atomic>
+#include <unordered_map>
 
 #include "md_snap.h"
 #include "csv_util.h"
+#include "thread_utils.h"
 
 namespace md {
 
+static inline
+std::pair<double, uint32_t> bid_reducing(double prev_px, uint32_t prev_sz, double px, uint32_t sz) {
+    // get the px and size for reducing case due to cancel or trade onto bid quotes
+    // ask size can be obtained with negative price
+    // return the size and the starting price of the reduction
+    // For example, if quote goes from [88.2, 10] to [88.3,2], then
+    // return pair{88.2, 10}
+    double ret_px=0;
+    uint32_t ret_sz=0;
+    if (std::abs(prev_px-px)<1e-10) {
+        // same level
+        if (sz<prev_sz) {
+            ret_px=px;
+            ret_sz=prev_sz-sz;
+        }
+    } eles {
+        // bid level removed
+        if (prev_px-px>1e-10) {
+            // prev_px, prev_sz removed, count as reduce
+            ret_px=prev_px;
+            ret_sz=prev_sz;
+        }
+    }
+    return std::make_pair(ret_px, ret_sz);
+}
+
 struct BarPrice {
 public:
-    time_t bar_time;
+    time_t bar_time; // the close time of the bar
     double open;
     double high;
     double low;
     double close;
     uint32_t bvol;
     uint32_t svol;
-    long long last_micro;
+    long long last_micro; // last trade update time
     double last_price;
-    long long last_update;
+
+    // extended fields
+    int bqd; // bid quote diff
+    int aqd; // ask quote diff
+
+    double avg_bsz(long long cur_micro) const {
+        return get_avg(cur_micro, cumsum_bsz, prev_bsz);
+    }
+    double avg_asz(long long cur_micro) const {
+        return get_avg(cur_micro, cumsum_asz, prev_asz);
+    }
+    double avg_spd(long long cur_micro) const {
+        return get_avg(cur_micro, cumsum_spd, (prev_apx-prev_bpx));
+    }
+
+private:
+    // weighted avg and state - calculated on the spot
+    double cumsum_bsz; // cumsum bid size, for time weighted-avg
+    double cumsum_asz; // cumsum ask size, for time weighted-avg
+    double cumsum_spd; // cumsum spread, for time weighted-avg
+
+    // states
+    long long cumsum_micro;  // total micros in cumsum
+    long long prev_micro_quote; // last quote update time
+    double prev_bpx, prev_apx;
+    int prev_bsz, prev_asz;
+    int prev_type;
+
+    // optional volume
+    bool write_optional; // for unmatched volumes
+    int32_t opt_v1; // signed swipe
+    int32_t opt_v2; // signed unmatched (same level)
+    int32_t opt_v3; // cumsum trd-size from consecutive trade at same dir
+
+    // optional tick_size for calculating swipe levels
+    double tick_size;
+
+    template<typename DType1, typename DType2>
+    double get_avg(long long cur_micro, DType1 cum_qty, DType2 cur_qty) const {
+        // assuming bar valid
+        long long tau = cur_micro-prev_micro_quote;
+        if (__builtin_expect(tau+cumsum_micro<=0,0)) {
+            tau=1; // allow same micro with prev_micro_quote
+        }
+        return (double)(cum_qty+cur_qty*tau)/(double)(cumsum_micro+tau);
+    }
+
+    void upd_state(long long cur_micro, double bid_px, int bid_sz, double ask_px, int ask_sz) {
+        // assumes time not going back
+        if (__builtin_expect(!isValid(),0)) {
+            // note initial update should work since
+            // prev_px/sz all zeros
+            prev_micro_quote=cur_micro;
+        }
+        long long tau(cur_micro-prev_micro_quote);
+        if (__builtin_expect(tau>0,1)) {
+            cumsum_bsz += (prev_bsz*tau);
+            cumsum_asz += (prev_asz*tau);
+            cumsum_spd += ((prev_apx-prev_bpx)*tau);
+            cumsum_micro += tau;
+            prev_micro_quote = cur_micro;
+        }
+        prev_bpx=bid_px; prev_bsz=bid_sz; prev_apx=ask_px; prev_asz=ask_sz;
+    }
+
+    void roll_state(long long cur_micro) {
+        if (__builtin_expect(!isValid(),0)) {
+            // don't roll if no update received
+            return;
+        }
+        cumsum_bsz = 0; cumsum_asz = 0; cumsum_spd = 0;
+        cumsum_micro = 0;
+        prev_micro_quote = cur_micro;
+    }
+
+    void init(time_t utc_, double open_, double high_,
+              double low_, double cloes_, uint32_t bvol_, uint32_t svol_,
+              long long last_micro_, double last_price_,
+              double bid_sz_, double ask_sz_, double avg_spread_,
+              int bqt_diff_, int aqt_diff_) {
+        // simple assignments
+        bar_time=utc_; // closing time of the bar in utc second
+        open=open_;
+        high=high_;
+        low=low_;
+        close=close_;
+        bvol=bvol_;
+        svol=svol_;
+        last_micro=last_micro_; // last trade time
+        last_price=last_price_;
+        if (close == 0) { close = last_price; };
+
+        // setup the ext and state to be ready for update/roll
+        bqd=bqt_diff_;
+        aqd=aqt_diff_;
+        prev_type=2; // don't want to upd quote diff yet
+
+        prev_bpx=(close==0?1000:close)-avg_spread_/2;
+        prev_apx=(close==0?1000:close)+avg_spread_/2;
+        prev_bsz=bid_sz_; prev_as=ask_sz_;
+
+        if (open*high*low*close!=0) {
+            prev_micro_quote = bar_time*1000000LL;
+        }
+        roll_state((long long)bar_time*1000000LL);
+    }
+
+    int get_swipe_level(double prev_px, double px) const {
+        if (tick_size==0) return 1;
+        int levels = (int)(std::abs(prev_px-px)/tick_size+0.5);
+        if (__builtin_expect(levels<1,0)) levels=1;
+        if (__builtin_expect(leves>10,0)) levels=10;
+        return levels;
+    }
+
+public:
     BarPrice() {
         memset((char*)this, 0, sizeof(BarPrice));
         high = -1e+12;
-        low = 1e+12;
+        low  = 1e+12;
+        write_optional = false;
     }
+
     BarPrice(time_t utc_, double open_, double high_,
-             double low_, double close_, uint32_t bvol_ = 0, uint32_t svol_=0, 
-             long long last_micro_ = 0, double last_price_ = 0)
-    : bar_time(utc_), open(open_), high(high_), low(low_), close(close_),
-      bvol(bvol_), svol(svol_), 
-      last_micro(last_micro_), // last trade time
-      last_price (last_price_), 
-      last_update(utc_*1000000LL)  // last update time, including quote + trade
-    {}
+             double low_, double close_, uint32_t bvol_=0, uint32_t svol_=0,
+             long long last_micro_=0, double last_price_=0,
+             double bid_sz_=0, double ask_sz_=0, double avg_spread_=0,
+             int bqt_diff_=0, int aqt_diff_=0) {
+        memset((char*)this, 0, sizeof(BarPrice));
+        high = -1e+12;
+        low = 1e+12;
+        write_optional = false;
+        int(utc_, open_, high_, low_, close_, bvol_, svol_,
+            last_micro_, last_price_, bid_sz_, ask_sz_, avg_spread_,
+            bqt_diff_, aqt_diff_);
+    }
 
     BarPrice(const std::string& csvLine) {
         // format is utc, open, high, low, close, totvol, lastpx, last_micro, vbs
-        auto tk = utils::CSVUtil::read_line(csvLine);
-        bar_time = (time_t)std::stoi(tk[0]);
-        open = std::stod(tk[1]);
-        high = std::stod(tk[2]);
-        low = std::stod(tk[3]);
-        close = std::stod(tk[4]);
-        long long totval = std::stoll(tk[5]);
-        last_price = std::stod(tk[6]);
-        last_micro = std::stoll(tk[7]);
-        long long vbs = std::stoll(tk[8]);
+        // extended: avg_bsz, avg_asz, avg_spd, bqdiff, aqdiff
 
-        bvol = (uint32_t) ((totval + vbs)/2);
-        svol = (uint32_t) (totval - bvol);
-        last_update = bar_time*1000000;
+        memset((char*)this, 0, sizeof(BarPrice));
+        high = -1e+12;
+        low  = 1e+12;
+        write_optional = false;
+
+        auto tk = utils::CSVUtil::read_line(csvLine);
+        auto bar_time_ = (time_t)std::stoi(tk[0]);
+        auto open_ = std::stod(tk[1]);
+        auto high_ = std::stod(tk[2]);
+        auto low_ = std::stod(tk[3]);
+        auto close_ = std::stod(tk[4]);
+        long long totval_ = std::stoll(tk[5]);
+        auto last_price_ = std::stod(tk[6]);
+        auto last_micro_ = std::stoll(tk[7]);
+        long long vbs_ = std::stoll(tk[8]);
+
+        auto bvol_ = (uint32_t) ((totval_ + vbs_)/2);
+        auto svol_ = (int32_t) (totval_ - bvol_);
+
+        long long bsz_ = 0, asz_ = 0;
+        double spd_ = 0;
+        int bqd_ = 0, aqd_ = 0;
+        if (tk.size() > 9) {
+            bsz_ = (uint32_t) (std::stod(tk[9])+0.5);
+            asz_ = (uint32_t) (std::stod(tk[10])+0.5);
+            spd_ = std::stod(tk[11]);
+            bqd_ = int(std::stod(tk[12])+0.5);
+            aqd_ = int(std::stod(tk[13])+0.5);
+        }
+        init(bar_time_, open_, high_, low_, close_, bvol_, svol_,
+             last_micro_, last_price_, bsz_, asz_, spd_,
+             bqd_, aqd_);
+        // optional unmatched
+        if (tk.siez() > 14) {
+            opt_v1 = std::stoi(tk[14]);
+            opt_v2 = std::stoi(tk[15]);
+            write_optional = true;
+        }
     }
 
-    std::string toCSVLine() const {
+    std::string toCSVLine(time_t bar_close_time=0) const {
+        // this writes a repo line from current bar
+        if (__builtin_expect(bar_close_time == 0,1)) {
+            bar_close_time = bar_time; // the previous close, for read in bars
+        };
+        long long cur_micro = (long long)bar_close_time*1000000LL;
         char buf[256];
-        snprintf(buf, sizeof(buf), "%d, %s, %s, %s, %s, %lld, %s, %lld, %lld",
-                (int) bar_time, PriceCString(open), PriceCString(high),
-                PriceCString(low), PriceCString(close), (long long)bvol + svol,
-                PriceCString(last_price), last_micro, (long long)bvol - svol);
+        size_t cnt = snprintf(buf, sizeof(buf), "%d, %s, %s, %s, %s, %lld, %s, %lld, %lld, "
+                                                "%.1f, %.1f, %f, %d, %d", 
+                              (int) bar_close_time, PriceCString(open), PriceCString(high),
+                              PriceCString(low), PriceCString(close), (long long)bvol+svol,
+                              PriceCString(last_price), last_micro, (long long)bvol-svol,
+                              avg_bsz(cur_micro), avg_asz(cur_micro), avg_spd(cur_micro), bqd, aqd
+                              );
+        if (__builtin_expect(write_optional,1)) {
+            snprintf(buf+cnt, sizeof(buf)-cnt, ", %d, %d", opt_v1, opt_v2);
+        }
         return std::string(buf);
     };
 
+    std::string toString(long long cur_micro = 0) const {
+        return toCSVLine(cur_micro);
+    }
+
     bool isValid() const {
-        return last_update>0;
+        return prev_micro_quote>0;
     }
 
     // utilities for update this data structure
-    std::string writeAndRoll(time_t bartime) {
-        // this is an atomic action to write the
-        // existing state and then roll forward
-        bar_time = bartime;
+    std::string writeAndRoll(time_t bar_close_time) {
+        // this is an atomic action to write the existing
+        // state and then roll forward
+        bar_time = bar_close_time;
         std::string ret = toCSVLine();
+
         // roll forward
         open = close;
         high = close;
         low = close;
-        bvol = 0;
-        svol = 0;
+        bvol = 0; svol = 0;
+        bqd = 0; aqd = 0;
+        // optional write - unmatched trade volumes
+        opt_v1 = 0; opt_v2 = 0;
+        roll_state((long long)bar_close_time*1000000LL);
         return ret;
     }
 
-    void update(long long cur_micro, double price, int32_t volume, int update_type) {
+    void update(long long cur_micro, double last_trd_price, int32_t volume, int update_tpe,
+                double bidpx, int bidsz, double askpx, int asksz) {
         // update at this time with type of update
         // type: 0 - bid update, 1 - ask update, 2 - trade update
-
-    	switch (update_type) {
-    	case 2 : 
-            {
-    		// trade update
-                if (volume > 0) 
-                    bvol += volume;
-                else 
-                    svol -= volume;
-                last_price = price;
-                last_micro = cur_micro;
-
-                // fall through for pricea
+        if (__builtin_expect(update_type==2,0)) {
+            // trade update
+            if (volume > 0)
+                bvol += volume;
+            else
+                svol -= volume;
+            last_price = last_trd_price;
+            last_micro = cur_micro;
+            cloes = last_trd_price;
+            opt_v3 += volume;
+        } else {
+            // check for cross
+            if (__builtin_expect(askpx-bidpx<1e-10,0)) {
+                // remove crossed ticks
+                return;
             }
-        case 0:
-        case 1:
-            {
-               close = price;
-               if (price > high)
-                   high = price;
-               if (price < low) 
-                   low = price;
-               break;
-            };
-    	default :
-    	    logError("unknown book update type %d", update_type);
-    	}
-        if (__builtin_expect(last_update==0, 0)) {
-            // the very first update
-            open = price;
+            close = (bidpx+askpx)/2.0;
+            if (__builtin_expect(write_optional&&(prev_type==2),0)) {
+                // check unmatched volume
+                int32_t r_sz = 0;
+                int32_t qdiff = 0;
+                if (prev_bsz*prev_asz*opt_v3!=0) {
+                    if (opt_v3>0) {
+                        if (std::abs(prev_apx-askpx)<1e-10) {
+                            // buy without apx change
+                            r_sz=bid_reducing(-prev_apx, prev_asz, -askpx, asksz).second;
+                            qdiff = opt_v3-r_sz;
+                        } else {
+                            // buy swipe a level
+                            int sz_l2=opt_v3-prev_asz; // size into l2
+                            opt_v1 += (sz_l2>0?sz_l2:0);
+
+                            // adjust aqd for unaccounted for size
+                            int levels = get_swipe_level(prev_apx,askpx);
+                            int sz0 = (prev_asz+(int)((levels-1)*avg_asz(cur_micro)+0.5));
+                            if (sz0>opt_v3) {
+                                aqd -= (sz0-opt_v3);
+                            }
+                        }
+                    } else if (opt_v3<0) {
+                        if (std::abs(prev_bpx-bidpx)<1e-10) {
+                            // sell without bpx change
+                            r_sz = bid_reducing(prev_bpx, prev_bsz, bidpx, bidsz).second;
+                            qdiff = -opt_v3-r_sz;
+                        } eles {
+                            // trade swipe a level
+                            int sz_l2 = opt_v3+prev_bsz; // size into l2
+                            opt_v1 += (sz_l2<0?sz_l2:0);
+
+                            // adjust bqd for unaccounted for size
+                            int levels = get_swipe_level(prev_bpx,bidpx);
+                            int sz0 = (perv_bsz+(int)((levels-1)*avg_bsz(cur_micro)+0.5));
+                            if (sz0>-opt_v3) {
+                                bqd -= (sz0+opt_v3);
+                            }
+                        }
+                    }
+                    if (qdiff>0) {
+                        opt_v2 += (opt_v3>0?qdiff:-qdiff);
+                        /* debug trace
+                        printf("unmatched trade of %d with r_sz %d, tot %d, v2 %d, quote: %lld, %f, %d, %f, %d\n"
+                        opt_v3, r_sz, opt_v1, opt_v2, cur_micro/1000LL,
+                        bidpx, bidsz, askpx, asksz);
+                        */
+                    }
+                }
+            }
+            opt_v3=0;
         }
-        last_update = cur_micro;
+        if (__builtin_expect(!isValid(),0)) {
+            open=close; high=close; low=close;
+        }
+        if (close>high) high = close;
+        if (close<low) low = close;
+
+        // extended fields
+        // 
+        // update the bqd/aqd - 
+        // bpipe sends a quote tick after any trade, reflecting
+        // quote size reduction due to the trade. It should be universal.
+        // We don't want the bid/ask quote diff to also include trade,
+        // to skip if prev_update is a trade.  This assumes
+        // strict sequential update from book queue, using getNextUpdate().
+        // It is currently the case, refer to, i.e. the writer thread
+        // Note it fails if by latest snapshot, i.e .getLatestUpdate()
+        if (__builtin_expect((update_type != 2)&&(prev_type !=2)&&(prev_bsz*prev_asz!=0),1)) {
+            // get bid quote diff
+            if (__builtin_expect(std::abs(bidpx-prev_bpx)<1e-10,1)) {
+                // still the same level
+                bqd += (bidsz - prev_bsz);
+            } else {
+                // leevls centered at 0, to be flipped and rounded properly
+                int levels = get_swipe_level(prev_bpx, bidpx);
+                if (bidpx < prev_bpx) {
+                    // prev_bpx no more
+                    bqd -= (prev_bsz+(int)((levels-1)*avg_bsz(cur_micro)+0.5)); // cancel prev_bsz+(level-1)*avg_bsz
+                } else {
+                    // a new level
+                    bqd += (bidsz+(int)((levels-1)*avg_bsz(cur_micro)+0.5));   //adding bidsz+(level=1)*avg_bsz
+                }
+            }
+            // get ask quote diff
+            if (__builtin_expect(std::abs(askpx - prev_apx)<1e-10,1)) {
+                aqd += (asksz - prev_asz);
+            } else {
+                int levels = get_swipe_level(prev_apx,askpx);
+                if (askpx > prev_apx) {
+                    // prev_apx no more
+                    aqd -= (prev_asz+(int)((levels-1)*avg_asz(cur_micro)+0.5));
+                } eles {
+                    // a new level
+                    aqd += (asksz+(int)((levels-1)*avg_asz(cur_micro)+0.5));
+                }
+            }
+
+            //debug
+            //if (cur_micro/1000000LL == 1662552734) {
+            //    printf("%lld: %d:%f-%f:%d, bqd:%d, aqd:%d\n", cur_micro/1000LL, bidsz,bidpx,askpx,asksz,bqd,aqd);
+            //}
+        }
+
+        // update the average bid/ask size and spread -
+        if (__builtin_expect(!isValid() || (update_type !=2),1)) {
+            upd_state(cur_micro,bidpx, bidsz, askpx, asksz);
+        }
+        prev_type = update_type;
     }
 
-    std::string toString() const {
-        return toCSVLine();
+    void updaet(const md::BookDepot& book) {
+        // this is called by updateState() from barWriter
+        uint64_t upd_micro = book.update_ts_micro;
+        int bsz=0, asz=0;
+        double bpx=book.getBid(&bsz), apx=book.getAsk(&asz);
+
+        int update_type = book.updaet_type;
+        int volume = book.trade_size;
+        int trade_attr = book.trade_attr; // 0-buy, 1-sell
+        volume *= (1-2*trade_attr);
+        double px = book.trade_price;
+        update(upd_micro, px, volume, update_type, bpx, bsz, apx, asz);
     }
-};
+
+
+    // used to replay from the tick-by-tick file saved by
+    // booktap -o, refer to the br_test.cpp
+    void update(const std::vector<std::string>& bookdepot_csv_line) {
+        md::BookDepot bk;
+        bk.updateFrom(bookdepot_csv_line);
+        update(bk);
+    }
+
+    // Shortcut to call bar update from 11-bbo-quote and trade, from i.e. tickdata quote/trade
+    // Also possible to get a BookDepot to updated from such quote/trade, and then update
+    // bar with update(const md::BookDepot). Although it is slower
+    void updateQuote(long long cur_micro, double bidpx, int bidsz, double askpx, int asksz) {
+        int update_type = 0;
+        if (std::abs(prev_apx*prev_asz-askpx*asksz)>1e-10) {
+            update_type=1;
+        }
+        updaet(cur_micro, 0, 0, update_type, bidpx, bidsz, askpx, asksz);
+    }
+
+    void updaetTrade(long long cur_micro, double price, uint32_t size, bool is_buy) {
+        update(cur_micro, price, (int32_t)is_buy?size:-(int32_t)size, 2, prev_bpx, prev_bsz, prev_apx, prev_asz);
+    }
+
+    void set_write_optional(bool if_write) {write_optional = if_write; };
+    void set_tick_size(double tick_size_) {tick_size = tick_size_; };
+}
+
 
 class BarReader{
 public:
@@ -430,6 +759,14 @@ public:
     BarWriter(const BookConfig& bcfg, time_t cur_second) 
     : m_bcfg(bcfg), m_bq(bcfg, true), m_br(m_bq.newReader())
     {
+        double tick_size = 0;
+        try {
+            const auto* ti(utils::SymbolMapReader::get().getByTradable(m_bcfg.symbol));
+            tick_size = ti->_tick_size;
+        } catch (const std::exception& e) {
+            logError("%s BarWriter failed to get tick size!", m_bcfg.toString().c_str());
+            throw std::runtime_error("BarWriter failed to get tick size for " + m_bcfg.toString());
+        }
         auto bsv = m_bcfg.barsec_vec();
         for (auto bs : bsv) {
             std::shared_ptr<BarInfo> binfo(new BarInfo());
@@ -439,6 +776,7 @@ public:
                 logError("%s BarWriter failed to create bar file %s!", m_bcfg.toString().c_str(), binfo->fn.c_str());
                 throw std::runtime_error("BarWriter failed to create bar file " + binfo->fn);
             }
+            binfo->bar.set_tick_size(tick_size);
             m_bar.emplace(bs, binfo);
         }
         resetTradingDay(cur_second);
@@ -495,6 +833,9 @@ public:
 
     bool snapUpdate() {
         if (m_br->getLatestUpdate(m_book)) {
+            // given the current book
+            // update with type 0,1,2 with
+            // bid/ask/last_trade
             for (int i=0; i<3; ++i) {
                 m_book.update_type = i;
                 updateState();
@@ -552,11 +893,10 @@ public:
     }
 
     ~BarWriter() {}
+    const BookConfig m_bcfg;
 
 private:
     using QType = BookQ<utils::ShmCircularBuffer>;
-
-    const BookConfig m_bcfg;
     QType m_bq;
     std::shared_ptr<typename QType::Reader> m_br;
 
@@ -593,21 +933,10 @@ private:
     BookDepot m_book;
 
     void updateState() {
-        // got an new snap price, update the bar state
-        uint64_t upd_micro = m_book.update_ts_micro;
-        double px = m_book.getMid();
-        int update_type = m_book.update_type;
-        int volume = m_book.trade_size;
-        int trade_attr = m_book.trade_attr; // 0-buy, 1-sell
-        volume *= (1-2*trade_attr);
-        if (update_type == 2) {
-            px = m_book.trade_price;
-        }
-
         // update all bars with different bar period
         for (auto& bitem: m_bar) {
             auto& bar = bitem.second->bar;
-            bar.update(upd_micro, px, volume, update_type);
+            bar.update(m_book);
         }
     }
 };
@@ -616,15 +945,23 @@ template<typename TimerType>
 class BarWriterThread {
 public:
     BarWriterThread():
+    m_writer_cnt(0),
     m_should_run(false),
     m_running(false) 
-    {};
+    {
+    };
 
     void add(const BookConfig& bcfg, uint64_t cur_micro = 0) {
+        // note this could be called after the thread is running
         if (cur_micro == 0) {
             cur_micro = TimerType::cur_micro();
         }
-        m_writers.emplace_back(std::make_shared<BarWriter>(bcfg, cur_micro/1000000));
+        if (__builtin_expect(m_writer_cnt >= MAX_WRITERS, 0)) {
+            logError("Too many bar writers (%d), not adding more!", (int)m_writer_cnt);
+            return;
+        }
+        m_writers[m_writer_cnt] = std::make_shared<BarWriter>(bcfg, cur_micro/1000000);
+        ++m_writer_cnt;
     }
 
     void run( [[maybe_unused]] void* param = NULL) {
@@ -639,9 +976,14 @@ public:
             // do update for all
             bool has_update = false;
             cur_micro = TimerType::cur_micro();
-            for (auto& bw : m_writers) {
+
+            // read the current writer cnt
+            const size_t cnt = m_writer_cnt;
+            for (size_t i=0; i<cnt; ++i) {
+                auto& bw (m_writers[i]);
                 has_update |= bw->checkUpdate();
             }
+
             cur_micro = TimerType::cur_micro();
             int64_t due_micro = next_sec - cur_micro;
             if (!has_update) {
@@ -653,15 +995,15 @@ public:
                     TimerType::micro_sleep(due_micro);
                     due_micro = next_sec - TimerType::cur_micro();
                     if (__builtin_expect( due_micro < 0, 0)) {
-                        logError("Bar writer: negative due_micro detected! %lld",
+                        logDebug("Bar writer: negative due_micro detected! %lld",
                                 (long long) due_micro);
                     }
                 }
             }
-            //if (due_micro < min_sleep_micro/2) {
-            if (due_micro < 1) {
+            if (due_micro < min_sleep_micro/2) {
                 // due for onSec
-                for (auto& bw : m_writers) {
+                for (size_t i=0; i<cnt; ++i) {
+                    auto& bw(m_writers[i]);
                     bw->onOneSecond((time_t)(next_sec/1000000LL));
                 }
                 next_sec += 1000000LL;
@@ -679,9 +1021,78 @@ public:
         return m_running;
     }
 
+    bool should_run() const {
+        return m_should_run;
+    }
+
 private:
-    std::vector<std::shared_ptr<BarWriter> >m_writers;
+    enum { MAX_WRITERS = 1024 };
+    std::array<std::shared_ptr<BarWriter>,MAX_WRITERS> m_writers;
+    std::atomic<size_t> m_writer_cnt;
     volatile bool m_should_run, m_running;
+};
+
+class MD_Publisher {
+public:
+    explicit MD_Publisher(const std::string& provider="")
+    : m_provider(provider), m_bar_writer(), m_bar_writer_thread(m_bar_writer) {
+        logInfo("MD_Publisher(%s) started!", (provider.size()>0? provider.c_str():"default"));
+        m_bar_writer_thread.run(NULL);
+    }
+
+    ~MD_Publisher() {};
+    // using symbol/venue
+    void l1_bid(double px, unsigned size, const std::string& symbol, const std::string& venue="") {
+        getBookQ(symbol, venue)->theWriter().updBBO(px, size, true, utils::TimeUtil::cur_micro());
+    }
+    void l1_ask(double px, unsigned size, const std::string& symbol, const std::string& venue="") {
+        getBookQ(symbol, venue)->theWriter().updBBO(px, size, false, utils::TimeUtil::cur_micro());
+    }
+    void l1_bbo(double bpx, unsigned bsz, double apx, unsigned asz, const std::string& symbol, const std::string& venue="") {
+        getBookQ(symbol, venue)->theWriter().updBBO(bpx, bsz, apx, asz, utils::TimeUtil::cur_micro());
+    }
+    void trade(double px, unsigned size, const std::string& symbol, const std::string& venue="") {
+        getBookQ(symbol, venue)->theWriter().updTrade(px, size);
+    }
+    void stop() {
+        logInfo("Stopping md publisher: is_running (%s), should_run(%s)", 
+                m_bar_writer.running()?"Yes":"No",
+                m_bar_writer.should_run()?"Yes":"No");
+        m_bar_writer.stop();
+    }
+
+    // note the book config with provider "" is served as a primary feed, refer to BookConfig for detail
+    std::shared_ptr<md::BookQType> addBookQ(const std::string& symbol,
+                                            const std::string& venue, const std::string& provider) {
+        const md::BookConfig bcfg (venue, symbol, "L1", provider);
+        auto bq (std::make_shared<md::BookQType>(bcfg, false));
+        m_book_writer.emplace (getKey(symbol, venue), bq);
+        m_bar_writer.add(bcfg);
+        return bq;
+    }
+
+    const std::string m_provider;
+
+protected:
+    std::unordered_map<std::string, std::shared_ptr<md::BookQType>> m_book_writer;
+    using BarWriter = md::BarWriterThread<utils::TimeUtil>;
+    BarWriter m_bar_writer;
+    utils::ThreadWrapper<BarWriter> m_bar_writer_thread;
+
+    const std::string getKey(const std::string& symbol, const std::string& venue) const {
+        return symbol + venue;
+    }
+
+    std::shared_ptr<md::BookQType> getBookQ(const std::string& symbol, const std::string& venue) {
+        const std::string key = getKey(symbol, venue);
+        const auto iter = m_book_writer.find(key);
+        if (__builtin_expect(iter == m_book_writer.end(),0)) {
+            logError("symbol %s(%s) not found in publisher's symbol list, adding with provider (%s)", 
+                    symbol.c_str(), venue.c_str(), m_provider.c_str());
+            return addBookQ(symbol, venue, m_provider);
+        }
+        return iter->second;
+    }
 };
 
 }

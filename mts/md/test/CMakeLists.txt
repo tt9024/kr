@@ -13,4 +13,7 @@ target_link_libraries(br_test PRIVATE plcc gtest gtest_main rt pthread)
 set_target_properties(br_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
 add_test(NAME br_test COMMAND 
     $<TARGET_FILE:br_test>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+
+configure_file(bar_test.csv "${CMAKE_BINARY_DIR}/tests/bar_test.csv")

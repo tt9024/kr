@@ -1,11 +1,11 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+# basic FloorCPR functions
 add_library(floorlib STATIC
     ExecutionReport.cpp
     PositionData.cpp
     PositionManager.cpp
-    RiskManager.cpp
-    FloorManager.cpp
+    RiskMonitor.cpp
     )
 
 target_link_libraries(floorlib PUBLIC plcc rt pthread)
@@ -13,9 +13,19 @@ target_include_directories(floorlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/)
 target_include_directories(floorlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../md)
 target_include_directories(floorlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../util)
 
-# floor
-add_executable(floor FloorManagerMain.cpp)
+# floor manager
+add_executable(floor FloorManagerMain.cpp
+                     FloorManager.cpp
+    )
 target_link_libraries(floor PRIVATE floorlib)
+
+# floor trader
+# add akk execution traders here
+add_executable(ftrader FloorTraderMain.cpp 
+                       FloorTrader.cpp
+                       TWAPTrader.cpp
+    )
+target_link_libraries(ftrader PRIVATE floorlib)
 
 # flr
 add_executable(flr flr.cpp)

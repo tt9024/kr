@@ -175,10 +175,10 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
             # make sure eday is not more than end_date
             # if end_date was given as a weekend dates
             if (eday > end_date) :
-                print 'ending to ', end_date, ' adjust to ',
+                print ('ending to ', end_date, ' adjust to ',)
                 ti0=l1.TradingDayIterator(eday)
                 eday = ti0.prev().yyyymmdd()
-                print eday
+                print (eday)
 
             if next_contract :
                 fc=fcn
@@ -199,22 +199,22 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
                         try :
                             if os.stat(fn0+ext0).st_size > 1024:
                                 found += 1
-                                print 'found existing file: ', fn0+ext0, ' count = ', found
+                                print ('found existing file: ', fn0+ext0, ' count = ', found)
                         except :
                             continue
                     assert found == 1
-                    print 'reusing ', fn0, ' for ', ext_str 
+                    print ('reusing ', fn0, ' for ', ext_str )
                 except :
-                    print 'getting ', ext_str, ' FILE: ', fn0, ' (found = %d)'%(found)
+                    print ('getting ', ext_str, ' FILE: ', fn0, ' (found = %d)'%(found))
                     fext.append(ext)
                     cext.append(etp)
 
             if len(fext) == 0 :
-                print 'Nothing to get from %s to %s!'%(sday, eday)
+                print ('Nothing to get from %s to %s!'%(sday, eday))
                 continue
 
             if len(fext) == 1 and fext[0] == '_trd.csv' and next_contract and getqt :
-                print '!! Next Contract using existing quote only'
+                print ('!! Next Contract using existing quote only')
                 continue
                 
             if ibclient is None :
@@ -222,7 +222,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
                 # don't run it (save time)
                 # the caller should except file
                 # not found and handle it with zero bar
-                print 'Not running ibclient (None)!'
+                print ('Not running ibclient (None)!')
                 fnarr.remove(fn)
                 continue
 
@@ -254,7 +254,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
                         for ist, ext in zip (cext, fext) :
                             fn0=fn+ext
                             cmdline=ibclient + ' ' + str(cid) + ' ' + sym + ' ' + '\"'+eday_str+'\"' + ' ' + str(barsec) + ' ' + fn0 + ' ' + ist + ' ' + clp
-                            print 'running ', cmdline
+                            print ('running ', cmdline)
                             if not mock_run :
                                 fs0 = file_size(fn0)
                                 os.system( cmdline )
@@ -267,12 +267,12 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
                                 time.sleep(2)
                                 #os.system( 'sleep 2' 
                         if no_update_cnt >= 4:
-                            print 'no data on ', d0
+                            print ('no data on ', d0)
                             break
                     tic.next()
                     d0=tic.yyyymmdd()
             except (KeyboardInterrupt, SystemExit) :
-                print 'stop ...'
+                print ('stop ...')
                 return []
             except :
                 traceback.print_exc()
@@ -281,7 +281,7 @@ def get_ib_future(symbol_list, start_date, end_date, barsec, ibclient=IB_CLIENT,
         for ext in fext :
             fn0=fn+ext
             if not mock_run:
-                print 'gzip ', fn0
+                print ('gzip ', fn0)
                 os.system('gzip ' + fn0)
 
     """
@@ -375,9 +375,9 @@ def bar_file_cleanup(sym) :
         ts_trd = subprocess.check_output("head -n 1 " + f0201trd + " | cut -d ',' -f 1",shell=True)[:-1]
         qt_ln = subprocess.check_output("grep -n " + ts_trd + " " + f0125qt + " | cut -d ':' -f1 | tail -n 1",shell=True)[:-1]
         if len(qt_ln) == 0 :
-            print 'manually get the line number  '
+            print ('manually get the line number  ')
             qt_ln = str(matchts(f0125qt, f0201trd,is_head=True))
-        print 'trim ', f0125qt, ' got line number ', qt_ln
+        print ('trim ', f0125qt, ' got line number ', qt_ln)
 
         # take the qt context on and after the line
         os.system('tail -n +' + qt_ln + ' ' + f0125qt + ' > ' + sym_dir + '/0125qt_tmp')
@@ -389,7 +389,7 @@ def bar_file_cleanup(sym) :
         #print 'mv ' + sym_dir + '/0125qt_tmp' + ' ' + f0201trd[:-7]+'qt.csv'
 
     else :
-        print sym_dir+'/*_2018012?_*_qt.csv not found', f0125qt
+        print (sym_dir+'/*_2018012?_*_qt.csv not found', f0125qt)
 
     f0507qt = glob.glob(sym_dir+'/*_20180507_?S_qt.csv')
     if len(f0507qt) == 2 :
@@ -398,23 +398,23 @@ def bar_file_cleanup(sym) :
                 continue
             else :
                 break
-        print 'got ', f
+        print ('got ', f)
         # need 0502 trade
         f0507qt = f
         f0502trd = glob.glob(sym_dir+'/*_20180502_*_trd.csv')[0]
         ts_trd = subprocess.check_output("tail -n 1 " + f0502trd + " | cut -d ',' -f 1",shell=True)[:-1]
         qt_ln = subprocess.check_output("grep -n " + ts_trd + " " + f0507qt + " | cut -d ':' -f1 | head -n 1",shell=True)[:-1]
         if len(qt_ln) == 0 :
-            print 'manually get the line number'
+            print ('manually get the line number')
             qt_ln = str(matchts(f0507qt, f0502trd,is_head=False))
-        print 'trim ', f0507qt, ' got line number ', qt_ln
+        print ('trim ', f0507qt, ' got line number ', qt_ln)
 
         # take the qt contend on and before the line
         os.system('head -n ' + qt_ln + ' ' + f0507qt + ' > ' + sym_dir + '/0507qt_tmp')
         os.system('mv ' + f0507qt + ' ' + f0507qt + '.sav')
         os.system('mv ' + sym_dir + '/0507qt_tmp' + ' ' + f0502trd[:-7]+'qt.csv')
     else :
-        print sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt
+        print (sym_dir+'/*_20180507_?S_qt.csv len not 2 ', f0507qt)
 
 
 def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=False, sym_list=None, sym_exclude_list=[]) :
@@ -437,7 +437,7 @@ def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=F
             sym_list = ib_sym_etf
         get_ib_future(sym_list,         start_day, end_day ,bar_sec,mock_run=False,cid=cid+10, getqt=True, gettrd=True, next_contract=False, reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=4, wait_thread=True)
     elif type_str == 'fx' :
-        print 'sym_list ', sym_list, ' ignored!'
+        print ('sym_list ', sym_list, ' ignored!')
         get_ib(                         start_day, end_day,                        cid=cid+20,                                              reuse_exist_file=reuse_exist_file, verbose=verbose,num_threads=4, wait_thread=True)
     elif type_str == 'future2' :
         if sym_list is None :
@@ -449,7 +449,7 @@ def get_all_hist(start_day, end_day, type_str, reuse_exist_file=False, verbose=F
             sym_list = ib_sym_idx
         get_ib_future(sym_list,         start_day, end_day, bar_sec,mock_run=False,cid=cid+40, getqt=False, gettrd=True, next_contract=False,reuse_exist_file=reuse_exist_file,verbose=verbose)
     else :
-        print 'unknown type_str ' , type_str, ' valid is future, etf, fx, future2'
+        print ('unknown type_str ' , type_str, ' valid is future, etf, fx, future2')
     return type_str
 
 def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_exist_file=True, reuse_exist_only=False) :
@@ -484,13 +484,13 @@ def get_missing_day(symbol, trd_day_arr, bar_sec, is_front, cid = None, reuse_ex
     fnarr = []
     for day in trd_day_arr :
         if day in l1.bad_days or l1.is_holiday(day):
-            print 'not getting holiday ', day
+            print ('not getting holiday ', day)
             continue
         cur_day = datetime.datetime.now().strftime('%Y%m%d')
         tdi = l1.TradingDayIterator(cur_day)
         tdi.prev_n_trade_day(260) # IB allow 1 year 1S bar
         if day <= tdi.yyyymmdd() :
-            print 'older than a year, IB not allowed to get ', day
+            print ('older than a year, IB not allowed to get ', day)
             continue
         if l1.venue_by_symbol(symbol) == 'FX':
             fnarr += get_ib(day, day, cid=cid+3,sym_list=[symbol],reuse_exist_file=reuse_exist_file, verbose=False, ibclient=ibclient)
@@ -509,7 +509,7 @@ def move_bar(rsync_dir_list=None, dt=None) :
     if dt is None: 
         dt = datetime.datetime.now()
     if dt.weekday() != 4 :
-        print 'not a friday!'
+        print ('not a friday!')
         return
     yyyymmdd = dt.strftime('%Y%m%d')
     # getting the previous week
@@ -520,11 +520,11 @@ def move_bar(rsync_dir_list=None, dt=None) :
 
     prev_dt = datetime.datetime.strptime(prev_yyyymmdd, '%Y%m%d')
     if prev_dt.weekday() != 4 :
-        print 'previous week', prev_yyyymmdd, ' not a friday ', prev_dt
+        print ('previous week', prev_yyyymmdd, ' not a friday ', prev_dt)
         return
 
     # move bars
-    print 'moving bar files to ', bar_path +'/' + yyyymmdd
+    print ('moving bar files to ', bar_path +'/' + yyyymmdd)
     os.system('mkdir -p ' + bar_path+'/'+yyyymmdd)
 
     for ft in ['csv','bin'] :
@@ -559,12 +559,12 @@ def ingest_ib(sday, eday, get_missing = True, ingest_hist=True, ingest_l1=True) 
     to update the trades and other bid/ask columns.
     """
     if ingest_hist:
-        print "ingesting history!"
+        print ("ingesting history!")
         import IB_hist as ibh
         ibh.ingest_all_symb(sday, eday, get_missing=get_missing)
 
     if ingest_l1:
-        print "ingesting l1!"
+        print ("ingesting l1!")
         import IB_L1_Bar as ibl1
         # figure out the bar_dir_list as fridays during sday to eday
         # since the bar_dir is the friday containing previous 5 trading days
@@ -586,11 +586,11 @@ def all_hist_symbols() :
 def ingest_kdb(symbol_list, year_s = 1998, year_e=2018, repo = None) :
     import KDB_hist as kdb
     for symbol in symbol_list :
-        print'ingesting ', symbol, ' from KDB.'
+        print ('ingesting ', symbol, ' from KDB.')
         try :
             kdb.gen_bar(symbol, year_s = year_s, year_e = year_e, repo=repo)
         except :
-            print 'problem with ', symbol
+            print ('problem with ', symbol)
 
 
 ######################
@@ -610,7 +610,7 @@ def weekly_get_hist(sday, eday, type_str_arr = ['future','future2','etf','fx','i
     if not nowait :
         for p in parr :
             p.join()
-    print 'finished with ', type_str_arr, ' ', sym_list
+    print ('finished with ', type_str_arr, ' ', sym_list)
     return type_str_arr
 
 
@@ -628,6 +628,6 @@ if __name__ == "__main__" :
         weekly_get_hist(sys.argv[1], sys.argv[2])
     if len(sys.argv) >= 4 :
         reuse_existing = True if sys.argv[3].upper()[0]=='Y' or sys.argv[3][0]=='1' else False
-        print 'reuse_existing: ', reuse_existing
+        print ('reuse_existing: ', reuse_existing)
         weekly_get_hist(sys.argv[1], sys.argv[2], reuse_existing = reuse_existing)
 

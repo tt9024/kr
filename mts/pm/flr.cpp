@@ -1,72 +1,33 @@
-#include "FloorBase.h"
-#include "time_util.h"
-#include <stdio.h>
-#include <iostream>
-#include <istream>
-#include <sstream>
+#include "flr.h"
+#include "async_io.h"
 
-namespace pm {
-    class FloorClientUser: public FloorBase {
-        // FloorClientUser encapsulates user input, sends to 
-        // FloorManager and output the response.
-        // 
-
-    public:
-        explicit FloorClientUser(const std::string& name)
-        : FloorBase(name, false)
-        {}
-
-        ~FloorClientUser(){};
-
-        // update the floor manager whenever
-        std::string sendReq(const std::string& cmd) {
-            switch (cmd[0]) {
-            case '@':
-            {
-                // FloorBase::AlgoUserCommand
-                m_msgin.type = FloorBase::AlgoUserCommand;
-                m_msgin.copyString(cmd.c_str()+1);
-                if ((m_channel->request(m_msgin, m_msgout, 5) && 
-                    (m_msgout.type == FloorBase::AlgoUserCommandResp))) {
-                    return std::string(m_msgout.buf);
-                } else {
-                    return "Reqeust Timedout!";
-                }
-            }
-            default:
-            {
-                // FloorBase::UserReq
-                m_msgin.type = FloorBase::UserReq;
-                m_msgin.copyString(cmd);
-                if ((m_channel->request(m_msgin, m_msgout, 5) && 
-                    (m_msgout.type == FloorBase::UserResp))) {
-                    return std::string(m_msgout.buf);
-                } else {
-                    return "Reqeust Timedout!";
-                }
-            }
-            }
-        }
-
-    protected:
-        FloorClientUser(const FloorClientUser& mgr) = delete;
-        FloorClientUser& operator=(const FloorClientUser& mgr) = delete;
-    };
-};
-
-static const char* Version = "1.0";
+static const char* Version = "1.1";
 
 int main(int argc, char**argv) {
     pm::FloorClientUser fcu ("user");
     if (argc == 1) {
         // an interative user interface
         pm::FloorClientUser fcu ("user");
-        std::cout << "Floor Client Version "<< Version << std::endl;
+        std::cout << "Floor Client Version "<< Version << std::endl << "Doesn't support Delete and Arrow keys, use CTRL-C instead."<< std::endl;
+        std::string resp_;
+        char cmd[MAX_LINE_LEN+1];
+        size_t cmd_len;
+        int resp_cnt = 1;
+        std::cout << ">>> " << std::flush ;
         while (true) {
-            std::cout << ">>> ";
-            std::string cmd;
-            std::getline (std::cin >> std::ws ,cmd);
-            std::cout << fcu.sendReq(cmd) << std::endl;
+            if (utils::getline_nb(cmd, sizeof(cmd), &cmd_len)) {
+                if (cmd_len > 1) {
+                    std::cout << fcu.sendReq(std::string(cmd)) << std::endl;
+                    resp_cnt = 1;
+                }
+                std::cout << ">>> " << std::flush;
+            }
+            utils::TimeUtil::micro_sleep(100*1000);
+            resp_ = "";
+            if (fcu.checkPrevResp(resp_)) {
+                resp_cnt++;
+                std::cout << std::endl << "*** the " << resp_cnt << " response ***" << std::endl << resp_ << std::endl << std::flush;
+            }
         }
     } else {
         // an one-time command, 

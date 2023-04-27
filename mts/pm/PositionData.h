@@ -12,6 +12,7 @@
 #include "ExecutionReport.h"
 #include "csv_util.h"
 #include "plcc/PLCC.hpp"
+#include "symbol_map.h"
 
 // forward declaration 
 namespace algo {
@@ -77,8 +78,12 @@ namespace pm {
         bool operator==(const IntraDayPosition& idp) const;
             // compares two positions, in terms of position and vap
 
-        utils::CSVUtil::LineTokens toCSVLine() const;
-            // writes the current position to a csv line
+        utils::CSVUtil::LineTokens toCSVLine(bool use_mtm_pnl=false, double mtm_pnl_adjust=0, const double* ref_px=nullptr) const;
+            // writes realized pnl to eod_pos.csv
+        utils::CSVUtil::LineTokens toCSVLineMtm(const double* ref_px=nullptr) const; 
+            // writes mtm pnl as an additional column into eod_pos_mtm.csv
+        utils::CSVUtil::LineTokens toCSVLineMtmDaily(const utils::CSVUtil::FileTokens& prev_vec, const double* ref_px=nullptr) const; 
+            // writes daily mtm pnl as pnl in same format of eod_pos.csv
 
         std::string toString() const;
             // writes the current position to a text line
@@ -107,7 +112,7 @@ namespace pm {
         double getRealizedPnl() const;
             // calculate current realized pnl
         
-        double getMtmPnl(double ref_px) const;
+        double getMtmPnl(const double* ref_px = nullptr) const;
             // calculate realized pnl plus mark to market pnl
             // using the given ref_px
            
@@ -115,6 +120,9 @@ namespace pm {
         
         std::string get_symbol() const { return m_symbol ; };
         std::string get_algo() const   { return m_algo;    };
+        bool is_mleg() const { return utils::SymbolMapReader::get().isMLegSymbol(m_symbol); };
+
+        static std::string get_pod_from_algo(const std::string& algo) { return algo.substr(0,algo.find("-")); };
 
     protected:
         std::string m_algo;
@@ -136,6 +144,7 @@ namespace pm {
 
     struct OpenOrder {
         const IntraDayPosition* m_idp;
+        int64_t m_ord_qty;  // the inital qty upon open
         IDType m_clOrdId;
         //IDType m_execId;  // in case clOrdId is not unique (?)
         int64_t m_open_qty; // + buy - sell, from er

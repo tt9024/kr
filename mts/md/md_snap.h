@@ -65,6 +65,12 @@ struct PriceEntry {
         snprintf(buf, sizeof(buf), "%lld(%s:%d)", (unsigned long long) ts_micro, PriceCString(getPrice()), size);
         return std::string(buf);
     }
+
+    std::string toStringPxSz() const {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%d:%s",  (int) size, PriceCString(getPrice()));
+        return std::string(buf);
+    }
 };
 
 class VenueConfig {
@@ -183,44 +189,83 @@ struct BookConfig {
     std::string venue;
     std::string symbol;
     std::string type; // "L1, L2, TbT"
+    std::string provider; // BPIPE, TT, etc
 
-    BookConfig(const std::string& v, const std::string& s, const std::string& bt) :
-        venue(v), symbol(s), type(bt) {
+    // provider is empty for prod feed, otherwise, the qname/bfname will have provider
+    BookConfig(const std::string& v_, const std::string& s_, const std::string& bt_, const std::string& provider_) 
+    : venue(v_), type(bt_), provider(provider_) {
+        const auto* ti = utils::SymbolMapReader::get().getTradableInfo(s_);
+        symbol = ti->_tradable;
+        if (venue.size()==0) {
+            venue = ti->_venue;
+        }
     };
 
-    // construct by venue/symbol and a book type: "L1 or L2"
+    BookConfig(const std::string& v_, const std::string& s_, const std::string& bt_) 
+    : venue(v_), type(bt_) {
+        const auto* ti = utils::SymbolMapReader::get().getTradableInfo(s_);
+        symbol = ti->_tradable;
+        if (venue.size()==0) {
+            venue = utils::SymbolMapReader::get().getTradableInfo(symbol)->_venue;
+        }
+    };
+
+    // construct by provider@venue/symbol and a book type: "L1 or L2"
     // or a tradable or MTS symbol in case "/" is not found
+    // venue could have a '@' to specify a provider, i.e. bbg@CME, or tt@ICE
+    // it is possible to omit venue, i.e.,  bbg@/SPX_N1
     BookConfig(const std::string& venu_symbol, const std::string& bt) :
         type(bt) {
         size_t n = strlen(venu_symbol.c_str());
         auto pos = venu_symbol.find("/");
         if (pos == std::string::npos) {
             // try tradable
-            const auto* ti(utils::SymbolMapReader::get().getByTradable(venu_symbol, true));
+            const auto* ti(utils::SymbolMapReader::get().getTradableInfo(venu_symbol));
             if (!ti) {
-                ti = utils::SymbolMapReader::get().getByMtsSymbol(venu_symbol, true);
-                if (!ti) {
-                    logError("venue/symbol cannot be parsed, slash not found: %s", venu_symbol.c_str());
-                    throw std::runtime_error(std::string("venue/symbol cannot be parsed!") + venu_symbol);
-                };
+                logError("symbol cannot be parsed: %s", venu_symbol.c_str());
+                throw std::runtime_error(std::string("symbol cannot be parsed!") + venu_symbol);
             }
             symbol = ti->_tradable;
             venue = ti->_venue;
         } else {
-            venue=venu_symbol.substr(0,pos);
-            symbol=venu_symbol.substr(pos+1,n);
+            // venue (and optional provider) and symbol specified
+            const auto venue0 = venu_symbol.substr(0,pos);
+            const auto symbol0 = venu_symbol.substr(pos+1,n);
+            // parsing symbols
+            const auto* ti(utils::SymbolMapReader::get().getTradableInfo(symbol0));
+            if (!ti) {
+                logError("symbol cannot be parsed: %s", symbol0.c_str());
+                throw std::runtime_error(std::string("symbol cannot be parsed!") + symbol0);
+            }
+            symbol = ti->_tradable;
+
+            // parsing venue
+            pos = venue0.find("@");
+            if (pos != std::string::npos) {
+                provider = venue0.substr(0,pos);
+                venue = venue0.substr(pos+1,venue0.size());
+            } else {
+                venue = venue0;
+            }
+            if (venue.size() == 0) {
+                venue = ti->_venue;
+            }
         }
-        //logInfo("BookConfig %s", toString().c_str());
+        logDebug("BookConfig %s", toString().c_str());
     }
 
     std::string qname() const {
-        return venue+"_"+symbol+"_"+type;
+        auto qn = venue+"_"+symbol+"_"+type;
+        if (provider.size()>0) {
+            qn = provider + "_" + qn;
+        }
+        return qn;
     }
 
     std::string toString() const {
         try {
-            const auto* ti(utils::SymbolMapReader::get().getByTradable(symbol, false));
-            return venue+"_"+ti->_mts_contract+"_"+type;
+            const auto* ti(utils::SymbolMapReader::get().getTradableInfo(symbol));
+            return venue+"_"+ti->_mts_contract+"_"+type+"_"+provider;
         } catch (const std::exception& e) {
             return qname();
         }
@@ -228,14 +273,17 @@ struct BookConfig {
 
     std::string bfname(int barsec) const {
         // get the current bar file
+
         return plcc_getString("BarPath")+"/"+
-                   venue+"_"+symbol+"_"+std::to_string(barsec)+"S.csv";
+               (provider.size()>0? (provider + "_"):"") + 
+               venue+"_"+symbol+"_"+std::to_string(barsec)+"S.csv";
     }
 
     std::string bhfname(int barsec) const {
         // get the previous bar file
         return plcc_getString("HistPath")+"/"+
-                   venue+"_"+symbol+"_"+std::to_string(barsec)+"S.csv";
+               (provider.size()>0? (provider + "_"):"") + 
+               venue+"_"+symbol+"_"+std::to_string(barsec)+"S.csv";
     }
 
     std::vector<int> barsec_vec() const {
@@ -252,6 +300,10 @@ struct BookConfig {
 
     const utils::TradableInfo* getTradableInfo() const {
         return utils::SymbolMapReader::get().getByTradable(symbol, true);
+    }
+
+    bool operator== (const BookConfig& cfg) const {
+        return qname() == cfg.qname();
     }
 };
 
@@ -368,6 +420,26 @@ struct BookDepot {
         return px/qty;
     }
 
+    const PriceEntry getBestBidPE() const {
+        for (int i = 0; i<avail_level[0]; ++i) {
+            if (pe[i].size > 0) {
+                return pe[i];
+            }
+        }
+        return PriceEntry();
+    }
+
+    const PriceEntry getBestAskPE() const {
+        for (int i = BookLevel; i<BookLevel+avail_level[1]; ++i) {
+            if (pe[i].size > 0) {
+                return pe[i];
+            }
+        }
+        return PriceEntry();
+    }
+
+
+    // TODO - use PE functions
     Price getBid(Quantity* size) const {
         if ((avail_level[0] < 1))
             return 0;
@@ -1130,9 +1202,62 @@ bool getBBO(const std::string& symbol, double& bidpx, int& bidsz, double& askpx,
     if (!LatestBook(symbol, "L1", myBook)) {
         return false;
     }
+    bidsz=0;
+    asksz=0;
     bidpx = myBook.getBid(&bidsz);
     askpx = myBook.getAsk(&asksz);
     return true;
+}
+
+static inline
+bool getBBOPriceEntry(const std::string& symbol, PriceEntry& bid_pe, PriceEntry& ask_pe) {
+    BookDepot myBook;
+    if (!LatestBook(symbol, "L1", myBook)) {
+        return false;
+    }
+    bid_pe = myBook.getBestBidPE();
+    ask_pe = myBook.getBestAskPE();
+    return true;
+}
+
+static inline
+std::string getBBOString(const std::string& symbol, const double bidpx, const int bidsz, const double askpx, const int asksz) {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "%s BBO (%d %s : %s %d)", symbol.c_str(), bidsz, PriceCString(bidpx), PriceCString(askpx), asksz);
+    return std::string(buf);
+}
+
+static inline
+double getBidPrice(const std::string& symbol) {
+    int bsz = 0,asz = 0;
+    double bpx = 0, apx = 0;
+    getBBO(symbol, bpx,bsz,apx,asz);
+    return bpx;
+
+}
+
+static inline
+double getAskPrice(const std::string& symbol) {
+    int bsz = 0,asz = 0;
+    double bpx = 0, apx = 0;
+    getBBO(symbol, bpx,bsz,apx,asz);
+    return apx;
+}
+
+static inline
+int getBidSize(const std::string& symbol) {
+    int bsz = 0,asz = 0;
+    double bpx = 0, apx = 0;
+    getBBO(symbol, bpx,bsz,apx,asz);
+    return bsz;
+}
+
+static inline
+int getAskSize(const std::string& symbol) {
+    int bsz = 0,asz = 0;
+    double bpx = 0, apx = 0;
+    getBBO(symbol, bpx,bsz,apx,asz);
+    return asz;
 }
 
 // price string could be in the form of 
@@ -1169,7 +1294,8 @@ bool getPriceByStr(const std::string& symbol, const char* px_str, double& px) {
     if (! *ptr) {
         try {
             px = std::stod(px_str);
-            px = (int) (px / ti->_tick_size + 0.5) * ti->_tick_size;
+            const int sn { std::signbit(px)?-1:1 };
+            px = (int) (std::abs(px) / ti->_tick_size + 0.5) * sn * ti->_tick_size;
             logDebug("Parsed to a price string: %s - %lf", px_str, px);
             return true;
         } catch (const std::exception& e) {
@@ -1214,6 +1340,12 @@ bool getPriceByStr(const std::string& symbol, const char* px_str, double& px) {
     double bidpx, askpx;
     int bidsz, asksz;
     if (! getBBO(symbol, bidpx, bidsz, askpx, asksz)) {
+        return false;
+    }
+    // check if the market has any quotes on the 'side'
+    if ((side?bidsz:asksz) == 0) {
+        logError("there is no quotes on the %s side, cannot make price string from %s", 
+                (side?"bid":"ask"), px_str);
         return false;
     }
     px = (side? bidpx:askpx);

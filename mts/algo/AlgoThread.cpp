@@ -128,78 +128,79 @@ namespace algo {
         // 'strat_name E' : stop 
         // 'strat_name D' : dump
 
+        std::string respstr("Ack");
         switch (msg_in.type) {
             case FloorBase::AlgoUserCommand :
             {
-                std::string respstr("Ack");
                 const char* cmd = msg_in.buf;
                 const auto tk = utils::CSVUtil::read_line(cmd, ' ');
                 const auto& sn(tk[0]);
                 if (strcmp(sn.c_str(), "L")==0) {
                     respstr = toString();
                     logInfo("List loaded: %s", respstr.c_str());
-                } else if (strcmp(sn.c_str(), "*")==0) {
-                    stop(sn);
-                } else {
-                    if (m_algo_map.find(sn) == m_algo_map.end()) {
-                        logError("Strategy %s not found!", sn.c_str());
-                        respstr = "Strategy " + sn + " not found!";
-                        break;
-                    };
-                    if (tk.size() < 2) {
-                        logError("No command given for Strategy %s!", sn.c_str());
-                        respstr = "No command given for Strategy " + sn + " \nRun help to see a list of supported commands.";
-                        break;
-                    }
-
-                    const auto& c(tk[1]);
-                    switch (c[0]) {
-                    case 'S':
-                    {
-                        logInfo("Starting strategy %s", sn.c_str());
-                        start(sn);
-                        break;
-                    }
-                    case 'E':
-                    {
-                        logInfo("Stopping strategy %s", sn.c_str());
-                        stop(sn);
-                        break;
-                    }
-                    case 'R':
-                    {
-                        if (tk.size() < 3) {
-                            respstr = std::string("Reload command error!\n@strat_name R config_file");
-                            logError("%s", respstr.c_str());
-                            break;
-                        }
-                        const auto& cfg_file(tk[2]);
-                        logInfo("Reload strategy %s with config %s", 
-                                sn.c_str(), cfg_file.c_str());
-                        reload(sn, cfg_file);
-                        break;
-                    }
-                    case 'D':
-                    {
-                        auto dumpstr = m_algo_map[sn]->toString();
-                        logInfo("Dump %s: %s", sn.c_str(), dumpstr.c_str());
-                        respstr = dumpstr;
-                        break;
-                    }
-                    default :
-                        logError("Unknown strategy command: %s", cmd);
-                        respstr = "Unknown strategy command: " + std::string(cmd);
-                    }
+                    break;
                 }
-                m_msgout.type = FloorBase::AlgoUserCommandResp;
-                m_msgout.ref = msg_in.ref;
-                m_msgout.copyString(respstr);
-                m_channel->update(m_msgout);
+                if (m_algo_map.find(sn) == m_algo_map.end()) {
+                    logInfo("Strategy %s not found!", sn.c_str());
+                    //respstr = std::string("Strategy ") + sn + " not found!";
+                    break;
+                };
+                if (tk.size() < 2) {
+                    logError("No command given for Strategy %s!", sn.c_str());
+                    respstr = std::string("No command given for Strategy ") + sn + " \nRun help to see a list of supported commands.";
+                    break;
+                }
+
+                const auto& c(tk[1]);
+                switch (c[0]) {
+                case 'S':
+                {
+                    logInfo("Starting strategy %s", sn.c_str());
+                    start(sn);
+                    break;
+                }
+                case 'E':
+                {
+                    logInfo("Stopping strategy %s", sn.c_str());
+                    stop(sn);
+                    break;
+                }
+                case 'R':
+                {
+                    if (tk.size() < 3) {
+                        respstr = std::string("Reload command error!\n@strat_name R config_file");
+                        logError("%s", respstr.c_str());
+                        break;
+                    }
+                    const auto& cfg_file(tk[2]);
+                    logInfo("Reload strategy %s with config %s", 
+                            sn.c_str(), cfg_file.c_str());
+                    reload(sn, cfg_file);
+                    break;
+                }
+                case 'D':
+                {
+                    auto dumpstr = m_algo_map[sn]->toString();
+                    logInfo("Dump %s: %s", sn.c_str(), dumpstr.c_str());
+                    respstr = dumpstr;
+                    break;
+                }
+                default :
+                    logError("Unknown strategy command: %s", cmd);
+                    respstr = "Unknown strategy command: " + std::string(cmd);
+                }
                 break;
             }
             default :
+            {
                 logError("Unknown message type received: %s", msg_in.toString().c_str());
+                respstr = "unknown message type!";
+            }
         }
+        m_msgout.type = FloorBase::AlgoUserCommandResp;
+        m_msgout.ref = msg_in.ref;
+        m_msgout.copyString(respstr);
+        m_channel->update(m_msgout);
     }
 
     void AlgoThread::addAlgo(const std::string& name, const std::string& class_name, const std::string& cfg) {

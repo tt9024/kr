@@ -37,7 +37,7 @@ REPO_PATH = '/home/bfu/kisco/repo'
 GET_HIST_LOG = '/cygdrive/e/ib/kisco/gethist.log'
 GET_HIST_LOG_SIZE = [0, 0, 0] # prev_sz, prev_utc, prev_bounce_utc
 RESET_WAIT_SECOND_Current = 150
-RESET_WAIT_SECOND_Max = 300
+RESET_WAIT_SECOND_Max = 180
 RESET_WAIT_SECOND_Decay = 0.8
 GET_HIST_LOG_SIZE_INC = 200
 

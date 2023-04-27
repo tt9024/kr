@@ -6,7 +6,8 @@ namespace algo {
     IDBO_TF::IDBO_TF (const std::string& name, const std::string& cfg, pm::FloorBase::ChannelType& channel, uint64_t cur_micro)
     : AlgoBase(name, channel),
       m_name(name),
-      m_cfg(cfg)
+      m_cfg(cfg),
+      m_weight(0)
     {
         onReload(cur_micro, m_cfg);
         logInfo("%s created with cfg %s", m_name.c_str(), m_cfg.c_str());
@@ -37,6 +38,7 @@ namespace algo {
             if (reader.get<std::string>("update_date") != cur_trading_day) {
                 throw std::runtime_error(std::string("Config update date ") + reader.get<std::string>("update_date") + " not equalt to current trading day " + cur_trading_day);
             }
+            m_weight = reader.get<double>("strategy_weight");
             const auto& sym_reader = reader.getReader("symbols");
             for (const auto& key: sym_reader.listKeys()) {
                 auto new_param( std::make_shared<Param> (key, sym_reader.getReader(key),  (time_t)(cur_micro/1000000ULL)));
@@ -84,17 +86,6 @@ namespace algo {
             const auto& trigger_time(state._trigger_time);
             int& next_idx (state._next_trigger_idx);
 
-            // debug
-            // TODO - remove!
-            /*
-            logDebug("onOneSecond: cur_utc(%d), next_idx(%d), trigger_size(%d)",
-                    (int) (cur_micro/1000000ULL), next_idx, (int) trigger_time.size());
-            if (trigger_time.size() > 0) {
-                logDebug("trigger(%d-%d)",  (int)trigger_time[0],
-                        (int) trigger_time[trigger_time.size()-1]);
-            }
-            */
-
             if (trigger_time.size() <= (size_t) next_idx) {
                 // done for the day
                 continue;
@@ -114,11 +105,11 @@ namespace algo {
         auto tgt_position = state._tgt_pos;
         if (tgt_position != state._pos) {
             time_t tgt_utc = utils::TimeUtil::cur_utc() + 5*60;
-            if (!setPositionTWAP(state._symid, tgt_position, tgt_utc)) {
+            if (!setPositionTWAP2(state._symid, tgt_position, tgt_utc)) {
                 logError("%s failed to set position to %lld from %lld", 
                         m_name.c_str(), (long long) tgt_position, 
                         (long long) state._pos);
-            } else {
+            } else {  
                 state._pos_td = m_param[state._symid]->_trade_day;
             }
         }
@@ -149,8 +140,8 @@ namespace algo {
         if (state._last_updated == 0) {
             state._h = state._bar.high;
             state._l = state._bar.low;
-            state._last_updated = cur_utc;
         }
+        state._last_updated = cur_utc;
 
         //state._tgt_pos = state._pos;
         if (state._pos != 0) {
@@ -169,14 +160,13 @@ namespace algo {
             if (((state._pos > 0) && (state._bar.low <= state._stop)) ||
                 ((state._pos < 0) && (state._bar.high >= state._stop))) 
             {
-                logInfo("clearing position %s", onDump().c_str());
-
                 state._tgt_pos = 0;
                 state._stop = 0;
                 state._h = 0;
                 state._l = 0;
                 state._ic = 0;
                 state._ds = 0;
+                logInfo("%s(%s) clearing position: %s", m_name.c_str(), param._bcfg->toString().c_str(), state.toString(false).c_str());
             } else {
                 // update stop level and speed
                 if (state._pos > 0) {
@@ -217,7 +207,7 @@ namespace algo {
                     state._stop = state._bar.close - x_trade * state._ds;
                     state._ic =  param._sar_ic;
                     state._tgt_pos = x_trade * param._pos_n;
-                    logInfo("%s taking position: %s", param._bcfg->toString().c_str(), state.toString(false).c_str());
+                    logInfo("%s(%s) taking position: %s", m_name.c_str(), param._bcfg->toString().c_str(), state.toString(false).c_str());
                 }
             }
         }
@@ -339,12 +329,12 @@ namespace algo {
     std::string IDBO_TF::onDump() const {
         // dump the state book/bar/curpos
         // dump the param coef/barsec/st/et/maxpos
-        std::string ret;
+        std::string ret = "Dump: (strategy weigght = " + std::to_string(m_weight) + ")\n";
         for (const auto& sp: m_state) {
             const auto& state = *sp.second;
             const auto iter = m_param.find(sp.first);
             const auto& param(*(iter->second));
-            ret += std::string("\n*****Dump: ") + param.toString(true) + "\nState: " + state.toString(true) + "\n.";
+            ret += std::string("\n******\n") + param.toString(true) + "\nState: " + state.toString(true) + "\n.";
         }
         return ret.substr(0, ret.size()-1);
     }

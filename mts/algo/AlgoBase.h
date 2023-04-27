@@ -41,6 +41,7 @@ namespace algo {
         bool setPositionLimit(int symid, int64_t tgt_qty, double tgt_px);
         bool setPositionPassive(int symid, int64_t tgt_qty, double tgt_px, time_t tgt_utc);
         bool setPositionTWAP(int symid, int64_t tgt_qty, time_t tgt_utc);
+        bool setPositionTWAP2(int symid, int64_t tgt_qty, time_t tgt_utc);
 
         // set the position of symid to 0
         bool coverPosition(int symid);

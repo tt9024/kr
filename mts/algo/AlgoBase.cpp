@@ -87,6 +87,7 @@ namespace algo {
                 )
             );
     }
+
     bool AlgoBase::setPositionTWAP(int symid, int64_t tgt_qty, time_t tgt_utc) {
         const auto& sinfo (m_symbols[symid]);
         return setPosition(pm::FloorBase::PositionInstruction(
@@ -96,6 +97,19 @@ namespace algo {
                     0, 
                     tgt_utc, 
                     pm::FloorBase::PositionInstruction::TWAP
+                )
+            );
+    }
+
+    bool AlgoBase::setPositionTWAP2(int symid, int64_t tgt_qty, time_t tgt_utc) {
+        const auto& sinfo (m_symbols[symid]);
+        return setPosition(pm::FloorBase::PositionInstruction(
+                    m_name, 
+                    sinfo->_bcfg.symbol, 
+                    tgt_qty, 
+                    0, 
+                    tgt_utc, 
+                    pm::FloorBase::PositionInstruction::TWAP2
                 )
             );
     }

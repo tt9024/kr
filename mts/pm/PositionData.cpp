@@ -2,7 +2,7 @@
 #include "time_util.h"
 #include <cmath>
 #include <cstdlib>
-#include "symbol_map.h"
+#include "md_snap.h"
 
 namespace pm {
 
@@ -40,48 +40,58 @@ namespace pm {
 
     void IntraDayPosition::update(const ExecutionReport& er) {
         switch(er.m_tag39[0]) {
-        case '0': // new
-        {
-            addOO(er);
-            break;
-        }
+            case '0': // new
+            {
+                addOO(er);
+                break;
+            }
 
-        case '1': // Partial Fill
-        case '2': // Fill
-        {
-            int64_t qty = (int64_t) er.m_qty;
-            double px = er.m_px;
+            case '1': // Partial Fill
+            case '2': // Fill
+            {
+                int64_t qty = (int64_t) er.m_qty;
+                double px = er.m_px;
 
-            // add fill - qty to be multiplied by contract size
-            addFill(qty, px, er.m_recv_micro);
+                // add fill - qty to be multiplied by contract size
+                addFill(qty, px, er.m_recv_micro);
 
-            // update open order
-            updateOO(er.m_clOrdId, qty);
-            break;
-        }
+                // update open order
+                updateOO(er.m_clOrdId, qty);
+                break;
+            }
 
-        case '3': // done for day
-        case '4': // cancel
-        case '5': // replaced
-        case '7': // stopped
-        case 'C': // Expired
-        {
-            deleteOO(er.m_clOrdId);
-            break;
-        }
+            case '3': // done for day
+            case '4': // cancel
+            case '5': // replaced
+            case '7': // stopped
+            case 'C': // Expired
+            {
+                deleteOO(er.m_clOrdId);
+                break;
+            }
 
-        case '8': // rejected
-        {
-            logError("Reject received: %s", er.m_clOrdId);
-            break;
-        }
-        case 'A': // pending new
-        case 'E': // pending replace
-        case '6': // pending cancel
-            break;
+            case '8': // rejected
+            {
+                // reject either new or replace, the state would
+                // not be changed in these two cases, so just log
+                logError("Reject received: %s", er.m_clOrdId);
+                break;
+            }
+            /*
+             * fall to default for loggings
+             *
+            case 'A': // pending new
+            case 'E': // pending replace
+            case '6': // pending cancel
+                break;
+            */
 
-        default : // everything else
-            break;
+            default : // everything else
+            {
+                logError("unknown execution tag39(%c) received on clOrdid(%s)", er.m_tag39[0], er.m_clOrdId);
+                logError("the unknown execution report detail(%s)", er.toString().c_str());
+                break;
+            }
         }
     }
 
@@ -175,11 +185,14 @@ namespace pm {
         return diff(idp, false).size()==0;
     };
 
-    utils::CSVUtil::LineTokens IntraDayPosition::toCSVLine() const {
-        // same token sequence as above
+    utils::CSVUtil::LineTokens IntraDayPosition::toCSVLine(bool use_mtm_pnl, double mtm_pnl_adjust, const double* ref_px) const {
+        // token sequence: algo, mts_contract, qty, vap, pnl(daily realized), last_utc, ccy
         utils::CSVUtil::LineTokens vec;
         double vap, pnl;
         int64_t qty = getPosition(&vap, &pnl);
+        if (use_mtm_pnl) {
+            pnl = getMtmPnl(ref_px) + mtm_pnl_adjust;
+        }
         const auto* ti = utils::SymbolMapReader::get().getByTradable(m_symbol);
         vec.push_back(m_algo);
         vec.push_back(ti->_mts_contract);
@@ -191,14 +204,50 @@ namespace pm {
         return vec;
     }
 
+    utils::CSVUtil::LineTokens IntraDayPosition::toCSVLineMtmDaily(const utils::CSVUtil::FileTokens& prev_vec, const double* ref_px) const {
+        // token sequence: algo, mts_contract, qty, vap, pnl(daily realized plus DAILY outstanding mtm change), last_utc, ccy
+        // search the prev_vec for the the algo and symbol
+        // if found, adjust with previous mtm and pnl as the following:
+        //      daily_mtm_pnl = current_mtm - (previous_mtm - prevous_pnl)
+        //
+        const auto* ti = utils::SymbolMapReader::get().getByTradable(m_symbol);
+        for (const auto& line: prev_vec) {
+            if ( (line[0] == m_algo) && (line[1] == ti->_mts_contract) ) {
+                const double last_mtm = std::stod(line[4]);  // refer to toCSVLineMtm() for position
+                const double last_pnl = std::stod(line[5]);
+                return this->toCSVLine(true, -(last_mtm-last_pnl), ref_px);
+            }
+        }
+        return this->toCSVLine(true,0, ref_px);
+    }
+
+    utils::CSVUtil::LineTokens IntraDayPosition::toCSVLineMtm(const double* ref_px) const {
+        // token sequence: algo, mts_contract, qty, vap, pnl(daily realized plus outstanding mtm), pnl(daily realized), last_utc, ccy
+        utils::CSVUtil::LineTokens vec;
+        double vap, pnl, pnl_mtm = getMtmPnl(ref_px);
+        int64_t qty = getPosition(&vap, &pnl);
+        const auto* ti = utils::SymbolMapReader::get().getByTradable(m_symbol);
+        vec.push_back(m_algo);
+        vec.push_back(ti->_mts_contract);
+        vec.push_back(std::to_string(qty));
+        vec.push_back(PriceString(vap));
+        vec.push_back(PnlString(pnl_mtm));
+        vec.push_back(PnlString(pnl));
+        vec.push_back(std::to_string(m_last_micro));
+        vec.push_back(ti->_currency);
+        return vec;
+    }
+
     std::string IntraDayPosition::toString() const {
-        double vap, pnl;
+        double vap, pnl, pnl_mtm = getMtmPnl();
         int64_t qty = getPosition(&vap, &pnl);
 
+
         char buf[256];
-        size_t bytes = snprintf(buf, sizeof(buf), "%s:%s qty=%lld, vap=%s, pnl=%s, last_updated=", 
-                m_algo.c_str(), utils::SymbolMapReader::get().getByTradable(m_symbol)->_mts_contract.c_str(), 
-                (long long) qty, PriceCString(vap), PnlCString(pnl));
+        size_t bytes = snprintf(buf, sizeof(buf), "%-13s  %-16s  %-5s  %-10s  %-8s   (%-8s)  ",
+                m_algo.c_str(), 
+                utils::SymbolMapReader::get().getByTradable(m_symbol)->_mts_contract.c_str(), 
+                std::to_string(qty).c_str(), PriceString(vap).substr(0,10).c_str(), PnlStringColor(pnl_mtm).c_str(), PnlStringColor(pnl).c_str());
         bytes += utils::TimeUtil::frac_UTC_to_string(m_last_micro, buf+bytes, sizeof(buf)-bytes,6);
         return std::string(buf);
     }
@@ -221,7 +270,7 @@ namespace pm {
         try {
             return int(utils::SymbolMapReader::get().getByTradable(m_symbol)->_point_value + 0.5);
         } catch (const std::exception & e) {
-            logError("cannot get point value for %s, set to 1.0\n", m_symbol.c_str());
+            logError("cannot get point value for %s, set to 1.0", m_symbol.c_str());
             return 1;
         }
     }
@@ -264,9 +313,28 @@ namespace pm {
         return pnl;
     }
     
-    double IntraDayPosition::getMtmPnl(double ref_px) const {
+    double IntraDayPosition::getMtmPnl(const double* ref_px_ptr) const {
         double vap, pnl;
         int64_t m_qty = getPosition(&vap, &pnl);
+        if (m_qty == 0) {
+            return pnl;
+        }
+        double ref_px = 0;
+        if (!ref_px_ptr) {
+            try {
+                double bidpx, askpx;
+                int bidsz,  asksz;
+                if (md::getBBO(m_symbol, bidpx, bidsz, askpx, asksz)) {
+                    ref_px = m_qty > 0? bidpx : askpx;
+                } else {
+                    logInfo("cannot get %s snap price, MTM pnl not calculated", m_symbol.c_str());
+                }
+            } catch (const std::exception& e) {
+                logInfo("Exception get %s snap price, MTM pnl not calculated: %s", m_symbol.c_str(), e.what());
+            }
+        } else {
+            ref_px = *ref_px_ptr;
+        }
         return pnl + m_qty*(ref_px-vap) * m_contract_size;
     }
 
@@ -340,22 +408,30 @@ namespace pm {
 
 
     OpenOrder::OpenOrder(const IntraDayPosition* idp) 
-    : m_idp(idp), m_open_qty(0), m_open_px(0), m_open_micro(0)
+    : m_idp(idp), m_ord_qty(0), m_open_qty(0), m_open_px(0), m_open_micro(0)
     {
         memset(m_clOrdId, 0, sizeof(m_clOrdId));
     }
 
     OpenOrder::OpenOrder(const IntraDayPosition* idp, const ExecutionReport& er)
-    : m_idp(idp), m_open_qty(er.m_qty), m_open_px(er.m_px), m_open_micro(er.m_recv_micro)
+    : m_idp(idp), m_ord_qty(er.m_qty), m_open_qty(er.m_qty), m_open_px(er.m_px), m_open_micro(er.m_recv_micro)
     {
         memcpy(m_clOrdId, er.m_clOrdId, sizeof(IDType));
+        if (er.m_reserved != 0) {
+            // take as cumQty
+            m_open_qty -= er.m_reserved;
+            logInfo("got new with cumQty: er:%s, oo:%s",
+                    er.toString().c_str(), 
+                    toString().c_str());
+        }
     }
 
     std::string OpenOrder::toString() const {
         char buf[256];
         snprintf(buf, sizeof(buf), 
-                "OpenOrder(clOrdId=%s,%s,open_qty=%lld,open_px=%s,open_time=%s)",
-                m_clOrdId, m_open_qty>0?"Buy":"Sell",std::llabs(m_open_qty), PriceCString(m_open_px),
+                "OpenOrder(clOrdId=%s,%s,ord_qty=%lld,open_qty=%lld,open_px=%s,open_time=%s)",
+                m_clOrdId, m_open_qty>0?"Buy":"Sell",std::llabs(m_ord_qty), std::llabs(m_open_qty), 
+                PriceCString(m_open_px),
                 utils::TimeUtil::frac_UTC_to_string(m_open_micro,6).c_str());
         return std::string(buf);
     }

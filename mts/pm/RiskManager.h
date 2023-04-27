@@ -31,6 +31,9 @@ namespace pm {
         static std::string ManualStrategyName();
         static bool isManualStrategy(const std::string& strat_name);
 
+        void setPause(const std::string& symbol, bool if_pause);
+        bool getPause(const std::string& symbol) const;
+
     private:
         RiskManager();
         RiskManager(const RiskManager& rm) = delete;
@@ -47,6 +50,9 @@ namespace pm {
         std::unordered_map<std::string, utils::RateLimiter> m_rateLimiter;
         std::set<std::string> m_paper_trading_strats;
         std::unordered_map<std::string, time_t> _logThrottle;
+
+        // used to do put a manual stop on a symbol
+        std::unordered_map<std::string, bool> _paused_symbols;
     };
 }
 
@@ -104,11 +110,20 @@ namespace pm {
                      int64_t ord_qty,
                      const PositionManager& pm)
     {
+        return true;
+
+
+
         // bypass manual trade
         if (isManualStrategy(strat)) {
             return true;
         }
         const auto& symbol = utils::SymbolMapReader::get().getByTradable(tradable_symbol)->_symbol;
+        const auto iter = _paused_symbols.find(tradable_symbol);
+        if (__builtin_expect( (iter != _paused_symbols.end()) && (iter->second), 0)) {
+            logError("Risk Check Failed! Trading of %s is paused!", tradable_symbol.c_str());
+            return false;
+        }
 
         // check rate
         if (!rateCheck(strat, symbol)) {
@@ -141,10 +156,13 @@ namespace pm {
             const auto& tradable_symbol = ti->_tradable;
 
             // for all strategies (including the current open positions)
+            //
+            logInfo("getting all srategies");
             engine_qty += pm.getPosition(tradable_symbol, nullptr, nullptr, &open_qty);
             engine_qty += open_qty;
 
             // for this strategy (including the current open positions)
+            logInfo("getting only this srategies");
             open_qty = 0;
             strat_qty += pm.getPosition(strat, tradable_symbol, nullptr, nullptr, &open_qty);
             strat_qty += open_qty;
@@ -198,4 +216,17 @@ namespace pm {
     RiskManager::RiskManager() {
         load();
     };
+
+    inline
+    void RiskManager::setPause(const std::string& symbol, bool if_pause) {
+        const auto& tradable (utils::SymbolMapReader::get().getTradableSymbol(symbol));
+        _paused_symbols[tradable] = if_pause;
+    }
+
+    inline
+    bool RiskManager::getPause(const std::string& symbol) const {
+        const auto& tradable (utils::SymbolMapReader::get().getTradableSymbol(symbol));
+        const auto iter = _paused_symbols.find(tradable);
+        return ((iter!=_paused_symbols.end()) && iter->second);
+    }
 }

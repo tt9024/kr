@@ -16,6 +16,12 @@ VenueMap = config/venue_map.cfg
 XmlPath = config/symbol
 AssetsXml = assets.xml
 
+# Market Data Providers
+MDProviders = {
+                  BPipe = config/bpipe.cfg
+                  TTFix = Config = config/legacy/feed_TT.xml
+              }
+
 # Subscription
 # For all tradable from symbol map, if it fall in 
 # either one of the lists, it is subscribed.
@@ -24,13 +30,29 @@ AssetsXml = assets.xml
 
 # N bounded by MaxN
 MaxN = 2
-
-MTSVenue = [ CBF, CBT, CEC, CME, IFCA, IFEU, IFLL, IFLX, IFUS, MGE, NYM, EOP, EUR ]
-#MTSVenue = [ ]
-
-#MTSSymbol = [ SPX ]
-MTSSymbol = [ ]
-
+MTSVenue = {
+               # venue: [primary, backup]
+               #CBF=  [TTFix , BPipe]
+               CBT=  [ BPipe]
+               CEC=  [ BPipe]
+               CME=  [ BPipe]
+               #IFCA= [TTFix , BPipe]
+               IFEU= [ BPipe]
+               IFLL= [ BPipe]
+               #IFLX= [TTFix , BPipe]
+               IFUS= [ BPipe]
+               #MGE=  [TTFix , BPipe]
+               NYM=  [ BPipe]
+               #EOP=  [TTFix , BPipe]
+               #EUR=  [TTFix , BPipe]
+           }
+# this setting mainly for testing purpose
+# when set up, be careful not to have
+# cause multiple primary among providers
+MTSSymbol = {
+              #WTI=   [ BPipe  ]
+            }
+        
 # Strategy
 Strat = config/strat.cfg
 

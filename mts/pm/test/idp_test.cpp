@@ -50,6 +50,7 @@ void setupConfig() {
             "        currency = USD\n"
             "        expiration_date = 2021-05-20\n"
             "        bbg_id = CLM1 COMDTY\n"
+            "        bbg_px_multiplier = 1.0\n"
             "        tickdata_id = CLM21\n"
             "        tickdata_px_multiplier = 1.000000000000\n"
             "        tickdata_timezone = America/New York\n"
@@ -133,8 +134,9 @@ TEST (IDPTest, LoadSave) {
         std::string difflog = idpload.diff(idpcopy);
         EXPECT_FALSE (difflog.size()>0) << "load mismatch with copy!" << std::endl << difflog << std::endl;
 
-        double pnlm2m = idpcopy.getMtmPnl(3.1);
-        double pnlref = (vapref-3.0 + 9*(vapref-3.1));
+        double refpx = 3.1;
+        double pnlm2m = idpcopy.getMtmPnl(&refpx);
+        double pnlref = (vapref-3.0 + 9*(vapref-refpx));
         EXPECT_FALSE (std::fabs(pnlm2m-pnlref)) << "expect Mtm pnl "<< pnlref << " got " << pnlm2m;
 
         // update idpcopy with the coverings, but 
@@ -223,6 +225,29 @@ TEST (IDPTest, AddLoad) {
         (oovec[2]->m_open_qty != 5)) << "add_copy oo open qty mistmach!" << std::endl << idp.toString() << "\n" << idp.dumpOpenOrder() ;
 };
 
+TEST (IDPTest, toMTMDaily) {
+    utils::CSVUtil::FileTokens prev_mtm_lines = {
+        {"TSC-7000-380","WTI_202106","-10","100.0","-1000","-2000","1660317047735535","USD"},
+        {"TSD-7000-380","WTI_202106","0","   0.0",   "30000","30000","1660305722047827","USD"},
+    };
+
+    // create a position with vap
+    pm::IntraDayPosition idp("sym1","TSC-7000-380",-10, 100);
+    double ref_px = 102.0;
+    const auto line = idp.toCSVLine(true, 0, &ref_px);
+    double mtm_pnl = std::stod(line[4]);
+    EXPECT_DOUBLE_EQ(mtm_pnl, -20.0);  // contract size is 1
+
+    // account for the previous lines
+    const auto line2 = idp.toCSVLineMtmDaily(prev_mtm_lines, &ref_px);
+    mtm_pnl = std::stod(line2[4]);
+    EXPECT_DOUBLE_EQ(mtm_pnl, -1020.0);
+
+    pm::IntraDayPosition idp2("sym1","TSC-7000-300",10, 100);
+    const auto line3 = idp2.toCSVLineMtmDaily(prev_mtm_lines, &ref_px);
+    mtm_pnl = std::stod(line3[4]);
+    EXPECT_DOUBLE_EQ(mtm_pnl, 20.0);
+}
 
 int main(int argc, char** argv) {
     utils::PLCC::setConfigPath("/tmp/main.cfg");

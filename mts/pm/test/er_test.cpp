@@ -27,6 +27,7 @@ void setupConfig() {
             "        currency = USD\n"
             "        expiration_date = 2021-05-20\n"
             "        bbg_id = CLM1 COMDTY\n"
+            "        bbg_px_multiplier = 1.0\n"
             "        tickdata_id = CLM21\n"
             "        tickdata_px_multiplier = 1.000000000000\n"
             "        tickdata_timezone = America/New York\n"
@@ -87,7 +88,8 @@ TEST (ExecutionReportTest, TestER) {
                 std::stod(line[6]),
                 line[7],
                 line[8],
-                std::stoull(line[9]));
+                std::stoull(line[9]),
+                0);
     };
 
     if (verbose) {

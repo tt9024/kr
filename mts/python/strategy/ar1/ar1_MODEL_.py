@@ -1,0 +1,117 @@
+#!/usr/bin/python3
+
+import numpy as np
+import datetime
+import time
+import copy
+import os
+import subprocess
+import traceback
+import sys
+import threading
+
+import mts_util
+import symbol_map
+import ar1_md
+import ar1_model
+
+class AR1_WTI:
+    def __init__(self, cfg_fname = '/home/mts/upload/ZFU_STRATS/INTRADAY_MTS_AR1_WTI_US/LiveHO-INTRADAY_MTS_AR1_WTI_US.cfg', barsec=300):
+        self.logger =  mts_util.MTS_Logger('AR1_WTI', logger_file = '/tmp/ar1')
+        self.barsec = int(barsec)
+        self.md = ar1_md.AR1Data(barsec)
+        self.model = ar1_model.AR1_Model(self.logger, cfg_fname)
+
+    def start(self):
+        dtnow = datetime.datetime.now()
+        utcnow = int(dtnow.strftime('%s'))
+        self.tdu = mts_util.TradingDayUtil()
+        trade_day = self.tdu.get_trading_day_dt(dtnow, snap_forward=True)
+        t0 = self.tdu.get_start_utc(trade_day)
+        t1 = self.tdu.get_end_utc(trade_day)
+
+        # load the model
+        self.model.sod(trade_day)
+        self.md.sod()
+
+        param = self.model.param
+        self.sw = param['sw']
+        self.sn = param['strategy_key']
+
+        trd_hours = self.model.param['trading_hour']
+        # t0_trd to t1_trd allowed to trade
+        self.t0_trd = int(datetime.datetime.strptime(trade_day, '%Y%m%d').strftime('%s')) + int(trd_hours[0]*3600+0.5)
+        self.t1_trd = self.t0_trd + int((trd_hours[1]-trd_hours[0])*3600+0.5)
+        next_bar_utc = t0+self.barsec
+        k = 0
+
+        trigger_utc = (np.r_[1,self.model.trigger_time]+t0).astype(int)
+        trigger_utc = np.r_[trigger_utc, t1+self.barsec].astype(int)
+
+        self.logger.logInfo('getting started')
+        cur_utc = int(datetime.datetime.now().strftime('%s'))
+        tr_ix = np.clip(np.searchsorted(trigger_utc, cur_utc)-1, 0, len(trigger_utc)+1)
+
+        self.logger.logInfo('trigger time: %i:%s\n%s'%(tr_ix, str(datetime.datetime.fromtimestamp(trigger_utc[tr_ix])), str(trigger_utc)))
+
+        while cur_utc < t1 + self.barsec and k < self.model.n :
+            try :
+                # make sure we are update-to-date with the bar
+                p0 = None
+                while next_bar_utc <= cur_utc :
+                    md_dict = self.md.on_bar(next_bar_utc)
+                    if md_dict is None :
+                        # wait a bit
+                        time.sleep(0.001)
+                        continue
+                    p0 = self.model.on_bar(k, md_dict)
+                    self.logger.logInfo('run on_bar of %i:%s\nmd=%s'%(k, datetime.datetime.fromtimestamp(next_bar_utc).strftime('%Y%m%d-%H:%M:%S'),str(md_dict)))
+                    next_bar_utc += self.barsec
+                    k+=1
+                    cur_utc = int(datetime.datetime.now().strftime('%s'))
+
+                # we are out into the current bar, work with trigger
+                if trigger_utc[tr_ix] <= cur_utc :
+                    a = 1.0-float(next_bar_utc-cur_utc)/float(self.barsec)
+                    md_dict = self.md.get_snap()
+                    p0 = self.model.on_snap(k, a, md_dict)
+                    self._set_pos(np.round(p0*self.sw))
+                    self.logger.logInfo('run on_snap k=%i, a=%f\nmd=%s'%(k,a,str(md_dict)))
+                    tr_ix += 1
+                else :
+                    # guard against running trigger right after running bar
+                    if p0 is not None:
+                        self.logger.logInfo('onbar - setting position of %i'%(p0))
+                        self._set_pos(np.round(p0*self.sw))
+
+                time.sleep(0.01)
+                cur_utc = int(datetime.datetime.now().strftime('%s'))
+            except KeyboardInterrupt as e :
+                self.logger.logInfo("keyboard interrupt, exiting")
+                break
+            except :
+                self.logger.logError("Exception while running: " + traceback.format_exc())
+                time.sleep(1)
+
+        self.logger.logInfo("Done for the day, waiting for exit!")
+        self.model.eod()
+        self.logger.logInfo("Exit!")
+
+    def _set_pos(self, qty, symbol = 'WTI_N1'):
+        # set position for symbol with target position to be qty
+        cur_utc = int(datetime.datetime.now().strftime('%s'))
+        if cur_utc < self.t0_trd or cur_utc > self.t1_trd :
+            self.logger.logInfo('qty %i not set, not in trading: %d to %d'%(qty, self.t0_trd, self.t1_trd))
+            qty = 0
+
+        run_str = ['/home/mts/run/bin/flr',  'X',  'TSC-7000-'+self.model.param['strat_code'] + ', ' + symbol + ', ' + str(qty) + ', Y1m']
+        try :
+            ret = subprocess.check_output(run_str)
+            #self.logger.logInfo("run command " + str(run_str) + " got " + str(ret))
+        except subprocess.CalledProcessError as e:
+            self.logger.logError("Failed to run command " + str(run_str) + ", return code: " + str(e.returncode) + ", return output: " + str(e.output))
+
+if __name__ == "__main__":
+    mdl = AR1_WTI()
+    mdl.start()
+

@@ -1,0 +1,129 @@
+data_date = 20211206
+function = 
+live_output = \
+  {
+    WTI_N1 = \
+      {
+        max_position = 100
+        min_trade = 5
+        parameters = \
+          {
+            barsec = 300
+            clp_ratio = 0.7
+            execution = \
+              [
+                {
+                  fscale_st = 1.0
+                  k0 = 6
+                  k1 = 11
+                  tscale_st = 2
+                },
+                {
+                  fscale_st = 1.0
+                  k0 = 67
+                  k1 = 100
+                  tscale_st = 2
+                },
+                {
+                  fscale_st = 1
+                  k0 = 108
+                  k1 = 120
+                  tscale_st = 2
+                },
+                {
+                  fscale_st = 1
+                  k0 = 120
+                  k1 = 132
+                  tscale_st = 1.5
+                },
+                {
+                  fscale_st = 1
+                  k0 = 144
+                  k1 = 160
+                  tscale_st = 2
+                },
+                {
+                  fscale_st = 1.0
+                  k0 = 174
+                  k1 = 192
+                  tscale_st = 10
+                },
+                {
+                  fscale_st = 1.0
+                  k0 = 192
+                  k1 = 209
+                  tscale_st = 2
+                },
+                {
+                  fscale_st = 1.0
+                  k0 = 209
+                  k1 = 212
+                  tscale_st = 1.5
+                }
+              ]
+            ixf = \
+              [
+                0,
+                1,
+                2,
+                5,
+                9,
+                15,
+                25,
+                41,
+                67,
+                107,
+                172,
+                275
+              ]
+            ixf_st = \
+              [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11
+              ]
+            mpscale = 0.1
+            n = 276
+            pick = \
+              [
+                47,
+                113
+              ]
+            trigger_cnt = 1200
+            tscale = 1.8
+            w_pos = 5
+          }
+        symbols = \
+          [
+            WTI_N1,
+            HGCopper_N1,
+            Gold_N1,
+            JPY_N1
+          ]
+        trading_hour = \
+          [
+            7,
+            16.8
+          ]
+      }
+  }
+strategy = MTS
+strategy_code = 370
+strategy_key = INTRADAY_MTS_AR1_WTI_US
+sub_strategy = AR1_WTI
+target_risk = 1030264
+theme = INTRADAY
+trade_date = 20211206
+type = MTS
+unit_risk = 100
+volatility = 1030264
+

@@ -1,6 +1,6 @@
 #include "AR1.h"
 #include <cmath>
-#include "RiskManager.h"
+#include "RiskMonitor.h"
 #include <stdexcept>
 
 namespace algo {
@@ -199,7 +199,7 @@ namespace algo {
 
         // getting the max position from the risk config, 
         // this could throw if the symbol is not defined
-        _max_pos = (int64_t) pm::RiskManager::get().stratMaxPosition(_name, symbol);
+        _max_pos = (int64_t) pm::risk::Monitor::get().maxPosition(_name, symbol);
 
         auto cl = vc.getArr<std::string>("Coef");
         for (const auto& c : cl) {

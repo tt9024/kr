@@ -84,6 +84,10 @@ public:
     static std::string curTradingDay1(); // trading day of current time with snap = 1, see tradingDay()
     static std::string curTradingDay2(); // trading day of current time with snap = 2, see tradingDay()
 
+    static time_t startUTC(time_t cur_utc = 0, int start_hour = -6, int start_min = 0,
+                  int end_hour = 17, int end_min = 0, int day_offset=0, int snap = 2);
+        // get the starting utc of the trading day given by cur_utc
+
     //
     // timer
     //

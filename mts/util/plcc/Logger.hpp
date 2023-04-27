@@ -2,8 +2,10 @@
 #include "time_util.h"
 #include <string>
 #include <string.h>
+#include "rate_limiter.h"
 
-#define MAX_LOG_ENTRY 2048
+#define MAX_LOG_ENTRY 1024*4
+#define MAX_LOG_PER_SECOND 100
 
 /*
  * TODO Add Line Number and File
@@ -61,15 +63,19 @@ namespace utils {
     }
 
     virtual void flush() = 0;
+    Logger():rl(MAX_LOG_PER_SECOND,1){}
     virtual ~Logger() {
     };
 
   protected:
     void log(LogLevel level, const char* file, int line, const char* fmt, va_list ap) {
+      if (__builtin_expect(rl.check() != 0,0)) {
+          return;
+      }
       char char_buffer[MAX_LOG_ENTRY];
       int len = Logger::prepare_log_string(level, file, line, char_buffer, MAX_LOG_ENTRY-1);
       int len2 = vsnprintf(char_buffer+len, MAX_LOG_ENTRY-len, fmt, ap);
-      if (len2 >= MAX_LOG_ENTRY-len) {
+      if (__builtin_expect(len2 >= MAX_LOG_ENTRY-len,0)) {
           strcpy(char_buffer+MAX_LOG_ENTRY-11, "<CROPPED!>");
           len = MAX_LOG_ENTRY-1;
       } else {
@@ -90,11 +96,12 @@ namespace utils {
     }
 
     virtual void writeLog(int level, const char* str, int size) = 0;
+    RateLimiter rl;
   };
 
   class FileLogger : public Logger {
   public:
-    FileLogger(const char* filepath): fp(NULL) {
+    FileLogger(const char* filepath): fp(NULL), fp_save(NULL) {
         if (strncmp(filepath, "stdout", 6)==0) {
             fp = stdout;
         } else {
@@ -103,21 +110,33 @@ namespace utils {
         if (!fp) {
             throw std::runtime_error("cannot open log file to write!");
         }
+        fp_save = fp;
     }
     ~FileLogger() {
         // don't close stdout yet
-        if (fp != stdout) {
-            fclose(fp);
+        if (fp_save && (fp_save != stdout)) {
+            fclose(fp_save);
         }
+        fp_save = NULL;
     }
     void flush() {
        fflush(fp);
     }
+
+    void loggerStdoutON() {
+        fp = stdout;
+    }
+
+    void loggerStdoutOFF() {
+        fp = fp_save;
+    }
+
   private:
     FILE* fp;
+    FILE* fp_save;
     void writeLog(int level, const char* str, int size) {
-      fwrite(str, 1, size, fp);
-      flush();
+        fwrite(str, 1, size, fp);
+        flush();
     };
   };
 };

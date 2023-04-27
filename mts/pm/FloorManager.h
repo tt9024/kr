@@ -1,89 +1,48 @@
 #pragma once
 
-#include "FloorBase.h"
-#include "PositionManager.h"
-#include "ExecutionReport.h"
-#include <unordered_map>
+#include "FloorCPR.h"
 
 namespace pm {
-    class FloorManager: public FloorBase {
-        // the FloorManager act as an interface between algo/engine to/from pm and traders
-        // It interacts with the following components
-        // * TP(Engine) :
-        //   - From: gets the execution report
-        //   - To  : sends the order 
-        // * Algo :
-        //   - From: gets the position requests (get + set)
-        //   - To  : respond to the position requests
-        // * User :
-        //   - From: gets the user command (queries + controls)
-        //   - To:   response to user command
-
+    class FloorManager: public FloorCPR<FloorManager> {
     public:
         static FloorManager& get();
         ~FloorManager();
-        void start();
-        void stop();
-        std::string toString() const;
-
-    protected:
-        PositionManager m_pm;
-        volatile bool m_started, m_loaded, m_should_run, m_eod_pending;
-        time_t m_loaded_time;
-        std::string m_recovery_file;
-        std::map<time_t, std::vector<std::shared_ptr<PositionInstruction>>> m_timedInst;
-        std::unordered_map<std::string, std::shared_ptr<PositionInstruction>> m_orderMap;
 
         explicit FloorManager(const std::string& name);
         FloorManager(const FloorManager& mgr) = delete;
         FloorManager& operator=(const FloorManager& mgr) = delete;
 
-        // main handle function from run_one_loop()
-        void handleMessage(MsgType& msg_in);
+        void start_derived(); //called upon position loaded and run_loop_drived will be called afterwards
+        void shutdown_derived();
+        std::string toString_derived() const;
+        void addPositionSubscriptions_derived(); // C++ position get/set
+        void run_loop_derived(); // extra handling after handling all messages in loop
 
-        // specific request handlers
-        void setInitialSubscriptions();
-        void addPositionSubscriptions();
-        void handleExecutionReport(const MsgType& msg);
-        void handleExecutionReport(const pm::ExecutionReport& er);
-        void handleUserReq(const MsgType& msg);
-        void handlePositionReq(const MsgType& msg);
-        void handleTimedPositionInstructions(time_t cur_utc=0);
-        void handlePositionInstructions(const std::vector<std::shared_ptr<PositionInstruction>>& pi_vec);
+        void handleExecutionReport_derived(const pm::ExecutionReport& er); // extra handling after receiving an er
+        bool handleUserReq_derived(const MsgType& msg, std::string& respstr);  // handles all except buy/sell, position req, display, return emtpy string if not handled
 
-        // send order functions
-        // if clOrdId is not nullptr but empty, then generate a clOrdId and assigns to it
-        // if clOrdId is not nullptr and non-empty, then uses the given clOrdId
-        std::string sendOrder(const bool isBuy, const char* algo, 
-                              const char* symbol, int64_t qty, double px, 
-                              std::string* clOrdId = nullptr);
-        std::string sendOrderByString(const char* bsstr, std::string* clOrdId=nullptr);
-        std::string sendCancelReplaceByString(const char* bsstr);
+        bool handlePositionReq_derived(const MsgType& msg, MsgType& msg_out);  
+        // handles positions requests from C++ and user cmd 'X' 
+        // Note - for msg type GetPositionReq - it comes from C++, 
+        // with msg buffer being the PositionRequest;
+        // for msg type SetPositionReq, it comes from both C++ and 
+        // 'X', with msg buffer being PositionInstruction.
 
-        // trader related handlers
-        bool scanOpenOrders();
-        void clearAllOpenOrders();
-        int64_t matchOpenOrders(const std::string& algo, const std::string& symbol, int64_t qty, double* px=nullptr);
-
-        // helpers to send requests
-        bool requestReplay(const std::string& loadUtc, std::string* errstr = nullptr);
-        bool requestOpenOrder(std::string* errstr=nullptr);
-
-        // this allows for base to call handleMessage
         friend class FloorBase;
+        bool isFloorManager() const { return true; };
 
     private:
+        std::string handleUserReqMD(const char* cmd);
         enum {
-            ScanIntervalMicro = 5000000, // 5 seconds
+            IdleSleepMicro       = 50000,    // sleep duration
+
+            // execution related parameters
+            ScanIntervalMicro    = 100000,    // open order scan interval
+            MaxPegTickDiff     = 3,       // maximum spreads before go aggressive in peg
+            PegAggIntervalMilli  = 2000,      // OO Peg, wait between consecutive aggressive
         };
-        bool loadRecoveryFromFill(const std::string& loadUtc, std::string* errstr = nullptr);
-        int64_t sendOrder_outContract(int64_t trade_qty, const std::shared_ptr<PositionInstruction>& pi, const IntraDayPosition& pos);
-        bool sendOrder_InContract(int64_t trade_qty, const std::shared_ptr<PositionInstruction>& pi);
-        void addPositionInstruction(const std::shared_ptr<PositionInstruction>& pos_inst, time_t cur_utc=0);
-        double getPegPx(const std::shared_ptr<const OpenOrder>& oo, bool peg_passive) const;
 
         bool shouldScan(const std::shared_ptr<const OpenOrder>& oo, bool& peg_passive) const;
-        std::vector<std::pair<time_t,long long>> getTWAPSlice(int64_t trade_qty, const std::string tradable_symbol, time_t target_utc, int lot_seconds = 60) const;
-
+        bool scanOpenOrders();
     };
 };

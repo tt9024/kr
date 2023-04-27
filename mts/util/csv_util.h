@@ -180,8 +180,23 @@ namespace utils {
             }
             return std::string(strbuf);
         }
+
+        static std::string printPnl(double d) {
+            auto s = printDouble(d, 0);
+            // add a sign place in the front
+            return d>=0? (std::string(" ")+s):s;
+        }
+
+        static std::string printPnlColor(double d) {
+            static const std::string NORM = "\x1B[0m";
+            static const std::string RED = "\x1B[31m";
+            static const std::string GRN = "\x1B[32m";
+            
+            const std::string ret = printPnl(d) + NORM;
+            if (d>=0) {
+                return GRN+ret;
+            }
+            return RED+ret;
+        }
     };
-
 }
-
-

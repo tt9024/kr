@@ -31,6 +31,7 @@ void setupSymMap() {
             "        currency = USD\n"
             "        expiration_date = 2021-05-20\n"
             "        bbg_id = CLM1 COMDTY\n"
+            "        bbg_px_multiplier = 1.0\n"
             "        tickdata_id = CLM21\n"
             "        tickdata_px_multiplier = 1.000000000000\n"
             "        tickdata_timezone = America/New York\n"
@@ -54,6 +55,7 @@ void setupSymMap() {
             "        currency = USD\n"
             "        expiration_date = 2021-06-20\n"
             "        bbg_id = CLN1 COMDTY\n"
+            "        bbg_px_multiplier = 1.0\n"
             "        tickdata_id = CLN21\n"
             "        tickdata_px_multiplier = 1.000000000000\n"
             "        tickdata_timezone = America/New York\n"
@@ -74,12 +76,13 @@ void setupStratConfig() {
     fprintf(fp, "RecoveryPath = /tmp\n");
     fclose(fp);
 
-    std::system("mkdir /tmp/strat/idbo_test > /dev/null 2>&1");
+    std::system("mkdir -p /tmp/strat/idbo_test > /dev/null 2>&1");
     std::system("rm -fR /tmp/strat/idbo_test/*.csv > /dev/null 2>&1");
 
     const std::string cfgstr = 
 "update_date = 20210506\n"
 "strategy_code = 7000-335\n"
+"strategy_weight = 0.5\n"
 "symbols = {\n"
 "    WTI_N1 = {\n"
 "        signal_tf = 0\n"

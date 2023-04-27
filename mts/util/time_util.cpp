@@ -171,7 +171,7 @@ namespace utils {
 
        if (utc_second == 0) {
            // current second
-           utc_second = time(NULL);
+           utc_second = utils::TimeUtil::cur_utc();
        }
        while (! isTradingTime(utc_second, start_hour, start_min, end_hour, end_min)) {
            if (snap == 0) 
@@ -195,6 +195,17 @@ namespace utils {
            utc_second += (24*3600);
        }
        return frac_UTC_to_string(utc_second, 0, "%Y%m%d");
+    }
+
+    time_t TimeUtil::startUTC(time_t utc_second, int start_hour, int start_min,
+                              int end_hour, int end_min, int day_offset, int snap)
+    {
+        auto trd_day = TimeUtil::tradingDay(utc_second, start_hour, start_min, 
+                end_hour, end_min, day_offset, snap); // in yyyymmdd
+        time_t utc = TimeUtil::string_to_frac_UTC(trd_day.c_str(),0,"%Y%m%d");
+        utc += (start_hour*3600);
+        utc += (start_min*60);
+        return utc;
     }
 
     uint64_t TimeUtil::micro_sleep(uint64_t micro) {

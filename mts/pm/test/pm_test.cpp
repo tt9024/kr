@@ -30,6 +30,7 @@ void setupConfig() {
             "        currency = USD\n"
             "        expiration_date = 2021-05-20\n"
             "        bbg_id = CLM1 COMDTY\n"
+            "        bbg_px_multiplier = 1.0\n"
             "        tickdata_id = CLM21\n"
             "        tickdata_px_multiplier = 1.000000000000\n"
             "        tickdata_timezone = America/New York\n"
@@ -53,6 +54,7 @@ void setupConfig() {
             "        currency = USD\n"
             "        expiration_date = 2021-06-20\n"
             "        bbg_id = CLN1 COMDTY\n"
+            "        bbg_px_multiplier = 1.0\n"
             "        tickdata_id = CLN21\n"
             "        tickdata_px_multiplier = 1.000000000000\n"
             "        tickdata_timezone = America/New York\n"
@@ -85,7 +87,14 @@ const char* RecoveryCSV="recovery.csv";
 const char* EODCSV = "eod_pos.csv";
 const std::string RecoverPath = "/tmp";
 
-TEST(PMTest,  LoadSave) {
+class PMTest : public ::testing::Test {
+public:
+    const utils::CSVUtil::FileTokens loadEoD_CSVLines(const std::string& eod_file, std::string* latest_day_ptr, const pm::PositionManager& pmgr) const {
+        return pmgr.loadEoD_CSVLines(eod_file, latest_day_ptr);
+    }
+};
+
+TEST_F(PMTest,  LoadSave) {
     utils::CSVUtil::FileTokens erlines0;
     utils::CSVUtil::write_file(erlines0, RecoverPath+"/"+EODCSV, false);
 
@@ -198,6 +207,20 @@ TEST(PMTest,  LoadSave) {
 
     for (auto& idp : idpvec) {
         std::cout << idp->toString() << std::endl;
+    }
+
+    // loading eod mtm
+    utils::CSVUtil::FileTokens erlines_mtm = {
+        {"20220811-17:00:03","TSD-7000-370","WTI_202209","-27","92.71451178","51757.46","31385.65","1660328703517184","USD"},
+        {"20220812-17:00:03","TSC-7000-380","Gilt_202209","-98","116.39671666","52498.75","23420.52","1660317309727922","GBP"}
+    };
+    utils::CSVUtil::write_file(erlines_mtm, RecoverPath+"/"+RecoveryCSV, false);
+    std::string latest_day;
+    const auto& line_vec(loadEoD_CSVLines(RecoverPath+"/"+RecoveryCSV, &latest_day, pmgr));
+    EXPECT_TRUE( latest_day == "20220812-17:00:03" );
+    EXPECT_EQ  ( line_vec.size(), 1 );
+    for (unsigned int i=0; i < line_vec[0].size(); ++i) {
+        EXPECT_TRUE  ( line_vec[0][i] == erlines_mtm[1][i+1] );
     }
 };
 

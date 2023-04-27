@@ -78,7 +78,8 @@ namespace pm {
                         std::stod(line[3]),
                         utils::TimeUtil::frac_UTC_to_string(new_micro/1000ULL, 3),
                         "",
-                        new_micro);
+                        new_micro,
+                        0);
                 enq(er_new);
 
                 // fill scheduled in 0.5 second
@@ -91,7 +92,8 @@ namespace pm {
                         std::stod(line[3]),
                         utils::TimeUtil::frac_UTC_to_string(fill_micro/1000ULL, 3),
                         "",
-                        fill_micro);
+                        fill_micro,
+                        0);
                 enq(er_fill);
             } catch (const std::exception& e) {
                 return e.what();

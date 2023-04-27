@@ -19,23 +19,22 @@
 #include <atomic>
 
 namespace utils {
-
-    /// a template for Runnable
+    /// a template for a Runnable
     class Runnable {
     public:
         void run(void* para);
         void stop();
     };
 
-    template<typename Runnable>
+    template<typename RunnableType>
     class ThreadWrapper {
     public:
         // note runnable has to live in its own scope. 
-        ThreadWrapper(Runnable& runnable) : m_runnable(runnable), m_param(NULL), m_isRunning(false), m_thread(0) {};
+        ThreadWrapper(RunnableType& runnable) : m_runnable(runnable), m_param(NULL), m_isRunning(false), m_thread(0) {};
         void run(void* para) {
             if (!m_isRunning) {
                 m_param = para;
-                int ret = pthread_create( &m_thread, NULL, ThreadWrapper<Runnable>::threadFunc, (void*) this);
+                int ret = pthread_create( &m_thread, NULL, ThreadWrapper<RunnableType>::threadFunc, (void*) this);
                 if (ret != 0) {
                     throw std::runtime_error(std::string("pthread creation error! errno=") + std::to_string(errno));
                 }
@@ -75,16 +74,16 @@ namespace utils {
         };
 
         // getters
-        Runnable& getRunnable() const { return m_runnable; };
+        RunnableType& getRunnable() const { return m_runnable; };
         void* getRunParam() const { return m_param; };
 
     private:
-        Runnable& m_runnable;
+        RunnableType& m_runnable;
         void* m_param;
         bool m_isRunning;
         pthread_t m_thread;
         static void* threadFunc(void* para) {
-            ThreadWrapper<Runnable> *wrapper = (ThreadWrapper<Runnable>*)para;
+            ThreadWrapper<RunnableType> *wrapper = (ThreadWrapper<RunnableType>*)para;
             wrapper->getRunnable().run(wrapper->getRunParam());
             return (void*)NULL;
         }
@@ -100,10 +99,6 @@ namespace utils {
     class SpinLock {
     public:
         using LockType = std::atomic<bool>;
-        static std::shared_ptr<LockType> CreateSpinLock(bool initial_value = false) {
-            return std::make_shared<LockType>(initial_value);
-        }
-
         explicit SpinLock(LockType& lock) noexcept 
         :_lock(&lock)
         {
@@ -111,28 +106,12 @@ namespace utils {
         }
 
         ~SpinLock() {
-            if (_lock) {
-                release();
-            }
+            release();
         }
 
-        static std::shared_ptr<SpinLock> TryLock(LockType& lock) noexcept {
-            // try lock, if success, return a shared pointer to the spin lock
-            // the destruct releases it out-of-scope
-            // if failed, return a nullptr
-            auto sl = std::make_shared<SpinLock>();
-            sl->_lock=&lock;
-            if (sl->try_lock()) {
-                return sl;
-            }
-            sl->_lock = nullptr;
-            return std::shared_ptr<SpinLock>();
-        }
-
-        SpinLock() : _lock(NULL) {};
     private:
         void acquire() noexcept {
-            for (;;) {
+            while (1) {
                 if (!_lock->exchange(true, std::memory_order_acquire)) {
                     break;
                 }
@@ -144,11 +123,6 @@ namespace utils {
 
         void release() noexcept {
             _lock->store(false, std::memory_order_release);
-        }
-
-        bool try_lock() noexcept {
-            return !_lock->load(std::memory_order_relaxed) &&
-                   !_lock->exchange(true, std::memory_order_acquire);
         }
 
 

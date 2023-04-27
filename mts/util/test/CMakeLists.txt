@@ -51,4 +51,15 @@ target_link_libraries(qtest PRIVATE rt pthread plcc)
 # cfg_reader is a manual test
 add_executable(cfg_reader cfg_reader.cpp)
 target_include_directories(cfg_reader PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(cfg_reader PRIVATE plcc rt pthread plcc)
+target_link_libraries(cfg_reader PRIVATE rt pthread plcc)
+
+# plcc_log is a manual test
+add_executable(plcc_log plcc_test.cpp)
+target_include_directories(plcc_log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(plcc_log PRIVATE rt pthread plcc)
+
+# OnlyMe is a manual test
+add_executable(onlyme onlyme.cpp)
+target_include_directories(onlyme PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(onlyme PRIVATE rt pthread plcc)
+

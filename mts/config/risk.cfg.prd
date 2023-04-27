@@ -1,0 +1,3003 @@
+strat = {
+    TSC-7000-337 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+    TSC-7000-380 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+    TSC-7000-336 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+    TSC-7000-387 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+
+    TSC-7000-391 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+    TSC-7000-390 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+    TSC-7000-389 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+
+    TSC-7000-388 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+    TSC-7000-387 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+    TSD-7000-387 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Corn = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Wheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            KansasWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Soybeans = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanMeal = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SoybeanOil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Cotton = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Coffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Sugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HGCopper = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gold = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Silver = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FeederCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LiveCattle = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LeanHogs = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NDX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DJIA = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EUR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            JPY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CHF = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            GBP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            AUD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NZD = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MXN = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BRL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            ZAR = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RUB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TU = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FV = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            TY = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            US = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            VIX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonCocoa = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RobustaCoffee = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Bund = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            DAX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gilt = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            FTSE = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Platinum = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Canola = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Palladium = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Rapeseed = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MW = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            CAC = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MillingWheat = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            V2X = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            LondonSugar = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BOBL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            OAT = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BTP = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            EuroStoxx600 = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            BUXL = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            MES = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Russell = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Schatz = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+
+    TSC-7000-370 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+
+    TSD-7000-370 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+
+    TSC-7000-373 = {
+        PaperTrading = 1
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+
+    TSC-7000-376 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            NG = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Brent = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            HO = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            RBOB = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            Gasoil = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+
+    TSD-7000-1 = {
+        PaperTrading = 0
+        Symbols = {
+            WTI = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+            SPX = {
+                position = 500.0
+                rate_limit = [60, 10]
+            }
+        }
+    }
+}
+
+mts = {
+    WTI = {
+        position = 1000
+        order_size = 1000
+    }
+    Brent = {
+        position = 1000
+        order_size = 1000
+    }
+    Gasoil = {
+        position = 1000
+        order_size = 1000
+    }
+    HO = {
+        position = 1000
+        order_size = 1000
+    }
+    NG = {
+        position = 1000
+        order_size = 1000
+    }
+    RBOB = {
+        position = 1000
+        order_size = 1000
+    }
+    Corn = {
+        position = 1000
+        order_size = 1000
+    }
+    Wheat = {
+        position = 1000
+        order_size = 1000
+    }
+    KansasWheat = {
+        position = 1000
+        order_size = 1000
+    }
+    Soybeans = {
+        position = 1000
+        order_size = 1000
+    }
+    SoybeanMeal = {
+        position = 1000
+        order_size = 1000
+    }
+    SoybeanOil = {
+        position = 1000
+        order_size = 1000
+    }
+    Cocoa = {
+        position = 1000
+        order_size = 1000
+    }
+    Cotton = {
+        position = 1000
+        order_size = 1000
+    }
+    Coffee = {
+        position = 1000
+        order_size = 1000
+    }
+    Sugar = {
+        position = 1000
+        order_size = 1000
+    }
+    HGCopper = {
+        position = 1000
+        order_size = 1000
+    }
+    Gold = {
+        position = 1000
+        order_size = 1000
+    }
+    Silver = {
+        position = 1000
+        order_size = 1000
+    }
+    FeederCattle = {
+        position = 1000
+        order_size = 1000
+    }
+    LiveCattle = {
+        position = 1000
+        order_size = 1000
+    }
+    LeanHogs = {
+        position = 1000
+        order_size = 1000
+    }
+    SPX = {
+        position = 1000
+        order_size = 1000
+    }
+    NDX = {
+        position = 1000
+        order_size = 1000
+    }
+    DJIA = {
+        position = 1000
+        order_size = 1000
+    }
+    EUR = {
+        position = 1000
+        order_size = 1000
+    }
+    JPY = {
+        position = 1000
+        order_size = 1000
+    }
+    CHF = {
+        position = 1000
+        order_size = 1000
+    }
+    GBP = {
+        position = 1000
+        order_size = 1000
+    }
+    AUD = {
+        position = 1000
+        order_size = 1000
+    }
+    CAD = {
+        position = 1000
+        order_size = 1000
+    }
+    NZD = {
+        position = 1000
+        order_size = 1000
+    }
+    MXN = {
+        position = 1000
+        order_size = 1000
+    }
+    BRL = {
+        position = 1000
+        order_size = 1000
+    }
+    ZAR = {
+        position = 1000
+        order_size = 1000
+    }
+    RUB = {
+        position = 1000
+        order_size = 1000
+    }
+    TU = {
+        position = 1000
+        order_size = 1000
+    }
+    FV = {
+        position = 1000
+        order_size = 1000
+    }
+    TY = {
+        position = 1000
+        order_size = 1000
+    }
+    US = {
+        position = 1000
+        order_size = 1000
+    }
+    VIX = {
+        position = 1000
+        order_size = 1000
+    }
+    LondonCocoa = {
+        position = 1000
+        order_size = 1000
+    }
+    RobustaCoffee = {
+        position = 1000
+        order_size = 1000
+    }
+    Bund = {
+        position = 1000
+        order_size = 1000
+    }
+    DAX = {
+        position = 1000
+        order_size = 1000
+    }
+    Gilt = {
+        position = 1000
+        order_size = 1000
+    }
+    FTSE = {
+        position = 1000
+        order_size = 1000
+    }
+    Platinum = {
+        position = 1000
+        order_size = 1000
+    }
+    EuroStoxx = {
+        position = 1000
+        order_size = 1000
+    }
+    Canola = {
+        position = 1000
+        order_size = 1000
+    }
+    Palladium = {
+        position = 1000
+        order_size = 1000
+    }
+    Rapeseed = {
+        position = 1000
+        order_size = 1000
+    }
+    MW = {
+        position = 1000
+        order_size = 1000
+    }
+    CAC = {
+        position = 1000
+        order_size = 1000
+    }
+    MillingWheat = {
+        position = 1000
+        order_size = 1000
+    }
+    V2X = {
+        position = 1000
+        order_size = 1000
+    }
+    LondonSugar = {
+        position = 1000
+        order_size = 1000
+    }
+    BOBL = {
+        position = 1000
+        order_size = 1000
+    }
+    OAT = {
+        position = 1000
+        order_size = 1000
+    }
+    BTP = {
+        position = 1000
+        order_size = 1000
+    }
+    EuroStoxx600 = {
+        position = 1000
+        order_size = 1000
+    }
+    BUXL = {
+        position = 1000
+        order_size = 1000
+    }
+    MES = {
+        position = 1000
+        order_size = 1000
+    }
+    Russell = {
+        position = 1000
+        order_size = 1000
+    }
+    Schatz = {
+        position = 1000
+        order_size = 1000
+    }
+}

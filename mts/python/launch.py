@@ -10,25 +10,39 @@ import symbol_map
 import traceback
 import daily_update
 import glob
+import tpmon
+import numpy as np
+import sys_util as su
+import gc
 
 _should_run = True
-
-def printfl(text) :
-    dt = datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S")
-    print(str(dt) + " " + str(text))
-    sys.stdout.flush()
-    sys.stderr.flush()
+_exit_code = 0
 
 def signal_handler(signal, frame) :
-    printfl( 'got signal '+ str(signal))
-    _should_run = False
-    kill_all()
-    sys.exit(1)
+    global _should_run
+    global _exit_code
+    _exit_code = 2
+    try :
+        su.printfl( 'got signal '+ str(signal))
+        if not _should_run :
+            su.printfl( 'signal is being processed during shutdown...')
+            return
+        _should_run = False
+    except:
+        pass
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
-
-procs=['bin/tpmain','bin/floor','bin/strat_run', 'python/strategy/hics_calh']
+procs=['bin/tpmain','bin/floor', 'bin/strat_run', 'bin/ftrader ftrader1',\
+#       'python/strategy/hics_calh', \
+#       'python/strategy/camid/CAMID2', 'python/strategy/ar1/ar1_ens_MODEL', \
+#       'python/strategy/idbo_MODEL',    'python/strategy/idbo_MODEL_tactical', \
+#       'python/strategy/idbo_MODEL_HV', 'python/strategy/idbo_MODEL_HV_tactical', \
+#       'python/strategy/idbo_MODEL_LV', 'python/strategy/idbo_MODEL_LV_tactical' \
+       ]
+#procs=['bin/tpmain','bin/floor', 'bin/strat_run']
+#tp_procs=['bin/bpmain', 'bin/tpmain']
+tp_procs=['bin/bpmain']
 flr = 'bin/flr'
 proc_map={}
 RESET_WAIT_SECOND = 80
@@ -41,50 +55,6 @@ PYTHON_PATH = 'python'
 ### needs to be called approximately every couple seconds
 daily_update_object = daily_update.DailyUpdate()
 
-class TPMon :
-    def __init__(self, stale_sec=60, close_hours = [ 17 ], open_hour = 18, open_minute = 0) :
-        self.stale_sec=stale_sec
-        self.bar_path=BAR_PATH
-        self.fn = glob.glob(self.bar_path+'/*CME*.csv')
-        self.fs = self.upd()
-        self.ts = datetime.datetime.now()
-        self.close_hours = close_hours
-        self.open_hour = open_hour
-        self.open_minute = open_minute
-
-    def upd(self) :
-        fs = []
-        for f in self.fn :
-            fs.append(os.stat(f).st_size)
-        return fs
-
-    def check(self) :
-        ss = (datetime.datetime.now()-self.ts).seconds
-        if ss < self.stale_sec :
-            return True
-
-        fsnow = self.upd()
-        ret=False
-        for s1, s2 in zip(self.fs, fsnow) :
-            if s2 != s1 :
-                ret=True
-                break
-
-        self.ts = datetime.datetime.now()
-        self.fs = fsnow
-
-        if not ret:
-            # override during off hour and first check after open
-            if self.ts.hour in self.close_hours:
-                ret = True
-            elif (self.ts.hour == self.open_hour) and (self.ts.minute*60 + self.ts.second <= self.open_minute*60 + self.stale_sec + 5):
-                ret = True
-
-        return ret
-
-# ==================
-# the following 3 functions control start/stop time
-# =================
 def is_weekend() :
     dt=datetime.datetime.now()
     wd=dt.weekday()
@@ -93,7 +63,7 @@ def is_weekend() :
     if wd == 5 :
         return True
     if wd==4 :
-        return dt.hour>17 or (dt.hour == 17 and dt.minute >= 1)
+        return dt.hour>22 or (dt.hour == 22 and dt.minute > 5 ) # note the weekend clean up would follow
     if wd==6 :
         return dt.hour<17 or (dt.hour == 17 and dt.minute <= 55)
 
@@ -102,9 +72,9 @@ def is_in_daily_trading() :
         return False
     dt=datetime.datetime.now()
     wd=dt.weekday()
-    if wd < 4:
-        # mon-thursday
-        return dt.hour != 17 or dt.minute < 1 or dt.minute > 55
+    if wd <= 4:
+        # mon-friday
+        return dt.hour != 17 or (dt.minute+dt.second) == 0 or dt.minute > 55
     return True
 
 def get_utcstart() :
@@ -131,10 +101,13 @@ def update_config(trd_day = "") :
                 # for the next trading day
                 utc += 24*3600
             trd_day = datetime.datetime.fromtimestamp(utc).strftime('%Y-%m-%d')
-        cfg_file = 'config/symbol'
         cfg_path = 'config'
-        printfl ("updating symbol map for trading day " + trd_day)
-        t, v = symbol_map.update_symbol_map(trd_day, cfg_file)
+        symbol_xml_file = os.path.join(cfg_path, 'symbol')
+        main_cfg_file =   os.path.join(cfg_path, 'main.cfg')
+        su.printfl ("updating symbol map for trading day " + trd_day)
+        symbol_spread_dict = symbol_map.get_symbol_spread_set(main_cfg_file)
+        max_N = symbol_map.get_max_N(main_cfg_file)
+        t, v = symbol_map.update_symbol_map(trd_day, symbol_xml_file, max_N=max_N, symbol_spread_dict=symbol_spread_dict, add_prev_day_symbols=True)
         symbol_map.writeToConfigure(t,v,cfg_path)
     except :
         traceback.format_exc()
@@ -150,70 +123,68 @@ def weekly_cleanups() :
     pass
 
 def eod_reconcile() :
-    printfl ('run reconcile.  Sending requestion: ' + flr + ' E')
+    su.printfl ('run reconcile.  Sending requestion: ' + flr + ' E')
     ret = subprocess.check_output([flr, "E"])
-    printfl (ret)
-    printfl ('waiting for EoD reconcile')
+    su.printfl (ret)
+    su.printfl ('waiting for EoD reconcile')
     time.sleep(15)
 
-def is_pid_alive(pid) :
-    pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
-    return pid in pids
-
-def is_proc_alive(proc) :
-    return proc.poll() is None
-
-def kill_proc(proc) :
-    try :
-        pid = proc.pid
-        while is_proc_alive(proc) :
-            printfl ('sending sigint')
-            proc.send_signal(signal.SIGINT)
-            time.sleep(5)
-            if is_proc_alive(proc) :
-                printfl ('sending sigterm')
-                proc.send_signal(signal.SIGTERM)
-                time.sleep(3)
-                if is_proc_alive(proc) :
-                    printfl ('sending sigkill')
-                    proc.send_signal(signal.SIGKILL)  #kill -9
-                    time.sleep(2)
-    except Exception as e :
-        printfl ('Exception in Kill: ' + str(e))
-        traceback.print_exc()
-        return 0
-    return 1
-
-def kill_p(p) :
-    if p in proc_map.keys() :
-        printfl ("killing " + str(p))
-        p0 = p.split('/')[-1]
-        os.system("pkill " + p0)
-        time.sleep(1)
-        proc=proc_map[p]
-        if is_proc_alive(proc) :
-            printfl ( p + '(' + str(proc.pid) +  ') is alive, killing')
-            kill_proc(proc)
-
 def kill_all() :
-    for p in proc_map.keys() :
-        kill_p(p)
+    try :
+        proc_keys = proc_map.keys()
+        for p in proc_keys:
+            try :
+                su.kill_python_proc(proc_map[p])
+            except:
+                pass
+        proc_map.clear()
+    except:
+        pass
+
+    # second round, make sure all instances are killed
+    for cmd_line in procs:
+        try:
+            su.kill_by_name(cmd_line)
+        except:
+            pass
+
+def kill_tp() :
+    try :
+        proc_keys = proc_map.keys()
+        for cmd_line in tp_procs:
+            if cmd_line in proc_keys:
+                try:
+                    su.kill_python_proc(proc_map[cmd_line])
+                    proc_map.pop(cmd_line)
+                except:
+                    pass
+    except:
+        pass
+
+    # second round, make sure all instances are killed
+    for cmd_line in tp_procs:
+        try:
+            su.kill_by_name(cmd_line)
+        except:
+            pass
 
 def launch(p) :
-    kill_p(p)
-    printfl ('launching ' + p + ' ' + str(datetime.datetime.now()))
-    #proc_map[p]=subprocess.Popen(p,shell=True)
-    proc_map[p]=subprocess.Popen([p])
+    su.kill_by_name(p)
+    su.printfl ('launching ' + p + ' ' + str(datetime.datetime.now()))
+    cmd = p.strip().split(' ')
+    proc_map[p]=subprocess.Popen(cmd)
 
-def launch_sustain() :
-    printfl("launching at " + str(datetime.datetime.now()))
+def launch_sustain(argv) :
+    su.printfl("launching at " + str(datetime.datetime.now()))
 
     alive = False
+    _should_run = True
     dtnow = datetime.datetime.now()
+    kill_all()
     while not should_run() and dtnow.weekday() != 6 :
         # Friday night or Saturday
-        printfl ('wait for Sunday open...')
-        time.sleep( RESET_WAIT_SECOND )
+        su.printfl ('wait for Sunday open...')
+        time.sleep( 12 * 3600 )
         dtnow = datetime.datetime.now()
     while dtnow.weekday() == 6 and not should_run() :
         # Sunday
@@ -221,51 +192,99 @@ def launch_sustain() :
         utcnow=get_cur_utc()
         utcstart=get_utcstart()
         while utcnow < utcstart -  RESET_WAIT_SECOND - 10 :
-            printfl ('wait for Sunday open...' +  str(utcnow) + " " + str(utcstart) + " " + str(utcstart-utcnow))
+            su.printfl ('wait for Sunday open...' +  str(utcnow) + " " + str(utcstart) + " " + str(utcstart-utcnow))
             time.sleep( RESET_WAIT_SECOND )
             utcnow=get_cur_utc()
 
-        printfl ('getting on-line, updating roll ' + str(datetime.datetime.now()))
+        su.printfl ('getting on-line, updating roll ' + str(datetime.datetime.now()))
         utcnow=get_cur_utc()
-        if utcstart > utcnow and not is_in_daily_trading() :
+        if utcstart > utcnow and not is_in_daily_trading():
             time.sleep(utcstart-utcnow)
 
         utcnow=get_cur_utc()
-        printfl ('spining for start ' +  str(utcnow))
+        su.printfl ('spining for start ' +  str(utcnow))
         while not is_in_daily_trading() :
             utcnow=get_cur_utc()
             time.sleep(1)
             #time.sleep( float((1000000-utcnow.microsecond)/1000)/1000.0 )
-        printfl ('starting on ' +  str(utcnow))
+        su.printfl ('starting on ' +  str(utcnow))
 
-    while should_run() : 
-        # Mon to Fri
-        if is_in_daily_trading() :
+    while should_run() :  # 17:55 Sun to 22:05 Friday
+        if is_in_daily_trading() : # Same range, but False at 17:00:01, back on 17:55
+            if not tpmon.check_order() :  # this won't throw
+                su.printfl("exit upon failed checking on order routing 35=3")
+                break
+
             if not alive :
-                printfl ('getting on-line, updating roll ' + str(datetime.datetime.now()))
-                update_config()
+                su.printfl ('launch getting on-line, kill all...')
+                kill_all()
+                su.printfl ('launch getting on-line, update config...')
+                update_config()  # this could throw
+
+                # bounce market data if daily start before 6pm
+                dtnow=datetime.datetime.now()
+                if dtnow.hour == 17:
+                    su.printfl('bouncing tp on daily start!')
+                    kill_tp()
+                tpm = tpmon.TPMonSnap()  # this could throw
                 alive = True
-                tpm = TPMon()
             # poll and sustain
             for p in procs :
-                if (p not in proc_map.keys()) or (not is_proc_alive(proc_map[p])) :
-                    launch(p)
+                if p not in proc_map.keys():
+                    try: 
+                        launch(p)
+                        time.sleep(1)
+                        continue
+                    except Exception as e:
+                        su.printfl('Launch ERR: failed to launch ' + p + ' ' + str(e))
+                        kill_all()
+                        _should_run = False
+                        break
+                
+                # check alive
+                if not su.is_python_proc_alive(proc_map[p]) :
+                    su.printfl('Launch ERR: '+p+' not responsive, killing and restarting')
+                    su.kill_python_proc(proc_map[p])  # this won't throw
+                    proc_map.pop(p)
+                    continue
+
+                # check multiple instances
+                pid_array = su.get_pid_array(p, match_exact=True)
+                if len(pid_array) != 1:
+                    su.printfl('Launch ERR: multiple instances detected for '+p+' pid_array: ' + str(pid_array) + ' killing all and restarting')
+                    su.kill_by_name(p)
+                    proc_map.pop(p)
+                    continue
+
+                # all good, do nothing
 
             time.sleep(1)
             # check market data, bounce if stale detected
-            if not tpm.check():
-                # the market data hasn't been updated for a while, 
-                # exit the process and retry in outer (while [ 1 ]) loop
-                printfl ('stale detected, exit!')
-                _should_run = False
-                kill_all()
-                alive=False
-                sys.exit(1)
-        else :
+            try :
+                if not tpm.check():
+                    # the market data hasn't been updated for a while, 
+                    # exit the process and retry in outer (while [ 1 ]) loop
+                    su.printfl ('stale detected, bouncing tp!')
+                    kill_tp()
+                    time.sleep(5)
+                    tpm = tpmon.TPMonSnap()
+            except Exception as e:
+                su.printfl('problem checking tp: ' + str(e))
+        
+        # Not in daily trading anymore
+        else:
             if alive :
                 # getting offline after 5pm
-                eod_reconcile()
-                printfl ('getting off-line...')
+                su.printfl ('launch getting off-line...')
+                try:
+                    eod_reconcile()
+                except Exception as e:
+                    su.printfl('Launch ERR: failed in eod_reconcile ' + str(e))
+                for i in np.arange(10):
+                    time.sleep(5)
+                    su.printfl('waiting for process to finish... %d/10'%(int(i)))
+
+                su.printfl('EoD kill all mts processes!')
                 kill_all()
                 alive = False
             time.sleep(1)
@@ -275,21 +294,26 @@ def launch_sustain() :
         sys.stdout.flush()
         sys.stderr.flush()
     
-    printfl ('stopped ' + str(datetime.datetime.now()))
+    su.printfl ('stopped ' + str(datetime.datetime.now()))
     if is_weekend() :
         # only do it on friday close
         dt=datetime.datetime.now()
         wd=dt.weekday()
         if wd == 4 :
-            eod_reconcile()
-            weekly_cleanups()
+            weekly_cleanups() # this should block until the end
 
     kill_all()
-
     sys.stdout.flush()
     sys.stderr.flush()
 
 if __name__ == "__main__":
     sys.path.append(PYTHON_PATH)
-    launch_sustain()
-    sys.exit()
+    try :
+        launch_sustain(sys.argv)
+    except KeyboardInterrupt as e:
+        sys.exit(2)
+    except Exception as e:
+        su.printfl('Launch ERR: unhandled exception out of launch: ' + str(e))
+    finally:
+        kill_all()
+    sys.exit(_exit_code)

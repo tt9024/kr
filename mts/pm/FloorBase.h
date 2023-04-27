@@ -11,6 +11,7 @@
 #include "floor.h"
 #include "symbol_map.h"
 #include "md_snap.h"
+#include "ExecutionReport.h"
 
 namespace pm {
 
@@ -34,11 +35,12 @@ namespace pm {
             ExecutionOpenOrderAck = 14,
             AlgoUserCommand = 15,
             AlgoUserCommandResp = 16,
+            TradingStatusNotice = 17,
             TotalTypes 
         };
 
         struct PositionRequest {
-            char algo[16];
+            char algo[32];
             char symbol[32];
             int64_t qty_done;
             int64_t qty_open;
@@ -62,13 +64,86 @@ namespace pm {
             }
         };
 
+        struct PositionInstructionStat {
+            std::string symbol;
+            std::string algo;
+            md::PriceEntry enter_bbo[2];
+            double avg_px;
+            int64_t cum_size;  // sign significant position
+            std::vector<std::tuple<double, int64_t, int64_t>> fills;
+            
+            explicit PositionInstructionStat(const std::string& sym, const std::string& alg): symbol(sym), algo(alg), avg_px(0), cum_size(0) {
+                setEnterBBO();
+            };
+
+            void addFill(double px, int64_t size, int64_t fill_micro=0) {
+                // usually the sign should be the same
+                if (size+cum_size==0) {
+                    avg_px = 0;
+                    cum_size = 0;
+                } else {
+                    avg_px = (cum_size*avg_px+(px*size))/(size+cum_size);
+                    cum_size += size;
+                }
+
+                if (fill_micro==0) {
+                    fill_micro = utils::TimeUtil::cur_micro();
+                }
+                fills.emplace_back(px, size, fill_micro);
+            }
+
+            std::string toString(bool show_each_fills) const {
+                char buf[2048];
+                size_t bcnt = snprintf(buf, sizeof(buf), \
+                        "Fill Stat: symbol: %s, algo: %s, enter_bid: %s, enter_ask: %s, total_fill_size: %lld, avg_fill_px: %s",\
+                        symbol.c_str(), algo.c_str(), enter_bbo[0].toString().c_str(), enter_bbo[1].toString().c_str(), (long long) cum_size, PriceCString(avg_px));
+
+                if (show_each_fills) {
+                    bcnt += snprintf(buf, sizeof(buf)-bcnt, "\nFills:");
+                    for (const auto& f : fills) {
+                        double px;
+                        int64_t sz, micro;
+                        std::tie(px,sz,micro) = f;
+                        bcnt += snprintf(buf+bcnt, sizeof(buf)-bcnt, " [%lld,%s,%lld]", (long long) sz, PriceCString(px), (long long)micro);
+                    }
+                }
+                return std::string(buf);
+            }
+
+            void operator+(const PositionInstructionStat& pis) {
+                avg_px = ((avg_px*cum_size)+(pis.avg_px*pis.cum_size))/(cum_size+pis.cum_size);
+                cum_size += pis.cum_size;
+                for (const auto f : pis.fills) {
+                    fills.push_back(f);
+                }
+            }
+
+            void setEnterBBO() {
+                md::getBBOPriceEntry(symbol, enter_bbo[0], enter_bbo[1]);
+            }
+        };
+
         struct PositionInstruction {
-            char algo[16];
+            char algo[32];
             char symbol[32];
+
+            // for PI in ordMap, the order qty
+            // for PI in piMap, the target qty from strategy
             int64_t qty;
-            double px; // maximum price before giving up
+
+            // for PI in ordMap, the limit price used for entering order
+            // for PI in piMap, the price used for specifying PI
+            double px; // price upon entry
+
+            // for PI in ordMap, only set upon order sent, cleared on any updates, and stay cleared, used to scan for unack'ed orders
+            // for PI in piMap, the last time checked for processing
+            int last_utc;
             int target_utc; // latest time before cancel all, in utc second
             int type; // trading style etc
+            int64_t reserved;  // lpm, etc
+
+            // bid/ask on creation time
+            std::shared_ptr<PositionInstructionStat> pis; // statistics of the fills so far
 
             enum TYPE {
                 INVALID = 0,
@@ -76,14 +151,16 @@ namespace pm {
                 LIMIT = 2,
                 PASSIVE = 3,
                 TWAP = 4,
-                TRADER_WO = 5,
-                TOTAL_TYPES
+                TWAP2 = 5,
+                TRADER_WO = 6,
+                TOTAL_TYPES = 7
             };
 
             PositionInstruction()
-            : qty(0), px(0),target_utc(0), type(-1) {
+            : qty(0), px(0),target_utc(0), type(-1), reserved(0) {
                 algo[0] = 0;
                 symbol[0] = 0;
+                last_utc = 0;
             }
             PositionInstruction(const std::string& algo_,
                                 const std::string& symbol_,
@@ -91,7 +168,8 @@ namespace pm {
                                 double px_limit_ = 0,
                                 int target_utc_ = 0,
                                 TYPE type_ = MARKET) 
-            : qty (qty_desired_), px(px_limit_), target_utc(target_utc_), type((int)type_)
+            : qty (qty_desired_), px(px_limit_), target_utc(target_utc_), type((int)type_),
+              reserved(0),pis(std::make_shared<PositionInstructionStat>(symbol_, algo_))
             {
                 if ( (algo_.size() > sizeof(algo)-1) ||
                      (symbol_.size() > sizeof(symbol)-1) ) {
@@ -101,15 +179,18 @@ namespace pm {
                 }
                 std::strcpy(algo, algo_.c_str());
                 std::strcpy(symbol, utils::SymbolMapReader::get().getTradableSymbol(symbol_).c_str());
+                last_utc = 0;
             }
 
+            /* the default copy constructor should work
             PositionInstruction(const PositionInstruction& pi) {
                 memcpy(this, &pi, sizeof(PositionInstruction));
-            }
+                pis = std::make_shared<PositionInstructionStat>();
+            }*/
 
             PositionInstruction(const char* pi_str) :
-            px(0), target_utc(0) {
-                // form of algo, symbol, qty [, px_str|twap_str]
+            px(0), target_utc(0), reserved(0) {
+                // format of algo, symbol, qty [, px_str|twap_str]
                 // the twap_str starts with 'T', followed by a number and a 's|m|h'
                 // for example T5m
                 // px_str is a md parsable string
@@ -129,9 +210,12 @@ namespace pm {
                 qty = std::stoll(tk[2]);
                 if (tk.size() == 4) {
                     // get the price from price str
-                    if (tk[3][0] == 'T') {
+                    if ((tk[3][0] == 'T') || (tk[3][0] == 'Y')) {
                         // expect twap_str such as T5m
-                        type = FloorBase::PositionInstruction::TWAP;
+                        type = (tk[3][0] == 'T')? 
+                            FloorBase::PositionInstruction::TWAP:
+                            FloorBase::PositionInstruction::TWAP2;
+
                         int dur = std::stoi(tk[3].substr(1, tk[3].size()-2));
                         char unit = tk[3][tk[3].size()-1];
                         if (unit == 'm' || unit=='M') {
@@ -158,17 +242,37 @@ namespace pm {
                     // a market order
                     type = FloorBase::PositionInstruction::MARKET;
                 }
+                pis = std::make_shared<PositionInstructionStat>(symbol, algo);
+                last_utc = 0;
             }
 
             std::string toString() const {
-
                 const auto& tradable = utils::SymbolMapReader::get().getTradableSymbol(symbol);
                 const auto& mts_contract = utils::SymbolMapReader::get().getByTradable(tradable)->_mts_contract;
 
                 char buf[256];
-                snprintf(buf, sizeof(buf), "PositionInstruction: %s, %s, %lld, %s, %s, %s", 
-                        algo, mts_contract.c_str(), (long long)qty, PriceCString(px), target_utc==0?"":utils::TimeUtil::frac_UTC_to_string(target_utc, 0).c_str(), TypeString((TYPE)type).c_str());
+                snprintf(buf, sizeof(buf), "PositionInstruction: %s, %s, qty(%lld), px(%s), target_utc(%s), last_utc(%s), type(%s), reserved(%lld)", 
+                        algo, mts_contract.c_str(), (long long)qty, PriceCString(px),
+                        target_utc==0?"":utils::TimeUtil::frac_UTC_to_string(target_utc, 0).c_str(),
+                        last_utc==0?"":utils::TimeUtil::frac_UTC_to_string(last_utc, 0).c_str(),
+                        TypeString((TYPE)type).c_str(),(long long)reserved);
                 return std::string(buf);
+            }
+
+            std::string dumpFillStat() const {
+                if (pis) {
+                    return pis->toString(false);
+                }
+                logError("no stats to dump for %s",toString().c_str());
+                return "";
+            }
+
+            void addFill(const pm::ExecutionReport& er) {
+                if (__builtin_expect(utils::SymbolMapReader::get().isMLegSymbol(symbol) &&
+                    (!utils::SymbolMapReader::get().isMLegSymbol(er.m_symbol)),0)) {
+                    return;
+                }
+                pis->addFill(er.m_px, er.m_qty, er.m_recv_micro);
             }
 
             static std::string TypeString(TYPE type) {
@@ -183,6 +287,8 @@ namespace pm {
                     return "PASSIVE";
                 case TWAP:
                     return "TWAP";
+                case TWAP2:
+                    return "TWAP2";
                 case TRADER_WO:
                     return "TraderWorkOrder";
                 default :
@@ -190,6 +296,18 @@ namespace pm {
                 }
             }
 
+            static std::string TypeString(int type) {
+                return TypeString((TYPE)type);
+            }
+
+            static TYPE typeFromString(const std::string& type_name) {
+                for (int i=0 ; i<(int) TYPE::TOTAL_TYPES; ++i) {
+                    if (type_name == std::string(TypeString((TYPE)i))){
+                        return (TYPE) i;
+                    }
+                }
+                throw std::runtime_error(std::string("PositionInstruction Type ") + type_name + " not found!");
+            }
         };
 
         using MsgType = utils::Floor::Message;
@@ -211,6 +329,7 @@ namespace pm {
 
         const std::string m_name;
         ChannelType m_channel;
+        MsgType m_msgin, m_msgout;
 
         static std::shared_ptr<FloorBase> getFloor(const std::string& name, bool is_server, const std::string& floor_name);
         // this operates on a different floor by the name of floor_name.  Usually used as simulation
@@ -220,7 +339,6 @@ namespace pm {
     protected:
 
         FloorBase(const std::string& name, bool is_server, const std::string& floor_name);
-        MsgType m_msgin, m_msgout;
         bool parseKeyValue (const std::string& cmd, std::map<std::string, std::string>& key_map) const;
     };
 

@@ -36,6 +36,7 @@ void print_usage(const char* cmd) {
            "\n"
            "to set array value given a key:\n"
            "    setArr models.ES01.subscriptions \"ES, HG, GC\"\n"
+           "    the updated config is written back to the given file\n"
            , cmd);
 }
 

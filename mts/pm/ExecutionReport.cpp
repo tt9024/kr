@@ -20,13 +20,14 @@ namespace pm {
            double px,
            const std::string& utcTime, //YYYYMMDD-HH:MM:SS[.sss] GMT
            const std::string& optionalTag, // reserved 
-           uint64_t recv_micro
+           uint64_t recv_micro,
+           int64_t reserved
     )
     :  m_qty(qty), m_px(px), 
        m_utc_milli(utils::TimeUtil::string_to_frac_UTC(utcTime.c_str(), 3, NULL, true)),
-       m_recv_micro(recv_micro) 
+       m_recv_micro(recv_micro), m_reserved(reserved)
     {
-        snprintf(m_symbol, sizeof(m_symbol),"%s", utils::SymbolMapReader::get().getByTradable(symbol)->_tradable.c_str());
+        snprintf(m_symbol, sizeof(m_symbol),"%s", ((symbol == "")?"":utils::SymbolMapReader::get().getByTradable(symbol)->_tradable.c_str()));
         snprintf(m_algo, sizeof(m_algo), "%s", algo.c_str());
         snprintf(m_clOrdId, sizeof(m_clOrdId), "%s", clOrdId.c_str());
         snprintf(m_execId, sizeof(m_execId), "%s", execId.c_str());
@@ -38,9 +39,13 @@ namespace pm {
     }
 
     ExecutionReport ExecutionReport::fromCSVLine(const utils::CSVUtil::LineTokens& token_vec) {
+        int64_t reserved=0;
+        if (token_vec.size() > 10) {
+            reserved = std::stoll(token_vec[10]);
+        }
         return ExecutionReport(token_vec[0], token_vec[1], token_vec[2], token_vec[3],
                 token_vec[4], std::stoi(token_vec[5]), std::stod(token_vec[6]),
-                token_vec[7], token_vec[8], std::stoull(token_vec[9]));
+                token_vec[7], token_vec[8], std::stoull(token_vec[9]),reserved);
     }
 
     utils::CSVUtil::LineTokens ExecutionReport::toCSVLine() const {
@@ -55,6 +60,7 @@ namespace pm {
         token_vec.push_back(utils::TimeUtil::frac_UTC_to_string(m_utc_milli, 3, NULL, true));
         token_vec.push_back(m_optional);
         token_vec.push_back(std::to_string(m_recv_micro));
+        token_vec.push_back(std::to_string(m_reserved));
         return token_vec;
     }
 
@@ -68,11 +74,12 @@ namespace pm {
     std::string ExecutionReport::toString() const {
         char buf[512];
         snprintf(buf, sizeof(buf), 
-                "Execution Report [symbol=%s, algo=%s, clOrdId=%s, execId=%s, tag39=%s, qty=%d, px=%s, execTime=%s, tag=%s, recvTime=%s]",
-                utils::SymbolMapReader::get().getByTradable(m_symbol)->_mts_contract.c_str(),
+                "Execution Report [symbol=%s, algo=%s, clOrdId=%s, execId=%s, tag39=%s, qty=%d, px=%s, execTime=%s, tag=%s, recvTime=%s, reserved=%lld]",
+                ((m_symbol[0]==0)?"":utils::SymbolMapReader::get().getByTradable(m_symbol)->_mts_contract.c_str()),
                 m_algo, m_clOrdId, m_execId, m_tag39, m_qty, PriceCString(m_px),
                 utils::TimeUtil::frac_UTC_to_string(m_utc_milli, 3).c_str(), m_optional, 
-                utils::TimeUtil::frac_UTC_to_string(m_recv_micro, 6).c_str());
+                utils::TimeUtil::frac_UTC_to_string(m_recv_micro, 6).c_str(), 
+                (long long) m_reserved);
         return std::string(buf);
     }
 
@@ -82,6 +89,14 @@ namespace pm {
 
     bool ExecutionReport::isNew() const {
         return (m_tag39[0] == '0');
+    }
+
+    bool ExecutionReport::isCancel() const {
+        return (m_tag39[0] == '4');
+    }
+
+    bool ExecutionReport::isReject() const {
+        return (m_tag39[0] == '8');
     }
 
     bool ExecutionReport::compareTo(const ExecutionReport& er, std::string* difflog)  const {
@@ -139,6 +154,8 @@ namespace pm {
                 {
                     line_vec.emplace_back(er.toCSVLine());
                 }
+            } catch (const std::invalid_argument& e) {
+                logDebug("Invalid argument - failed to load execution report: %s", e.what());
             } catch (const std::exception& e) {
                 logError("failed to load execution report: %s", e.what());
             }
@@ -159,9 +176,7 @@ namespace pm {
         // normalize the px
         md::getPriceByStr(symbol, std::to_string(px).c_str(), px);
         int64_t cur_micro = utils::TimeUtil::cur_micro();
-        const std::string clOrdId(std::string(syntheticOrdIdPrefix()) + ":"+
-                                  clOrdId_str + ":"+
-                                  std::to_string(cur_micro));
+        const std::string clOrdId (clOrdId_str);
         const std::string execId (clOrdId + "ExId");
         const std::string tag39 (std::to_string(2)); // filled
         const std::string utcTime (utils::TimeUtil::frac_UTC_to_string(cur_micro, 3, NULL, true));
@@ -174,7 +189,8 @@ namespace pm {
                                  px,
                                  utcTime,
                                  optional_tag,
-                                 cur_micro);
+                                 cur_micro,
+                                 0);
         logInfo("Generating a synthetic fill: %s", er.toString().c_str());
         return er;
     }

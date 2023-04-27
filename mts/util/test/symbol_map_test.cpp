@@ -3,6 +3,7 @@
 #include <string>
 #include "gtest/gtest.h"
 #include <cstdlib>
+#include "plcc/PLCC.hpp"
 
 class SymFixture : public testing::Test {
 public:
@@ -21,6 +22,8 @@ public:
         "        contract_month = 202002\n"
         "        tt_security_id = 3971113080253836646\n"
         "        tt_venue = NYM\n"
+        "        bbg_id = CLM1 CMD\n"
+        "        bbg_px_multiplier = 1.0\n"
         "        currency = USD\n"
         "        expiration_date = 2020-01-20\n"
         "        mts_symbol = WTI_N0\n"
@@ -39,6 +42,8 @@ public:
         "        contract_month = 202003\n"
         "        tt_security_id = 3971113080253836647\n"
         "        tt_venue = NYM\n"
+        "        bbg_id = CLK1 CMD\n"
+        "        bbg_px_multiplier = 1.0\n"
         "        currency = USD\n"
         "        expiration_date = 2020-03-20\n"
         "        mts_symbol = WTI_N1\n"
@@ -56,6 +61,8 @@ public:
         "        type = FUT\n"
         "        contract_month = 202002\n"
         "        tt_security_id = 3971113080253836648\n"
+        "        bbg_id = LCO CMD\n"
+        "        bbg_px_multiplier = 1.0\n"
         "        tt_venue = ICE_L\n"
         "        currency = USD\n"
         "        expiration_date = 2020-02-20\n"
@@ -67,9 +74,9 @@ public:
     _fn("/tmp/cfg_test.cfg") 
     {}
 
-    void writeCfg() const {
-        FILE* fp = fopen(_fn, "w");
-        fprintf(fp, "%s\n", _cfg_str);
+    void writeCfg(const char*fn, const char* cfg_str) const {
+        FILE* fp = fopen(fn, "w");
+        fprintf(fp, "%s\n", cfg_str);
         fclose(fp);
     }
 
@@ -108,6 +115,10 @@ public:
         const auto& tv2 = sr.getAllByTradable("BRN FMG0020!");
         EXPECT_EQ(tv2.size(), 1);
         EXPECT_STREQ(tv2[0]->_mts_symbol.c_str(), "Brent_N0");
+
+        EXPECT_STREQ(sr.getN1("CLG0")->_tradable.c_str(), "CLH0");
+        EXPECT_STREQ(sr.getN1("CLH0")->_tradable.c_str(), "CLH0");
+        EXPECT_EQ(sr.getN1("BRN FMG0020!"), nullptr);
     }
 
     const char* _cfg_str;
@@ -116,7 +127,7 @@ public:
 
 TEST_F (SymFixture, test) {
     // load the file and write to it
-    writeCfg();
+    writeCfg(_fn, _cfg_str);
     const auto& sr (utils::SymbolMapReader::getFile(_fn));
     testReader(sr);
 
@@ -139,6 +150,151 @@ TEST_F (SymFixture, test) {
     writer2.toConfigFile(_fn);
     const auto& sr4 = utils::SymbolMapReader::getFile(_fn);
     testReader(sr4);
+}
+
+TEST_F (SymFixture, sub) {
+    const char* cfn = "/tmp/main.cfg";
+    const char* main_cfg1 = 
+"SymbolMap = /tmp/cfg_test.cfg\n"
+"MDProviders = {\n"
+"                  BPipe = config/bpipe.cfg\n"
+"                  TTFix = Config = config/legacy/feed_TT.xml\n"
+"              }\n"
+"MaxN = 2\n"
+"MTSVenue = {\n"
+"               IFEU= [TTFix , BPipe]\n"
+"           }\n"
+"MTSSymbol = {\n"
+"              WTI=   [BPipe, TTFix ]\n"
+"            }\n";
+    writeCfg(cfn, main_cfg1);
+    utils::PLCC::setConfigPath(cfn);
+
+    //BPipe
+    const auto& sr = utils::SymbolMapReader::getFile(_fn);
+    const auto& bp = sr.getSubscriptions("BPipe");
+    const auto& tt = sr.getSubscriptions("TTFix");
+
+    EXPECT_EQ(bp.first.size(), 2);
+    std::set<std::string> bps (bp.first.begin(), bp.first.end());
+    EXPECT_TRUE(bps.find("WTI_N1") != bps.end());
+    EXPECT_TRUE(bps.find("WTI_N0") != bps.end());
+    EXPECT_EQ(bp.second.size(), 1);
+    EXPECT_STREQ(bp.second[0].c_str(), "Brent_N0");
+
+    EXPECT_EQ(tt.second.size(), 2);
+    std::set<std::string> tts (tt.second.begin(), tt.second.end());
+    EXPECT_TRUE(tts.find("WTI_N1") != tts.end());
+    EXPECT_TRUE(tts.find("WTI_N0") != tts.end());
+    EXPECT_EQ(tt.first.size(), 1);
+    EXPECT_STREQ(tt.first[0].c_str(), "Brent_N0");
+
+    const char* main_cfg2 =
+"SymbolMap = /tmp/cfg_test.cfg\n"
+"MDProviders = {\n"
+"                  BPipe = config/bpipe.cfg\n"
+"                  TTFix = Config = config/legacy/feed_TT.xml\n"
+"              }\n"
+"MaxN = 2\n"
+"MTSVenue = {\n"
+"             NYM = [BPipe]\n"
+"           }\n"
+"MTSSymbol = {\n"
+"               #Brent = []\n"
+"            }\n";
+    writeCfg(cfn, main_cfg2);
+    const auto& bp2 = sr.getSubscriptions("BPipe");
+    const auto& tt2 = sr.getSubscriptions("TTFix");
+
+    EXPECT_EQ(bp2.first.size(), 2);
+    bps.clear();
+    bps.insert(bp2.first.begin(), bp2.first.end());
+    EXPECT_TRUE(bps.find("WTI_N1") != bps.end());
+    EXPECT_TRUE(bps.find("WTI_N0") != bps.end());
+    EXPECT_EQ(bp2.second.size(), 0);
+
+    EXPECT_EQ(tt2.second.size(), 0);
+    EXPECT_EQ(tt2.first.size(), 0);
+
+    const char* main_cfg3 =
+"SymbolMap = /tmp/cfg_test.cfg\n"
+"MDProviders = {\n"
+"                  BPipe = config/bpipe.cfg\n"
+"                  TTFix = Config = config/legacy/feed_TT.xml\n"
+"              }\n"
+"MaxN = 2\n"
+"MTSVenue = {\n"
+"             IFEU= [BPipe,TTFix]\n"
+"             NYM = [BPipe]\n"
+"           }\n"
+"MTSSymbol = {\n"
+"            }\n";
+    writeCfg(cfn, main_cfg3);
+    const auto& bp3 = sr.getSubscriptions("BPipe");
+    const auto& tt3 = sr.getSubscriptions("TTFix");
+
+    EXPECT_EQ(bp3.first.size(), 3);
+    bps.clear();
+    bps.insert (bp3.first.begin(), bp3.first.end());
+    EXPECT_TRUE(bps.find("WTI_N1") != bps.end());
+    EXPECT_TRUE(bps.find("WTI_N0") != bps.end());
+    EXPECT_TRUE(bps.find("Brent_N0") != bps.end());
+    EXPECT_EQ(bp3.second.size(), 0);
+
+    EXPECT_EQ(tt3.second.size(), 1);
+    EXPECT_STREQ(tt3.second[0].c_str(), "Brent_N0");
+    EXPECT_EQ(tt3.first.size(), 0);
+
+    const char* main_cfg4 =
+"SymbolMap = /tmp/cfg_test.cfg\n"
+"MDProviders = {\n"
+"                  BPipe = config/bpipe.cfg\n"
+"                  TTFix = Config = config/legacy/feed_TT.xml\n"
+"              }\n"
+"MaxN = 2\n"
+"MTSVenue = {\n"
+"             IFEU= [BPipe,TTFix]\n"
+"             NYM = [BPipe]\n"
+"           }\n"
+"MTSSymbol = {\n"
+"            Brent = [TTFix]\n"
+"            }\n";
+    writeCfg(cfn, main_cfg4);
+    try {
+        const auto& bp4 = sr.getSubscriptions("BPipe");
+        EXPECT_EQ(1, 2);
+    } catch (const std::exception & e) {
+        // WTI 
+    }
+
+    const char* main_cfg5 =
+"SymbolMap = /tmp/cfg_test.cfg\n"
+"MDProviders = {\n"
+"                  BPipe = config/bpipe.cfg\n"
+"                  TTFix = Config = config/legacy/feed_TT.xml\n"
+"              }\n"
+"MaxN = 2\n"
+"MTSVenue = {\n"
+"             IFEU= [BPipe,BPipe]\n"
+"             NYM = [BPipe]\n"
+"           }\n"
+"MTSSymbol = {\n"
+"            Brent = [BPipe]\n"
+"            }\n";
+    writeCfg(cfn, main_cfg5);
+    const auto& bp5 = sr.getSubscriptions("BPipe");
+    const auto& tt5 = sr.getSubscriptions("TTFix");
+
+    EXPECT_EQ(bp5.first.size(), 3);
+    bps.clear();
+    bps.insert (bp5.first.begin(), bp5.first.end());
+    EXPECT_TRUE(bps.find("WTI_N1") != bps.end());
+    EXPECT_TRUE(bps.find("WTI_N0") != bps.end());
+    EXPECT_TRUE(bps.find("Brent_N0") != bps.end());
+    EXPECT_EQ(bp5.second.size(), 0);
+
+    EXPECT_EQ(tt5.second.size(), 0);
+    EXPECT_EQ(tt5.first.size(), 0);
 }
 
 int main(int argc, char** argv) {

@@ -545,6 +545,7 @@ namespace utils {
         volatile QPos *getPtrPosWrite() const { return (volatile QPos*) m_buffer.getHeaderStart() ; };
         volatile QPos *getPtrPosDirty() const { return (volatile QPos*) (m_buffer.getHeaderStart() + sizeof(QPos)) ; };
         volatile QPos *getPtrPosReady() const { return (volatile QPos*) (m_buffer.getHeaderStart() + 64); } ;
+        volatile QPos *getPtrPosReadyPrev() const { return (volatile QPos*) (m_buffer.getHeaderStart() + 64 + sizeof(QPos)) ; } ;
 
     private:
         const std::string m_name;
@@ -561,6 +562,7 @@ namespace utils {
             : m_buffer(queue.m_buffer),
               m_pos_write(queue.getPtrPosWrite()),
               m_ready_bytes(queue.getPtrPosReady()),
+              m_ready_bytes_prev(queue.getPtrPosReadyPrev()),
               m_pos(0),
               m_localBuffer(NULL),
               m_localBufferSize(0) {
@@ -573,8 +575,10 @@ namespace utils {
             // go across the circular buffer boundary
             QStatus takeNextPtr(volatile char*& buffer, int& bytes);
 
-            // this reads from a specific location 
-            QStatus copyPosIn(char*buffer, int& bytes, QPos pos);
+            // following 2 reads the latest update in the queue,
+            // if the queue is not empty, using m_ready_bytes_prev
+   	    QStatus copyLatestIn(char*buffer, int& bytes);
+            QStatus takeLatestPtr(volatile char*& buffer, int& bytes);
 
             // this reads from a specific location without checking ready_bytes
    	    QStatus copyPosInRandomAccess(char*buffer, int& bytes, QPos pos);
@@ -596,6 +600,7 @@ namespace utils {
             const BufferType<QLen, QType::HeaderLen>& m_buffer;
             const volatile QPos* const m_pos_write; // readonly volatile pointer to a ever changing memory location
             const volatile QPos* const m_ready_bytes;
+            const volatile QPos* const m_ready_bytes_prev;
             QPos m_pos;
             mutable char* m_localBuffer;
             mutable int  m_localBufferSize;
@@ -608,7 +613,8 @@ namespace utils {
             : m_buffer(queue.m_buffer),
               m_pos_write(queue.getPtrPosWrite()),
               m_pos_dirty(queue.getPtrPosDirty()),
-              m_ready_bytes(queue.getPtrPosReady()) {
+              m_ready_bytes(queue.getPtrPosReady()),
+              m_ready_bytes_prev(queue.getPtrPosReadyPrev()) {
                 //reset();
             };
 
@@ -624,11 +630,13 @@ namespace utils {
 						(long long) *m_ready_bytes);
             	return std::string(buf);
             }
+            QPos writePos() const { return *m_pos_write;};
         private:
             BufferType<QLen, MwQueue::HeaderLen>& m_buffer;
             volatile QPos* const m_pos_write;
             volatile QPos* const m_pos_dirty;
             volatile QPos* const m_ready_bytes;
+            volatile QPos* const m_ready_bytes_prev;
             QPos getWritePos(int bytes);
             void finalizeWrite(int bytes);
             static const QPos SpinThreshold = QLen/2;
@@ -722,10 +730,18 @@ namespace utils {
             // ready bytes are at least dirty bytes
             // try to update the read position
             QPos prev_ready_bytes = *m_ready_bytes;
+            const QPos prev_ready_bytes_save = prev_ready_bytes;
             while (prev_ready_bytes < dirty) {
                 // multiple writers may be updating ready_bytes
                 // take the hight dirty value
                 prev_ready_bytes = compareAndSwap(m_ready_bytes, prev_ready_bytes, dirty);
+            }
+
+            // update the previous ready bytes
+            // note this might not be the latest, but is a valid
+            // previous position, reader could use it to seek
+            if (__builtin_expect(prev_ready_bytes_save < prev_ready_bytes,1)) {
+                *m_ready_bytes_prev = prev_ready_bytes_save;
             }
         }
     }
@@ -804,6 +820,32 @@ namespace utils {
 
     template<int QLen, template<int, int> class BufferType>
     inline
+    QStatus MwQueue<QLen, BufferType>::Reader::copyLatestIn(char*buffer, int& bytes) {
+        const auto prev_m_pos = m_pos;
+        m_pos = *m_ready_bytes_prev;
+        QStatus qs = seekToTop();
+        if (__builtin_expect(qs == QStat_OK, 1)) {
+            qs = copyNextIn(buffer, bytes);
+        }
+        m_pos = prev_m_pos;
+        return qs;
+    }
+
+    template<int QLen, template<int, int> class BufferType>
+    inline
+    QStatus MwQueue<QLen, BufferType>::Reader::takeLatestPtr(volatile char*& buffer, int& bytes) {
+        const auto prev_m_pos = m_pos;
+        m_pos = *m_ready_bytes_prev;
+        QStatus qs = seekToTop();
+        if (__builtin_expect(qs == QStat_OK, 1)) {
+            qs = takeNextPtr(buffer, bytes);
+        }
+        m_pos = prev_m_pos;
+        return qs;
+    }
+
+    template<int QLen, template<int, int> class BufferType>
+    inline
     std::string MwQueue<QLen, BufferType>::Reader::dump_state() const {
     	char buf[128];
     	snprintf(buf, sizeof(buf), "MwQueue Reader %lld %lld %lld",
@@ -813,24 +855,9 @@ namespace utils {
     	return std::string(buf);
     }
 
-    
     template<int QLen, template<int, int> class BufferType>
     inline
-    QStatus MwQueue<QLen, BufferType>::Reader::copyPosIn(char*buffer, int& bytes, QPos pos) {
-        QPos prev_pos = m_pos;
-        m_pos = pos;
-        QStatus qstat = QStat_EAGAIN;
-        int spin = 0;
-        while (qstat == QStat_EAGAIN && ++spin < 10000) {
-            qstat = copyNextIn(buffer, bytes);
-        }
-        m_pos = prev_pos;
-        return qstat;
-    }
-
-    template<int QLen, template<int, int> class BufferType>
-    inline
-	QStatus MwQueue<QLen,BufferType>::Reader::copyPosInRandomAccess(char*buffer, int& bytes, QPos pos) {
+    QStatus MwQueue<QLen,BufferType>::Reader::copyPosInRandomAccess(char*buffer, int& bytes, QPos pos) {
         bytes = 0;
         if (__builtin_expect((pos > *m_pos_write),0)) {
             // queue restarted, return failure

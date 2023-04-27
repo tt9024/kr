@@ -19,15 +19,22 @@ TEST (ConfigTest, ReadWrite) {
         "k4 = [ { k41 = [ { k411 = v411},{k412=[1,2,3]}]\n"
         "         k42 = 0.2},\n"
         "       { k43 = { k431 = { k4311 = [ { k43111 = 0 }, { k43112 = [2,3]} #comments here\n"
-        "           ,] } # more comments\n"
-        "                 k432 = [ [\\=,\\,],\\[,\\},] }\n"
+        "           ] } # more comments\n"
+        "                 k432 = [ [\\=,\\,],\\[,\\}] }\n"
         "          \n"
         "    # \n"
         "          k44 = \\ abc\\\\d\\  \n"
         "        }]\n"
         "\n"
         "#k1 = [ v1 ]\n"
-        "#k1 = [ v1 ]";
+        "k5 = {\n"
+        "  #aaa\n"
+        "a=b\n"
+        "  #bbb\n"
+        "  #ccc\n"
+        "}\n"
+        "#k1 = [ v1 ]\n"
+        "#kk;";
     const char* cfg = "/tmp/cfgtest.cfg";
 
     FILE* fp = fopen(cfg, "w");
@@ -53,7 +60,7 @@ TEST (ConfigTest, ReadWrite) {
     const auto ks = v.listKeys();
     EXPECT_STREQ(ks[0].c_str(), "k431");
     EXPECT_STREQ(ks[1].c_str(), "k432");
-    EXPECT_EQ(v.getReader("k431.k4311").arraySize(), 3);
+    EXPECT_EQ(v.getReader("k431.k4311").arraySize(), 2);
 
     auto arr = v.getArr<int>("k431.k4311[1].k43112");
     std::vector<int> arr2 = {2, 3};
@@ -76,8 +83,8 @@ TEST (ConfigTest, ReadWrite) {
 
     // set some values 
     std::vector<std::string> arr3 = {" { = ] ", " \\\nmore \n bad char, "};
-    r2.set("k3.k31[3].k313[1]", 1);
-    r2.set("k3.k31[3].k313[0]", 0);
+    r2.set("k3.k31[1].k313[1]", 1);
+    r2.set("k3.k31[1].k313[0]", 0);
     r2.setArr("k3.k31[ 2 ][0]", arr3);
 
     // set some values with escaped values
@@ -86,6 +93,39 @@ TEST (ConfigTest, ReadWrite) {
     fclose(fp);
     utils::ConfigureReader r3(cfg);
     EXPECT_EQ(r2, r3);
+
+    // test json
+    const char* cfg_json = 
+    "{\n"
+    "\"k1\" : \"v1\",\n"
+    "\"k2\" : [ 2, 3 ],\n"
+    "\"k3\" : { \n"
+    "       \"k31\" : [2.1], \n"
+    "       \"k32\" : false  \n"
+    "         },\n"
+    "\"k4\" : [ { \"k41\" : [ { \"k411\" : \"val\\\"411\\\"\"},{\"k412\":[1,2,3]}]\n,\n \n"
+    "             \"k42\" : 0.2, \"k42_bad\": true,\n},"
+    "           { \"k43\" : { \"k431\" : { \"k4311\" : [ { \"k43111\" : 0 }, { \"k43112\" : [2,3]} \n"
+    "           ] }, \n"
+    "                \"k432\" : [ [\"=\", \":,{}[]\n\\\"\"],\"[\", \"\\\\\"]}\n"
+    "          \n, \"k43_bad\":true},"
+    "           {\"k44\" : \"abc\\\\d  \n\"}, {\"all_good\": false}"
+    "        ],\n"
+    "\n"
+    "\"k5\" : {\n\"empty_value\":\"\",     \"a\":\"\'b \""
+    "}\n}";
+
+    fp = fopen(cfg, "w");
+    fprintf(fp, "%s", cfg_json);
+    fclose(fp);
+    auto jr = utils::ConfigureReader::getJson(cfg);
+
+    fp = fopen(cfg, "w");
+    fprintf(fp, "%s", jr->toString().c_str());
+    fclose(fp);
+    auto jr2 = utils::ConfigureReader::getJson(cfg);
+
+    EXPECT_EQ(*jr, *jr2);
 }
 
 int main(int argc, char** argv) {

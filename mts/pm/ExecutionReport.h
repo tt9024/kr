@@ -26,7 +26,8 @@ namespace pm {
                 double px,
                 const std::string& utcTime, // YYYYMMDD-HH:MM:SS[.sss]
                 const std::string& optionalTag, // reserved 
-                uint64_t recv_micro = 0  // utc when it is received locally
+                uint64_t recv_micro,   // utc when it is received locally
+                int64_t reserved       // currently used for signed cumQty
         );
 
         static std::string ERPersistFile();
@@ -73,10 +74,13 @@ namespace pm {
         uint64_t m_utc_milli;
         TEXTType m_optional;
         uint64_t m_recv_micro;
+        int64_t m_reserved; // reserved for filled qty in new 
 
         // helper functions
         bool isFill() const;
         bool isNew() const;
+        bool isCancel() const;
+        bool isReject() const;
         std::string toString() const;
         bool compareTo(const ExecutionReport& er, std::string* difflog=nullptr) const;
 

@@ -147,6 +147,15 @@ TEST (TimeTest, TradingDayETFOffset) {
     }
 }
 
+TEST (TimeTest, StartUTC) {
+    time_t utc[2][2] = { {1671652272, 1671577200}, // normal time
+                       {1671577200, 1671577200}  // weekday snap forward
+    };
+    for (const auto& u: utc) {
+        EXPECT_EQ(utils::TimeUtil::startUTC(u[0]), u[1]);
+    }
+}
+
 TEST (TimeTest, FmtStr) {
     const char* td = "20201207";
     time_t utc_td = utils::TimeUtil::string_to_frac_UTC(td, 0, "%Y%m%d");

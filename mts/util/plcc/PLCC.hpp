@@ -28,9 +28,13 @@
 #define PriceString(px)  utils::CSVUtil::printDouble((px),  PRICE_PRECISION)
 #define PriceCString(px) utils::CSVUtil::printDouble((px),  PRICE_PRECISION).c_str()
 
-#define PNL_PRECISION 2
-#define PnlString(pnl)   utils::CSVUtil::printDouble((pnl), PNL_PRECISION)
-#define PnlCString(pnl)  utils::CSVUtil::printDouble((pnl), PNL_PRECISION).c_str()
+#define PnlString(pnl)   utils::CSVUtil::printPnl(pnl)
+#define PnlCString(pnl)  utils::CSVUtil::printPnl(pnl).c_str()
+#define PnlStringColor(pnl)  utils::CSVUtil::printPnlColor(pnl)
+
+#define _MAX_(x, y) ((x)>=(y)?(x):(y))
+#define _MIN_(x, y) ((x)<=(y)?(x):(y))
+#define _ABS_(x)    ((x)>=0 ?(x):(-x))
 
 #define DefaultLoggerConfigKey "Logger"
 #define DefaultConfigFilePath  "config/main.cfg"
@@ -44,12 +48,16 @@ public:
 
     static const char* getConfigPath();
     static void setConfigPath(const char* cfg_path);
+
+    // setup without main cfg, logging to stdout
+    static void ToggleTest(bool is_on=true);
     static const std::string getLogFileName(std::string logfile, std::string instname);
     static PLCC& instance(const char* instname=NULL);
 
 private:
     explicit PLCC(const char* configFileName, const std::string& instname);
     ~PLCC();
+    static PLCC* default_plcc;
     std::string m_configFileName;
 };
 }

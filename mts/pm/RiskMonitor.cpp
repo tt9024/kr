@@ -152,13 +152,20 @@ void Config::read_strat_scale(const utils::ConfigureReader& reader) {
         const auto& sname(line[0]);
         const auto& sc(std::stod(line[1]));
 
-        // ignore the zero weight strategies
-        if (sc == 0) continue;
+        // allow the zero weight strategies
+        // this would make setting scale in STRETEGY_WEIGHTS.yaml to
+        // diable trading
+        //if (sc == 0) continue;
 
         // get the strat code from map
-        const auto& code (strat_reader.get<std::string>(sname.c_str()));
-        m_scale[tsc_str+code] = sc;
-        m_scale[tsd_str+code] = sc;
+        try {
+            const auto& code (strat_reader.get<std::string>(sname.c_str()));
+            m_scale[tsc_str+code] = sc;
+            m_scale[tsd_str+code] = sc;
+        } catch (const std::exception& e) {
+            logInfo("RiskMonitor: %s from file %s not defined in risk config, ignored. Error: %s",
+                    sname.c_str(), scale_file.c_str(), e.what());
+        }
     }
     if (m_scale.size() == 0) {
         logError("RiskMonitor: problem reading the scale file %s", scale_file.c_str());
@@ -642,24 +649,34 @@ const std::string Status::toStringStatus() const {
 
 void Status::load_pause() {
     // load pause file and
-    // format of yyyymmdd, inst_name, algo, market_list, ON|OFF
-    const int line_size = 5;
+    // format of either
+    //     yyyymmdd, inst_name, algo, market_list, ON|OFF
+    // or
+    //     yyyymmdd, inst_name, Operator, oper_id
     const auto& file_token (utils::CSVUtil::read_file(m_persist_file));
     int line_number = 0;
 
+    m_tag50 = "Invalid";
     // initialize with all NOT paused
     setPause("","",false);
     for (const auto& line: file_token) {
-        if (line.size() != line_size) {
-            logError("RiskMonitor(%s): Pause File Reading Error: line size less than %d: %s:line(%d)", m_name.c_str(), line_size, m_persist_file.c_str(), line_number);
+        if ((line.size() == 6) && (line[2]=="Pause")) {
+            const auto& algo(line[3]);
+            const auto& market(line[4]);
+            setPause(algo, market, line[5]=="ON");
+        } else if ((line.size() == 4) && (line[2] != "operatorID")) {
+            m_tag50 = line[3];
+        } else {
+            logError("RiskMonitor(%s): Pause File Reading Error: bad line %s at line number %d",
+                    m_name.c_str(), m_persist_file.c_str(), line_number);
             throw std::runtime_error("Pause File reading error" + m_persist_file);
         }
-        const auto& algo(line[2]);
-        const auto& market(line[3]);
-        setPause(algo, market, line[4]=="ON");
         ++line_number;
     }
-    //logInfo("RiskMonitor(%s): Read Pause file, current pause status: %s", m_name.c_str(), toStringStatus().c_str());
+    if (m_tag50 == "Invalid") {
+        throw std::runtime_error("no tag50 set from status file " + m_persist_file);
+    }
+    //logInfo("RiskMonitor(%s): Read Pause File, current pause status: %s", m_name.c_str(), toStringStatus().c_str());
 }
 
 /*

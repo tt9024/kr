@@ -70,7 +70,8 @@ namespace utils {
                 tspec.tv_nsec = 100000000 ;
                 nanosleep(&tspec, &tspec);
             }
-            pthread_cancel(m_thread);
+            if (m_thread)
+                pthread_cancel(m_thread);
         };
 
         // getters

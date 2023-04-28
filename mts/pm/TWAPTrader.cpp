@@ -64,10 +64,16 @@ namespace pm {
             return true;
         }
 
-        // not done yet
+        // target qty not satisfied yet
         if (__builtin_expect(etinfo->_done,0)) {
-            etinfo->_done = false;
-            logError("extra fill (%s) on a done PI(%s), check qty", pi->toString().c_str());
+            logInfo("TWAPTrader got extra fill on a done PI($s)", pi->toString().c_str());
+            if (er.isFill() || er.isNew()) {
+                etinfo->_done = false;
+                logInfo("re-starting the PI");
+            } else {
+                logInfo("ignored");
+                return true;
+            }
         }
         auto state = etinfo->getStates<TWAPState>();
         scanQty(etinfo, state);

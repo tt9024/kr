@@ -141,8 +141,13 @@ public:
     template<typename FMType>
     void persist_pause(const FMType& fm, const char* cmd);
 
+    template<typename FMType>
+    void set_operator_id(const FMType& fm, const std::string& operator_id);
+
     //bool getOperatorID(const std::string& strategy);
-    void statusLoop() {}; // nothing to be done periodically
+
+    // periodic tasks such as sync pause status and operator id
+    void statusLoop() { load_pause(); }; // load latest pause/operator_id
 
     // read status from a persist file
     void load_pause();
@@ -152,6 +157,7 @@ public:
     // Otherwise, in case all is alive
     //     ALL, ALL, OFF
     const std::string toStringStatus() const;
+    const std::string get_operator_id() const { return m_tag50; };
 
     // data members
     std::string m_name;
@@ -167,11 +173,11 @@ private:
         TradingStatus_TOTAL = 5  // stopped and clear position
     };
     struct StatusInfo {
-        uint8_t operator_id;
         uint8_t status;  // TradingStatus
-        uint16_t reserved;
-        uint32_t reserved2;
-        StatusInfo(): operator_id(0), status((uint8_t)TradingStatus_INVALID), reserved(0), reserved2(0) {};
+        uint8_t reserved1;
+        uint16_t reserved2;
+        uint32_t reserved3;
+        StatusInfo(): status((uint8_t)TradingStatus_INVALID), reserved1(0), reserved2(0), reserved3(0) {};
         bool is_paused() const { return status != (uint8_t)TradingStatus_OK; };
         void set_pause(bool if_pause) {
             status = (uint8_t)(if_pause? TradingStatus_PAUSED:TradingStatus_OK);
@@ -181,6 +187,7 @@ private:
     pm::FloorClientUser m_fcu; // used for send out pause command upon failed checks
     std::unordered_map<std::string, std::unordered_map<std::string, StatusInfo>> m_status;
     std::shared_ptr<Config> m_cfg;
+    std::string m_tag50;
 };
 
 class State {
@@ -241,9 +248,8 @@ public:
                        bool is_from_report,
                        time_t cur_utc);
 
-    // run periodical tasks, such as 
-    // update rate estimation, output logs for gui,
-    // and run statusLoop()
+    // run periodical tasks, possibly
+    // update rate estimation, output logs for gui
     void stateLoop() { };
 
     // output a log string to be visualized by GUI
@@ -329,8 +335,8 @@ public:
     // m_price_ticks[mkt] and m_eng_spread_limit[mkt][bar_idx]
     bool checkLimitPrice(const std::string& symbol, double price, time_t cur_utc) const;
 
-    // run periodical tasks, such as sync status,
-    // persist states, output logs, etc
+    // run periodical tasks, possibly
+    // sync with status, output ppp for gui
     void runLoop() {};
 
     // whether to skip ER during PM's startup replay
@@ -393,6 +399,9 @@ bool Monitor::checkNewOrder(const std::string& algo,
                             int64_t ord_qty,
                             const PositionManager& pm,
                             time_t cur_utc) {
+    if (__builtin_expect(m_cfg->isManualStrategy(algo), 0)) {
+        return true;
+    }
     const auto& mkt (m_cfg->checkAlgoSymbol(algo, tradable_symbol));
     if (__builtin_expect(mkt == "",0)) {
         // algo or symbol not found
@@ -413,6 +422,10 @@ bool Monitor::checkReplace (const std::string& algo,
                             int64_t qty_delta,
                             const PositionManager& pm, 
                             time_t cur_utc) {
+
+    if (__builtin_expect(m_cfg->isManualStrategy(algo), 0)) {
+        return true;
+    }
     const auto& mkt (m_cfg->checkAlgoSymbol(algo, tradable_symbol));
     if (__builtin_expect(mkt == "",0)) {
         // algo or symbol not found
@@ -436,6 +449,9 @@ bool Monitor::checkNewOrder(const std::string& algo,
                             const std::string& tradable_symbol,
                             int64_t ord_qty,
                             time_t cur_utc) {
+    if (__builtin_expect(m_cfg->isManualStrategy(algo), 0)) {
+        return true;
+    }
     const auto& mkt (m_cfg->checkAlgoSymbol(algo, tradable_symbol));
     if (__builtin_expect(mkt == "",0)) {
         // algo or symbol not found
@@ -448,6 +464,9 @@ inline
 bool Monitor::checkReplace (const std::string& algo,
                             const std::string& tradable_symbol,
                             int64_t qty_delta) {
+    if (__builtin_expect(m_cfg->isManualStrategy(algo), 0)) {
+        return true;
+    }
     const auto& mkt (m_cfg->checkAlgoSymbol(algo, tradable_symbol));
     if (__builtin_expect(mkt == "",0)) {
         // algo or symbol not found
@@ -553,6 +572,7 @@ bool Monitor::updateER(const ExecutionReport& er, const PositionManager& pm, boo
 inline
 Monitor::Monitor(const std::string& risk_cfg):
     m_name("default"),
+
     m_cfg(std::make_shared<Config>(risk_cfg==""? DEFAULT_RISK_JSON:risk_cfg)),  // loads the config
     m_state(m_cfg), // creates rate limits from config
     m_status(m_cfg) // loads the status from persists
@@ -604,6 +624,9 @@ long long Monitor::maxPosition(const std::string& algo, const std::string& trada
 
 inline
 bool Config::isPaperTrading(const std::string& algo) const {
+    if (__builtin_expect(isManualStrategy(algo), 0)) {
+        return false;
+    }
     const auto iter=m_strat_paper_trading.find(algo); 
     if (__builtin_expect(iter ==m_strat_paper_trading.end(), 0)) {
         logError("RiskMonitor algo(%s) not found", algo.c_str());
@@ -618,22 +641,41 @@ bool Config::isPaperTrading(const std::string& algo) const {
 
 template<typename FMType>
 void Status::persist_pause(const FMType& fm, const char* cmd) {
-    // used by FM to write to the pause file
-    // just persist the user command into the load format
+    // used by FM to write to the pause file, format:
+    //     yyyymmdd, inst_name, Pause, algo, mkt, [ON|OFF]
     if (!fm.isFloorManager()) {
-        logError("RiskMonitor.Status: persist_pause() caller not a floor manager, not persisted!\n%s",
-                fm.toString().c_str());
+        logError("RiskMonitor.Status(%s): persist_pause() caller not a floor manager, not persisted!\n%s",
+                m_name.c_str(), fm.toString().c_str());
         return;
     }
-    logInfo("RiskMonitor.Status: persisting trading pause(%s:%s) to file (%s)",
+    logInfo("RiskMonitor.Status(%s): persisting trading pause(%s) to file (%s)",
             m_name.c_str(), cmd, m_persist_file.c_str());
 
     const auto tstr = utils::TimeUtil::frac_UTC_to_string();
     FILE *fp = fopen(m_persist_file.c_str(), "at");
-    if (cmd[0] == 'Z') {
-        cmd += 1;
+    fprintf(fp, "%s, %s, Pause, %s\n", tstr.c_str(), m_name.c_str(), cmd);
+    fclose(fp);
+}
+
+template<typename FMType>
+void Status::set_operator_id(const FMType& fm, const std::string& operator_id) {
+    if (m_tag50==operator_id) {
+        return;
     }
-    fprintf(fp, "%s, %s, %s\n", tstr.c_str(), m_name.c_str(), cmd);
+    m_tag50=operator_id;
+    if (!fm.isFloorManager()) {
+        //FloorCPR gets 'Y' command, only FM persists
+        //logError("RiskMonitor(%s) setting operator id(%s) from a non-FloorManager",
+        //        m_name.c_str(), operator_id.c_str());
+        return;
+    }
+    // persist
+    //     yyyymmdd, inst_name, Operator, oper_id
+    logInfo("RiskMonitor.Status(%s): persisting operator id(%s) to file (%s)",
+            m_name.c_str(), operator_id.c_str(), m_persist_file.c_str());
+    const auto tstr = utils::TimeUtil::frac_UTC_to_string();
+    FILE* fp=fopen(m_persist_file.c_str(), "at");
+    fprintf(fp, "%s, %s, Operator, %s\n", tstr.c_str(), m_name.c_str(), m_tag50.c_str());
     fclose(fp);
 }
 

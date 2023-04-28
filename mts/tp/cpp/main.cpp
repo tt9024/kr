@@ -1,6 +1,7 @@
 #include <iostream>
 #include "CApplication.h"
 #include <csignal>
+#include <Version.h>
 
 #define MTS_VERSION_HASH "3.0 2021"
 namespace
@@ -16,6 +17,12 @@ void signal_handler(int signal)
 
 int main(int argc, char* argv[])
 {
+    // Example of simple Version dump
+    std::cout << "Git branch: " << GIT_BRANCH
+        << "\nGit hash: " << GIT_COMMIT_HASH
+        << "\nDate/Time: " << BUILD_DATE << "/" << BUILD_TIME
+        << "\nTag: " << GIT_TAG << "\n";
+
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
     try {

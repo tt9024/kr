@@ -105,7 +105,7 @@ namespace Mts
             std::string getSenderCompID() const;
             std::string getSessionQualifier() const;
 
-            void queryHeader(FIX::Header & objHeader);
+            void queryHeader(FIX::Header & objHeader, bool set_tag50=false);
             const std::string getStrAccount(const std::string& algo) const;
 
             void processExecutionReport_Fill(

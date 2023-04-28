@@ -76,7 +76,8 @@ namespace pm {
                     "F \n\tdump the state of Floor Trader\n"
                     "K \n\tstop the floor message processing and done\n"
                     "M [symbol]\n\tget the snap and bars (with bar_sec for bar_cnt), empty symbol matches all symbols\n"
-                    "Z algo, market_list [,ON|OFF]\n\tset the paused for algo and list of markets, a ':' delimitered string, to be ON or OFF if given, otherwise gets paused status\n\tempty algo or symbol matches all\n\tmarket_list doesn't specify contract, i.e. WTI:Brent"
+                    "Z algo, market_list [,ON|OFF]\n\tget or set trading status paused for algo and list of markets, a ':' delimitered string, to be ON or OFF if given, otherwise, gets paused status\n\tempty algo or symbol matches ALL\n\tmarket_list doesn't specify contract, i.e. WTI:Breant\n"
+                    "Y [operator_id] \n\tget or set operator id\n"
                     // Below commands have message type
                     // "FloorBase::AlgoUserCommand"
                     // They are handled by AlgoThread

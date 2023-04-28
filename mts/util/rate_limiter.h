@@ -145,7 +145,7 @@ namespace utils {
 
     inline
     RateLimiterEns::RateLimiterEns(const std::vector<std::tuple<int, time_t, int>>& rld) {
-        for (const auto rl: rld) {
+        for (const auto& rl: rld) {
             auto [count, sec, mul] = rl;
             m_rl.emplace_back(std::make_shared<RateLimiter>(count, sec, mul));
         }
@@ -208,7 +208,7 @@ namespace utils {
     inline
     uint64_t RateLimiterEns::checkOnly(uint64_t cur_micro, int update_cnt) const {
         uint64_t wait_sec = 0;
-        for (const auto rl : m_rl) {
+        for (const auto& rl : m_rl) {
             auto wait0 = rl->checkOnly(cur_micro, update_cnt);
             wait_sec = (wait_sec>wait0? wait_sec: wait0);
         }
@@ -246,7 +246,7 @@ namespace utils {
     inline
     uint64_t RateLimiterEns::updateOnly(uint64_t cur_micro, int update_cnt) {
         uint64_t wait_sec = 0;
-        for (const auto rl : m_rl) {
+        for (const auto& rl : m_rl) {
             auto wait0 = rl->updateOnly(cur_micro, update_cnt);
             wait_sec = (wait_sec>wait0? wait_sec: wait0);
         }
@@ -265,7 +265,7 @@ namespace utils {
 
     inline
     void RateLimiterEns::removeOnly(int update_cnt) {
-        for (const auto rl : m_rl) {
+        for (const auto& rl : m_rl) {
             rl->removeOnly(update_cnt);
         }
     }

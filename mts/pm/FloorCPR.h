@@ -518,6 +518,24 @@ namespace pm {
                 }
                 break;
             }
+            case 'Y':
+            {
+                // get or set operator id
+                // Y [operator_id]
+                const auto& tk(utils::CSVUtil::read_line(cmd+1));
+                if (tk.size() == 0) {
+                    // getting current operator id
+                    respstr = risk::Monitor::get().status().get_operator_id();
+                    break;
+                }
+                if (__builtin_expect(tk.size()!=1,0)) {
+                    respstr="set operator id not understood. \nY [operator_id]";
+                    logError("%s",respstr.c_str());
+                    break;
+                }
+                risk::Monitor::get().status().set_operator_id(*this, tk[0]);
+                break;
+            }
             case 'Z':
             {
                 // user query for trading status, format
@@ -525,6 +543,9 @@ namespace pm {
                 //  algo/mkt can be empty, match all, or a ':' delimited list
                 // Note the 'Set' is sent via msg type TradingStatusNotice
                 // see RiskMonitor.cpp:notify_pause() and flr.h for detail
+                // The reason is that to meka 'Set' command to be sent without
+                // requiring ack from the receiver(s). This is needed for
+                // Feedhandlers to send such requests.
                 const auto& tk (utils::CSVUtil::read_line(cmd+1));
                 if (__builtin_expect(tk.size() != 2,0)) {
                     respstr = "Pause command not understood. \nZ algo,symbol\nalgo or symbol could be empty, matches all";
@@ -608,7 +629,7 @@ namespace pm {
         // persist if FM
         if (ret && static_cast<Derived*>(this)->isFloorManager()) {
             risk::Monitor::get().status().persist_pause(
-                    *static_cast<const Derived*>(this), cmd);
+                    *static_cast<const Derived*>(this), cmd+1);
         }
     }
 

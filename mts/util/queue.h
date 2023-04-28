@@ -3,9 +3,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdexcept>
+#include <vector>
+
+// compound assignment with 'volatile' -qualified left operand is deprecated [-Werror=volatile]
+//#pragma GCC diagnostic push
+//#pragma GCC diagnostic ignored "-Wvolatile"
 
 #include "circular_buffer.h"
-#include <vector>
 
 /** This is for multi-threaded environment.
  * Goal is to achieve multi-write, multi-read
@@ -287,6 +291,7 @@ namespace utils {
                     pos = m_pos;
                 }
                 if (pos > m_pos) {
+                    // no update caes
                     m_pos = pos;
                     return false;
                 }
@@ -295,7 +300,7 @@ namespace utils {
                     m_pos = 0;
                     return false;
                 };
-                return false;
+                return true;
             }
 
             void seekToBottom() {
@@ -1302,3 +1307,4 @@ namespace utils {
     }
 
 }
+//#pragma GCC diagnostic_pop /* "-Werror=volatile" */

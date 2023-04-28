@@ -12,14 +12,12 @@
 #include "time_util.h"
 #include "queue.h"  
 #include "symbol_map.h"
+#include "csv_util.h"
 #include <set>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#define getMax(x, y) ((x)>(y)?(x):(y))
-#define getMin(x, y) ((x)<(y)?(x):(y))
 
 namespace md {
 
@@ -400,13 +398,18 @@ struct BookDepot {
         return *this;
     }
 
+    explicit BookDepot(const std::string csv_line) {
+        reset();
+        updateFrom(utils::CSVUtil::read_line(csv_line));
+    }
+
     void reset() {
         memset((char*)this, 0, sizeof(BookDepot));
     }
 
     Price getVWAP(int level, bool isBid, Quantity* q=NULL) const {
         const int side=isBid?0:1;
-        int lvl = getMin(level, avail_level[side]);
+        int lvl = _MIN_(level, avail_level[side]);
         Quantity qty = 0;
         Price px = 0;
         const PriceEntry* p = pe + side*BookLevel;
@@ -621,6 +624,75 @@ struct BookDepot {
                 }
         }
         return std::string(buf);
+    }
+
+    // serialization
+    std::string toCSV(int bbo_level=1) const {
+        // update_micro, update_type(0,1,2), update_level trd_px, trd_sz, trd_dir, bid_levels, bid_0_px, bid_0_sz,... ask_levels, ask_0_px, ask_0_sz (,...)
+
+        char buf[1024];
+        int n=0;
+        n += snprintf(buf+n,sizeof(buf)-n,"%llu, %d, %d, %.7f, %d, %d",
+                (unsigned long long)update_ts_micro,update_type,update_level,
+                trade_price, (int)trade_size, trade_attr);
+        for (int s=0; s<2; ++s) {
+            int levels = avail_level[s];
+            levels=_MIN_(levels,bbo_level);
+            n+=snprintf(buf+n,sizeof(buf)-n,", %d", levels);
+            const PriceEntry* pe_=&(pe[s*BookLevel]);
+            for (int i=0;i<levels;++i) {
+                n+=snprintf(buf+n,sizeof(buf)-n,", %.7f, %d",
+                        (double) pe_->price, (int) pe_->size);
+                ++pe_;
+            }
+        }
+        return std::string(buf);
+    }
+
+    void updateFrom(const std::vector<std::string>& tk) {
+        // read the line from toCSV(), entertaining multiple levels
+        update_ts_micro=std::stoll(tk[0]);
+        update_type=std::stoi(tk[1]);
+        update_level=std::stoi(tk[2]);
+        trade_price=std::stod(tk[3]);
+        trade_size=std::stoi(tk[4]);
+        trade_attr=std::stoi(tk[5]);
+        int ix=6;
+        for (int s=0; s<2; ++s) {
+            avail_level[s]=std::stoi(tk[ix++]);
+            for (int i=0; i<avail_level[s]; ++i) {
+                double px=std::stod(tk[ix++]);
+                int sz=std::stoi(tk[ix++]);
+                pe[s*BookLevel+i]=PriceEntry(px,sz,1,update_ts_micro);
+            }
+        }
+    }
+
+    // Use it to replay l1_bbo_tics and trades, i.e. from tickdata quote/trade csv files
+    void updateFromQuote(long long cur_micro, double bidpx, int bidsz, double askpx, int asksz) {
+        // from a BBO update
+        update_ts_micro = cur_micro;
+        update_type=0;
+        Quantity prev_asz=0;
+        double prev_apx=getAsk(&prev_asz);
+        if (std::abs(prev_apx*prev_asz-askpx*asksz)>1e-10) {
+            update_type=1;
+        }
+        update_level=0;
+        if (__builtin_expect(avail_level[0]==0,0)) {
+            avail_level[0]=1;
+        }
+        pe[0].set(bidpx,bidsz,cur_micro);
+        if (__builtin_expect(avail_level[1]==0,0)) {
+            avail_level[1]=1;
+        }
+        pe[BookLevel].set(askpx,asksz,cur_micro);
+    }
+
+    void updateFromTrade(long long cur_micro, double price, uint32_t size) {
+        // from a trade update, size has no direction
+        update_ts_micro=cur_micro;
+        addTrade(price,(Quantity) size);
     }
 
     // Use it to preserve the quote accounting
@@ -910,7 +982,7 @@ template <template<int, int> class BufferType >
 class BookQ {
 public:
     static const int BookLen = sizeof(BookDepot);
-    static const int QLen = (1024*BookLen);
+    static const int QLen = (1024*8*BookLen);
     // This is to enforce that for SwQueue, at most one writer should
     // be created for each BookQ
     typedef utils::SwQueue<QLen, BookLen, BufferType> QType;

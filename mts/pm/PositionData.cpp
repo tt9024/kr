@@ -242,12 +242,17 @@ namespace pm {
         double vap, pnl, pnl_mtm = getMtmPnl();
         int64_t qty = getPosition(&vap, &pnl);
 
+        int pnlms=PnlString(pnl_mtm).size();
+        int pnls =PnlString(pnl).size();
+        size_t ms=_MAX_(0,(int)(8-pnlms));
+        size_t ps=_MAX_(0,(int)(8-pnls));
+        std::string s1(ms,' '), s2(ps, ' ');
 
         char buf[256];
         size_t bytes = snprintf(buf, sizeof(buf), "%-13s  %-16s  %-5s  %-10s  %-8s   (%-8s)  ",
                 m_algo.c_str(), 
                 utils::SymbolMapReader::get().getByTradable(m_symbol)->_mts_contract.c_str(), 
-                std::to_string(qty).c_str(), PriceString(vap).substr(0,10).c_str(), PnlStringColor(pnl_mtm).c_str(), PnlStringColor(pnl).c_str());
+                std::to_string(qty).c_str(), PriceString(vap).substr(0,10).c_str(), (s1+PnlStringColor(pnl_mtm)).c_str(), (s2+PnlStringColor(pnl)).c_str());
         bytes += utils::TimeUtil::frac_UTC_to_string(m_last_micro, buf+bytes, sizeof(buf)-bytes,6);
         return std::string(buf);
     }

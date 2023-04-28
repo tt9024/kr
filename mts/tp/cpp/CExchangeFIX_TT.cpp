@@ -11,6 +11,7 @@
 #include "CApplicationLog.h"
 
 #include "symbol_map.h"
+#include "RiskMonitor.h"
 
 using namespace Mts::Exchange;
 
@@ -121,7 +122,7 @@ bool CExchangeFIX_TT::submitMktOrder(const Mts::Order::COrder & objOrder) {
         // TimeInForce defaults to be '0' Day
         objNewOrder.setField(FIX::TimeInForce('0'));
 
-        queryHeader(objNewOrder.getHeader());
+        queryHeader(objNewOrder.getHeader(), true);
 
 
         FIX::Session::sendToTarget(objNewOrder, getSessionQualifier());
@@ -201,7 +202,7 @@ bool CExchangeFIX_TT::submitLmtOrder(const Mts::Order::COrder & objOrder,
         // cancel on disconnect option
         objNewOrder.setField(FIX::ExecInst("o 2"));
 
-        queryHeader(objNewOrder.getHeader());
+        queryHeader(objNewOrder.getHeader(), true);
 
         FIX::Session::sendToTarget(objNewOrder, getSessionQualifier());
 
@@ -344,7 +345,7 @@ bool CExchangeFIX_TT::submitTWAPOrder(const Mts::Order::COrder & objOrder) {
         // cancel on disconnect option
         objNewOrder.setField(FIX::ExecInst("o 2"));
 
-        queryHeader(objNewOrder.getHeader());
+        queryHeader(objNewOrder.getHeader(), true);
 
         FIX::Session::sendToTarget(objNewOrder, getSessionQualifier());
 
@@ -534,7 +535,7 @@ bool CExchangeFIX_TT::cancelOrder(const Mts::Order::COrderCancelRequest & objCan
         // set the algo tag for text TT field 16558
         objOrderCancelRequest.setField(FIX::StringField(16558, objCancelReq.getOrigOrder().getOrderTag()));
 
-        queryHeader(objOrderCancelRequest.getHeader());
+        queryHeader(objOrderCancelRequest.getHeader(), true);
 
         FIX::Session::sendToTarget(objOrderCancelRequest, getSessionQualifier());
 
@@ -564,7 +565,7 @@ bool CExchangeFIX_TT::cancelOrder(const std::string& origClOrdId, const std::str
 
         // set the algo tag for text TT field 16558
         objOrderCancelRequest.setField(FIX::StringField(16558, algo));
-        queryHeader(objOrderCancelRequest.getHeader());
+        queryHeader(objOrderCancelRequest.getHeader(), true);
         FIX::Session::sendToTarget(objOrderCancelRequest, getSessionQualifier());
         return true;
     }
@@ -638,7 +639,7 @@ bool CExchangeFIX_TT::replaceOrder(const std::string& origClOrdId, int64_t qty, 
 
         // set the algo tag for text TT field 16558
         crRequest.setField(FIX::StringField(16558, algo));
-        queryHeader(crRequest.getHeader());
+        queryHeader(crRequest.getHeader(), true);
         FIX::Session::sendToTarget(crRequest, getSessionQualifier());
         return true;
     }
@@ -1263,13 +1264,18 @@ void CExchangeFIX_TT::operator()() {
 }
 
 
-void CExchangeFIX_TT::queryHeader(FIX::Header & objHeader) {
+void CExchangeFIX_TT::queryHeader(FIX::Header & objHeader, bool set_operator_id) {
   objHeader.setField(m_SenderCompID);
   objHeader.setField(m_TargetCompID);
 
   objHeader.setField(FIX::OnBehalfOfSubID(m_strUsername));
+
+  if (__builtin_expect(set_operator_id,1)) {
+      const auto tag50(pm::risk::Monitor::get().status().get_operator_id());
+      objHeader.setField(FIX::SenderSubID(tag50));
+  }
+
   /*
-  objHeader.setField(FIX::SenderSubID(m_strUsername));
   objHeader.setField(FIX::StringField(25004, m_strUsername));
   objHeader.setField(FIX::StringField(1028, "N"));
   */

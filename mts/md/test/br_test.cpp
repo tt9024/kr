@@ -100,7 +100,7 @@ public:
         char buf[1024];
         size_t cnt = sprintf(buf, "%s", line[0].c_str());
         for (size_t i=1; i<line.size(); ++i) {
-            cnt += snprintf(buf+cnt, sizeof(buf)-cnt, ",%s",line[1].c_str());
+            cnt += snprintf(buf+cnt, sizeof(buf)-cnt, ", %s",line[i].c_str());
         }
         return ref==std::string(buf);
     }
@@ -143,10 +143,10 @@ TEST_F (BRFixture, RunSecond) {
     auto bar_line = bar.writeAndRoll(last_micro/1000000LL+1);
     // repo_line shown as 
     std::string repo_lines="1675285202, 4133.875, 4134.0, 4133.5, 4133.625, 342, 4133.5, 1675285201072262, -180, 67.4, 163.3, 0.250193, 98, 281";
-    EXPECT_EQ(bar_line, repo_line);
+    EXPECT_EQ(bar_line, repo_lines);
 }
 
-TEST_F(BARFixture, Extended) {
+TEST_F(BRFixture, Extended) {
     // utc, open, high, low, close, totval, lastpx, last_micro, vbs
     // extend: avg_bsz, avg_asz, avg_spd, bqdiff, aqdiff
     std::string line0 = "1, 50.1, 50.1, 50.1, 50.1, 0, 0, 0, 0";
@@ -165,7 +165,7 @@ TEST_F(BARFixture, Extended) {
         long long t0 = t;
 
         // all from t0
-        bar.updaet(t, 50.1, 0, 0, 50.0, 4, 50.2, 3);
+        bar.update(t, 50.1, 0, 0, 50.0, 4, 50.2, 3);
         for (int i=0; i<3; ++i) {
             bar.update(++t, 50.1, 0, 1, 50.0, 4, 50.2, 2); // ask sz -1
             bar.update(++t, 50.1, 0, 0, 50.0, 5, 50.2, 2); // bid sz +1
@@ -201,7 +201,7 @@ TEST_F(BARFixture, Extended) {
             EXPECT_TRUE(double_eq(bar.avg_asz(t+1), (39.0+5.0)/9.0));
             EXPECT_TRUE(double_eq(bar.avg_spd(t+1), (1.7+0.4)/9.0));
 
-            bar.updaet(++t, 50.05, 7, 1, 49.9, 3, 50.2, 2); // ask +2
+            bar.update(++t, 50.05, 7, 1, 49.9, 3, 50.2, 2); // ask +2
             bar.update(++t, 50.05, 7, 0, 49.9, 1, 50.2, 2); // bid -2
             bar.update(++t, 50.0,  7, 1, 49.9, 1, 50.1, 1); // ask +1
             bar.update(++t, 50.05, 7, 1, 49.9, 1, 50.2, 2); // ask -1
@@ -215,7 +215,7 @@ TEST_F(BARFixture, Extended) {
             t = t0 + (i+1)*1000000;
             // get back tot he first quote before roll
             bar.update(t, 50.1, 0, 0, 50.0, 4, 50.2, 3); // bid+4,ask+1
-            auto line = bar.writeAndroll( t/1000000LL );
+            auto line = bar.writeAndRoll( t/1000000LL );
             md::BarPrice bar0(line);
 
             EXPECT_EQ(bar0.bvol, 2);
@@ -305,7 +305,7 @@ TEST_F (BRFixture, ReadBackwardForward) {
     EXPECT_DOUBLE_EQ(barHist[9]->close, px-0.1);
 }
 
-TEST_F (BARFixture, Tickdata) {
+TEST_F (BRFixture, Tickdata) {
     // case 1 the normal case
 
     const std::vector<std::string> quote0 = {
@@ -531,7 +531,7 @@ TEST_F (BARFixture, Tickdata) {
         std::vector<std::string> bars;
         EXPECT_TRUE(tp.parse(bars));
         EXPECT_EQ(bars.size(), 2);
-        EXPECT-EQ(bars[1], "1675281152, 4126.875, 4127.75, 4126.5, 4127.625, 809, 4127.5, 1675281151902000, -685, 14.1, 33.4, 0.690678, 45, -36, 13, -697");
+        EXPECT_EQ(bars[1], "1675281152, 4126.875, 4127.75, 4126.5, 4127.625, 809, 4127.5, 1675281151902000, -685, 14.1, 33.4, 0.690678, 45, -36, 13, -697");
 
 
 

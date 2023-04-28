@@ -1,4 +1,2 @@
-20221223-09:00:00, RiskMonitor, ALL, ALL, OFF
-20230110-09:14:23, default,  ,,ON
-20230110-09:14:23, default,  ,,OFF
-20230110-09:14:23, default,  TSC-7000-387,WTI,ON
+20221223-09:00:00, RiskMonitor, Pause, ALL, ALL, OFF
+20221223-09:00:00, RiskMonitor, Operator, ZFU

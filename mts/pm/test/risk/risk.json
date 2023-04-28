@@ -1,6 +1,6 @@
 {
     "System" : {
-        "path" :  "/home/mts/dev/src/pm/test/risk",
+        "path" :  "tests",
         "files" : {
             "volume_spread_csv": "vs_5_15_60m.csv",
             "cme_price_banding": "cme_banding.csv",
@@ -12,7 +12,7 @@
     },
 
     "Scale":  { 
-        "file" : "/home/mts/dev/src/pm/test/risk/STRATEGY_WEIGHTS.yaml",
+        "file" : "tests/STRATEGY_WEIGHTS.yaml",
         "map"  : {
             "INTRADAY_MTS_AR1_WTI":                 369,
             "INTRADAY_MTS_AR1_WTI_US":              370,

@@ -113,7 +113,7 @@ namespace pm {
             void operator+(const PositionInstructionStat& pis) {
                 avg_px = ((avg_px*cum_size)+(pis.avg_px*pis.cum_size))/(cum_size+pis.cum_size);
                 cum_size += pis.cum_size;
-                for (const auto f : pis.fills) {
+                for (const auto& f : pis.fills) {
                     fills.push_back(f);
                 }
             }

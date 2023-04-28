@@ -223,7 +223,7 @@ void CEngine::run() {
 
             time_t cur_utc0 = utils::TimeUtil::cur_utc();
             if (__builtin_expect(cur_utc0-cur_utc>read_pause_itvl_sec,0)) {
-                pm::risk::Monitor::get().status().load_pause();
+                pm::risk::Monitor::get().status().statusLoop();
                 cur_utc = cur_utc0;
             }
         }
@@ -1281,10 +1281,12 @@ std::string CEngine::sendOrder(const char* data) {
                 bSent = false; break;
             }
             const auto cur_utc (utils::TimeUtil::cur_utc());
-            if (__builtin_expect(!pm::risk::Monitor::get().checkLimitPrice(symbol, dPx, cur_utc),0)) {
-                AppLogError("RiskMonitor %s:%s failed at FeedHandler checkLimitPrice() for incoming new order %s, order not sent",
-                        algo.c_str(), symbol.c_str(), data);
-                bSent = false; break;
+            if (__builtin_expect(!pm::risk::Monitor::get().config().isManualStrategy(algo), 1)) {
+                if (__builtin_expect(!pm::risk::Monitor::get().checkLimitPrice(symbol, dPx, cur_utc),0)) {
+                    AppLogError("RiskMonitor %s:%s failed at FeedHandler checkLimitPrice() for incoming new order %s, order not sent",
+                            algo.c_str(), symbol.c_str(), data);
+                    bSent = false; break;
+                }
             }
 
             // check paper trading

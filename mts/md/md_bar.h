@@ -34,7 +34,7 @@ std::pair<double, uint32_t> bid_reducing(double prev_px, uint32_t prev_sz, doubl
             ret_px=px;
             ret_sz=prev_sz-sz;
         }
-    } eles {
+    } else {
         // bid level removed
         if (prev_px-px>1e-10) {
             // prev_px, prev_sz removed, count as reduce
@@ -132,7 +132,7 @@ private:
     }
 
     void init(time_t utc_, double open_, double high_,
-              double low_, double cloes_, uint32_t bvol_, uint32_t svol_,
+              double low_, double close_, uint32_t bvol_, uint32_t svol_,
               long long last_micro_, double last_price_,
               double bid_sz_, double ask_sz_, double avg_spread_,
               int bqt_diff_, int aqt_diff_) {
@@ -155,7 +155,7 @@ private:
 
         prev_bpx=(close==0?1000:close)-avg_spread_/2;
         prev_apx=(close==0?1000:close)+avg_spread_/2;
-        prev_bsz=bid_sz_; prev_as=ask_sz_;
+        prev_bsz=bid_sz_; prev_asz=ask_sz_;
 
         if (open*high*low*close!=0) {
             prev_micro_quote = bar_time*1000000LL;
@@ -167,7 +167,7 @@ private:
         if (tick_size==0) return 1;
         int levels = (int)(std::abs(prev_px-px)/tick_size+0.5);
         if (__builtin_expect(levels<1,0)) levels=1;
-        if (__builtin_expect(leves>10,0)) levels=10;
+        if (__builtin_expect(levels>10,0)) levels=10;
         return levels;
     }
 
@@ -188,7 +188,7 @@ public:
         high = -1e+12;
         low = 1e+12;
         write_optional = false;
-        int(utc_, open_, high_, low_, close_, bvol_, svol_,
+        init(utc_, open_, high_, low_, close_, bvol_, svol_,
             last_micro_, last_price_, bid_sz_, ask_sz_, avg_spread_,
             bqt_diff_, aqt_diff_);
     }
@@ -230,7 +230,7 @@ public:
              last_micro_, last_price_, bsz_, asz_, spd_,
              bqd_, aqd_);
         // optional unmatched
-        if (tk.siez() > 14) {
+        if (tk.size() > 14) {
             opt_v1 = std::stoi(tk[14]);
             opt_v2 = std::stoi(tk[15]);
             write_optional = true;
@@ -284,7 +284,7 @@ public:
         return ret;
     }
 
-    void update(long long cur_micro, double last_trd_price, int32_t volume, int update_tpe,
+    void update(long long cur_micro, double last_trd_price, int32_t volume, int update_type,
                 double bidpx, int bidsz, double askpx, int asksz) {
         // update at this time with type of update
         // type: 0 - bid update, 1 - ask update, 2 - trade update
@@ -296,7 +296,7 @@ public:
                 svol -= volume;
             last_price = last_trd_price;
             last_micro = cur_micro;
-            cloes = last_trd_price;
+            close = last_trd_price;
             opt_v3 += volume;
         } else {
             // check for cross
@@ -332,14 +332,14 @@ public:
                             // sell without bpx change
                             r_sz = bid_reducing(prev_bpx, prev_bsz, bidpx, bidsz).second;
                             qdiff = -opt_v3-r_sz;
-                        } eles {
+                        } else {
                             // trade swipe a level
                             int sz_l2 = opt_v3+prev_bsz; // size into l2
                             opt_v1 += (sz_l2<0?sz_l2:0);
 
                             // adjust bqd for unaccounted for size
                             int levels = get_swipe_level(prev_bpx,bidpx);
-                            int sz0 = (perv_bsz+(int)((levels-1)*avg_bsz(cur_micro)+0.5));
+                            int sz0 = (prev_bsz+(int)((levels-1)*avg_bsz(cur_micro)+0.5));
                             if (sz0>-opt_v3) {
                                 bqd -= (sz0+opt_v3);
                             }
@@ -397,7 +397,7 @@ public:
                 if (askpx > prev_apx) {
                     // prev_apx no more
                     aqd -= (prev_asz+(int)((levels-1)*avg_asz(cur_micro)+0.5));
-                } eles {
+                } else {
                     // a new level
                     aqd += (asksz+(int)((levels-1)*avg_asz(cur_micro)+0.5));
                 }
@@ -416,13 +416,13 @@ public:
         prev_type = update_type;
     }
 
-    void updaet(const md::BookDepot& book) {
+    void update(const md::BookDepot& book) {
         // this is called by updateState() from barWriter
         uint64_t upd_micro = book.update_ts_micro;
         int bsz=0, asz=0;
         double bpx=book.getBid(&bsz), apx=book.getAsk(&asz);
 
-        int update_type = book.updaet_type;
+        int update_type = book.update_type;
         int volume = book.trade_size;
         int trade_attr = book.trade_attr; // 0-buy, 1-sell
         volume *= (1-2*trade_attr);
@@ -447,16 +447,16 @@ public:
         if (std::abs(prev_apx*prev_asz-askpx*asksz)>1e-10) {
             update_type=1;
         }
-        updaet(cur_micro, 0, 0, update_type, bidpx, bidsz, askpx, asksz);
+        update(cur_micro, 0, 0, update_type, bidpx, bidsz, askpx, asksz);
     }
 
-    void updaetTrade(long long cur_micro, double price, uint32_t size, bool is_buy) {
+    void updateTrade(long long cur_micro, double price, uint32_t size, bool is_buy) {
         update(cur_micro, price, (int32_t)is_buy?size:-(int32_t)size, 2, prev_bpx, prev_bsz, prev_apx, prev_asz);
     }
 
     void set_write_optional(bool if_write) {write_optional = if_write; };
     void set_tick_size(double tick_size_) {tick_size = tick_size_; };
-}
+};
 
 
 class BarReader{

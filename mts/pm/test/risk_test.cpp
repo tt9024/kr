@@ -108,7 +108,7 @@ public:
 
         "    }\n"
         "}"),
-    _risk_fn("/home/mts/dev/src/pm/test/risk/risk.json"),
+    _risk_fn("tests/risk.json"),
     _sym_fn("/tmp/risk_test_sym.cfg"),
     _main_cfg_fn("/tmp/main.cfg")
     {
@@ -207,9 +207,19 @@ TEST_F (RiskFixture, status_test) {
     auto cfg (std::make_shared<pm::risk::Config>(std::string(_risk_fn)));
     auto ts_csv (cfg->m_status_file);
     FILE* fp = fopen(ts_csv.c_str(), "w");
-    fprintf(fp, "20221223-09:00:00, RiskMonitor, ALL, ALL, OFF\n");
+    fprintf(fp, "20221223-09:00:00, RiskMonitor, Pause, ALL, ALL, OFF\n");
     fclose(fp);
 
+    try {
+        // should throw since no operator id is set
+        auto st = pm::risk::Status(cfg);
+        EXPECT_TRUE(false);
+    } catch (const std::exception& e){
+    }
+
+    fp=fopen(ts_csv.c_str(), "at");
+    fprintf(fp, "20221223-09:00:00, RiskMonitor, Operator, OP1\n");
+    fclose(fp);
     auto st = pm::risk::Status(cfg);
     const std::string mkt("WTI");
     const std::string strat ("TSC-7000-387");
@@ -218,16 +228,20 @@ TEST_F (RiskFixture, status_test) {
     // trading_status.csv has initial content of 
     //      20221223-09:00:00, RiskMonitor, ALL, ALL, OFF 
     EXPECT_FALSE(st.getPause(strat, mkt));
+    EXPECT_EQ(st.get_operator_id(), std::string("OP1"));
     //printf("queryPause: %s\n", st.queryPause("", "").c_str());
 
     st.setPause("", "", true);
     st.persist_pause(fm, "Z ,,ON");
+    st.set_operator_id(fm, "OP2");
     EXPECT_TRUE(st.getPause(strat, mkt));
+    EXPECT_EQ(st.get_operator_id(), std::string("OP2"));
     //printf("queryPause: %s\n", st.queryPause("", "").c_str());
 
     {
         auto st2 = pm::risk::Status(cfg);
         EXPECT_TRUE(st.getPause(strat, mkt));
+        EXPECT_EQ(st.get_operator_id(), std::string("OP2"));
     }
     st.setPause("", "", false);
     st.persist_pause(fm, "Z ,,OFF");
@@ -252,6 +266,7 @@ TEST_F (RiskFixture, status_test) {
     {
         auto st2 = pm::risk::Status(cfg);
         EXPECT_TRUE(st.getPause(strat, mkt));
+        EXPECT_EQ(st.get_operator_id(), std::string("OP2"));
     }
 }
 
@@ -508,7 +523,7 @@ TEST_F(RiskFixture, monitor_test) {
     double algo_pnl_, mkt_pnl_;
 
     // simple order update without PM
-    time_t cur_utc = utils::TimeUtil::cur_utc();
+    time_t cur_utc = utils::TimeUtil::cur_utc() + 5*60 + 1 + 24*3600;
     // make sure it's at 6:05 pm
     
     mon.status().setPause("", "", false);

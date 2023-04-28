@@ -594,7 +594,7 @@ namespace pm {
             double vwap = 0;
             idp0.getPosition(&vwap, nullptr);
             //ret += ("***Total qty: " + std::to_string(qty) + " avg_px: " + PriceString(vwap) + " pnl: " +  PnlString(pnl_mtm) + " ( realized: " + PnlString(pnl)+" )");
-            ret += ("***\nPnL: " +  PnlString(pnl_mtm) + " ( realized: " + PnlString(pnl)+" )");
+            ret += ("***\nPnL: " +  PnlStringColor(pnl_mtm) + " ( realized: " + PnlStringColor(pnl)+" )");
         }
 
         std::string retoo;

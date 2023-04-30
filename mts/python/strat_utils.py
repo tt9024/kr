@@ -381,9 +381,9 @@ def pnl_from_p0(p00, p0, lpx, tcost, fee = 2.0, contract_size=1000, lr0=0) :
 ##################
 # MTS Floor Util #
 ##################
-def set_target_position(strat, symbol, qty, logger, twap_minutes = 15):
+def set_target_position(strat, symbol, qty, logger, twap_minutes = 15, trader_type='T'):
     # set position for symbol with target position to be qty
-    run_str = ['/home/mts/run/bin/flr',  'X',  strat + ', ' + symbol + ', ' + str(qty) + ', Y%dm'%(twap_minutes)]
+    run_str = ['/home/mts/run/bin/flr',  'X',  strat + ', ' + symbol + ', ' + str(qty) + ', %s%dm'%(trader_type,twap_minutes)]
     try :
         ret = subprocess.check_output(run_str)
     except subprocess.CalledProcessError as e:
@@ -407,7 +407,7 @@ def get_mts_position(strat, symbol, logger=None, verbose=False):
                     logger.logInfo('position not found for strategy %s, symbol %s'%(strat, symbol_str))
         if len(pos) > 1:
             if logger is not None:
-                logger.logInfo('%d positions found for strategy %s, symbol %s: %s'%(len(pos), strat, symbol_str), str(pos))
+                logger.logInfo('%d positions found for strategy %s, symbol %s: %s'%(len(pos), strat, symbol_str, str(pos)))
         return np.sum(pos)
     except subprocess.CalledProcessError as e:
         if logger is not None:

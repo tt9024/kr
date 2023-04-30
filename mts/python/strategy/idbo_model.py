@@ -103,7 +103,9 @@ def load_sod(cur_trd_day, model_name, backtest_path, persist_path, persist_fn, s
         print('catching up from %s to %s'%(days[1], days[-1]))
         # in case we missed a day, then run_live() with live_sod, which writes backoffice, update parameters
         # run market data with stop loss state updated
-        idbo_ens.sim_live(idbo_obj, days[1], days[-1], write_backoffice=True, run_live_sod=True, lastday_sod=False, persist_sod=True)
+        if len(days)>2:
+            idbo_ens.sim_live(idbo_obj, days[1], days[-2], write_backoffice=True, run_live_sod=True, lastday_sod=False, persist_sod=False)
+        idbo_ens.sim_live(idbo_obj, days[-1], days[-1], write_backoffice=True, run_live_sod=True, lastday_sod=False, persist_sod=True)
 
     # At this point, idbo_obj has stop loss states updated at the end of previous trading day. 
     # idbo_obj.run_live() assumes that idbo_obj has end of day state but the parameters are not updated.

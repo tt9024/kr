@@ -256,7 +256,7 @@ class IDBO_Data() :
             ['DJIA',1615,700,1615,300,1615,      1,      5,USDR],
             ['FTSE',1130,700,1200,300,1200,      0.5,    10, GBPR],
             ['DAX',1130,700,1200,200,1200,       1.0,    25, EURR],
-            ['CAC',1130,700,1200,300,1200,       0.5,    10, EURR],
+            #['CAC',1130,700,1200,300,1200,       0.5,    10, EURR],
             ########['IBEX35',1130,700,1200,200,1200,    1,      1],
             ['EuroStoxx',1130,700,1200,200,1200, 0.1,    50, EURR],
             ['TY',1500,700,1600,300,1600,        0.015625,1000,USDR],
@@ -304,7 +304,7 @@ class IDBO_Data() :
                 if len(md_dict_in) > 0:
                     # only initialize symbols in md_dict_in, if given
                     continue
-                bars = repo_td.get_bars(sym, start_day, end_day, cols=self.cols, ignore_prev = True, barsec=self.barsec, is_mts_symbol=True)
+                bars = repo_td.get_bars(sym, start_day, end_day, cols=self.cols, barsec=self.barsec, is_mts_symbol=True)
             ind = DailyInd(bars, self.cols, bar_hour_dict, barsec=self.barsec)
             self.mkt[mkt] = {'signal':IDBO_Signal(ind), 'trd_open':trd_open, 'trd_close': trd_close, 'tick_size':tick_size, 'contract_size':contract_size, 'fx':fx}
 
@@ -357,7 +357,7 @@ class IDBO_Data() :
                 if len(md_dict_in.keys()) > 0:
                     continue
                 try :
-                    bars = repo_live.get_bars(sym, day, day, cols=self.cols, ignore_prev = True, barsec=self.barsec, is_mts_sybmol=True)
+                    bars = repo_live.get_bars(sym, day, day, cols=self.cols, barsec=self.barsec, is_mts_sybmol=True)
                 except :
                     # if no data updated, the gen would still generate the same parameter
                     print('problem getting data for %s on %s, continue'%(sym, day))
@@ -435,7 +435,7 @@ class IDBO_Data() :
         for mkt in mkt_list:
             try :
                 sym = mkt+self.contract
-                md_dict[sym] = repo_td.get_bars(sym, start_day, end_day, cols=self.cols, ignore_prev = True, barsec=self.barsec, is_mts_symbol=True)
+                md_dict[sym] = repo_td.get_bars(sym, start_day, end_day, cols=self.cols, barsec=self.barsec, is_mts_symbol=True)
             except KeyboardInterrupt as e:
                 return
             except :
@@ -1001,7 +1001,10 @@ class IDBO_Live :
                     # take close as lpx
                     bars = strat_utils.get_bar_cols(bfile, barcnt, cols=[0,1,2,3,6])
                     if bars is None:
-                        print('failed to get bar for %s'%(mkt))
+                        print('failed to get bar for %s (%s), wanted %d bars'%(mkt, bfile, barcnt))
+                        continue
+                    elif len(bars[:,0]) != barcnt and bars[-1,0]<last_utc+barsec*barcnt:
+                        self.logger.logError('bar file (%s) have less than %d bars! Market %s not processed!'%(bfile, barcnt, mkt))
                         continue
                     cur_utc0 = last_utc  #last_utc initialized as 18:00, same as utc0
 
@@ -1091,7 +1094,7 @@ class IDBO_Live :
             barsec = self.data.barsec
             cols = ['utc', 'open','high','low','lpx']
             try :
-                bar = repo_live.get_bars(symbol, prev_trade_day, prev_trade_day, barsec=barsec, get_roll_adj=False, cols = cols, is_mts_symbol=True, remove_zero=True, get_holiday=False)
+                bar = repo_live.get_bars(symbol, prev_trade_day, prev_trade_day, barsec=barsec, get_roll_adj=False, cols = cols, is_mts_symbol=True, get_holiday=False)
                 md_dict[symbol] = bar
             except:
                 print('%s sod not performed, no data on %s'%(symbol, prev_trade_day))
@@ -1170,8 +1173,8 @@ class IDBO_Live :
                     if lastday_sod or lastday_symbol[symbol] != day:
                         n0,nc0 = daily_bar.shape
                         md_dict_day[symbol] = daily_bar.reshape((1,n0,nc0)).copy() #save for sod()
-                    else:
-                        print('%s sod will not run on last day %s'%(symbol, day))
+                    #else:
+                    #    print('%s sod will not run on last day %s'%(symbol, day))
 
                     mkt0 = symbol.split('_')[0]
                     self.sim_day_mkt(mkt0,daily_bar)
@@ -1587,7 +1590,7 @@ def get_md_bar_days(symbol, start_day, end_day, barsec=300):
     """
     #repo_live = mts_repo.MTS_REPO_Live()
     repo_live = mts_repo.MTS_REPO_TickData()
-    bars, roll = repo_live.get_bars(symbol, start_day, end_day, barsec=barsec, cols=['utc','open','high','low','close','lpx'], get_roll_adj=True, is_mts_symbol=True, remove_zero=True)
+    bars, roll = repo_live.get_bars(symbol, start_day, end_day, barsec=barsec, cols=['utc','open','high','low','close','lpx'], get_roll_adj=True, is_mts_symbol=True)
     bar0 = bars.copy()
     bara = mts_repo.MTS_REPO.roll_adj(bars, 0, [1,2,3,4,5], roll)
     ndays, n, nc = bara.shape
@@ -1858,7 +1861,7 @@ def sim_live(idbo, sday, eday, write_backoffice=True, symbol_list = None, run_li
         for mkt in idbo.state.keys():
             symbol_list.append(mkt+idbo.data.contract)
 
-    repo_live = mts_repo.MTS_REPO_TickData()
+    repo_live = mts_repo.MTS_REPO_Live()  # could be mts_repo.MTS_REPO_TickData()
     tdi = mts_util.TradingDayIterator(sday)
     day=tdi.begin()
     barsec = idbo.data.barsec
@@ -1869,7 +1872,7 @@ def sim_live(idbo, sday, eday, write_backoffice=True, symbol_list = None, run_li
         for symbol in symbol_list:
             try :
                 print('getting %s'%(symbol))
-                bars = repo_live.get_bars(symbol, day, day, barsec=barsec, cols=['utc','open','high','low','lpx'], get_roll_adj=False, is_mts_symbol=True, remove_zero=True)
+                bars = repo_live.get_bars(symbol, day, day, barsec=barsec, cols=['utc','open','high','low','lpx'], get_roll_adj=False, is_mts_symbol=True)
                 md_dict[symbol] = bars
             except:
                 traceback.print_exc()
